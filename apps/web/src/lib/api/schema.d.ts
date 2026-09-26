@@ -616,6 +616,8 @@ export interface components {
     schemas: {
         CatalogItem: {
             slug: string;
+            /** @description False until the item's template exists in the geometry service; the Shop shows a 'Coming soon' ribbon and POST /api/designs answers 422 template_not_available. */
+            available: boolean;
             name: string;
             /** @enum {string} */
             category: "home_decor" | "nameplates" | "kitchen" | "desk_tech" | "gifting";

@@ -199,9 +199,10 @@ components:
   schemas:
     CatalogItem:
       type: object
-      required: [slug, name, category, template_id, default_params, default_material, base_price_paise, specs_line]
+      required: [slug, name, category, template_id, default_params, default_material, base_price_paise, specs_line, available]
       properties:
         slug: { type: string }
+        available: { type: boolean, description: "False until the item's template exists in the geometry service; the Shop shows a 'Coming soon' ribbon and POST /api/designs answers 422 template_not_available." }
         name: { type: string }
         category: { type: string, enum: [home_decor, nameplates, kitchen, desk_tech, gifting] }
         description: { type: string }
