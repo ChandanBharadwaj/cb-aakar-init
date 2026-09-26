@@ -67,6 +67,7 @@ export function useJobStream(jobId: string | undefined, handlers: JobStreamHandl
     };
 
     es.addEventListener("stage", (raw) => {
+      if (done) return;
       let ev: JobStageEvent;
       try {
         ev = JSON.parse((raw as MessageEvent<string>).data) as JobStageEvent;

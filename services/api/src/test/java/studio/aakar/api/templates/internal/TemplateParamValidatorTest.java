@@ -92,6 +92,6 @@ class TemplateParamValidatorTest {
         assertThatCode(() -> validator.validate(withEnum, Map.of("tray", false, "finish", "fluted"))).doesNotThrowAnyException();
         assertThatThrownBy(() -> validator.validate(withEnum, Map.of("tray", "yes", "finish", "glossy")))
                 .isInstanceOfSatisfying(ApiProblemException.class,
-                        e -> assertThat((List<?>) e.properties().get("params")).containsExactlyInAnyOrder("tray", "finish"));
+                        e -> assertThat(e.properties().get("params")).asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST).containsExactlyInAnyOrder("tray", "finish"));
     }
 }

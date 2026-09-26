@@ -1,5 +1,6 @@
 package studio.aakar.api.shared;
 
+import java.net.http.HttpClient;
 import java.time.Duration;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
 import org.springframework.boot.http.client.ClientHttpRequestFactorySettings;
@@ -28,7 +29,9 @@ public class RestClients {
     }
 
     public RestClient json(String baseUrl, Duration connectTimeout, Duration readTimeout) {
+        // HTTP/1.1 only: the geometry service (uvicorn) speaks 1.1 and h2c upgrades confuse some stubs/proxies.
         ClientHttpRequestFactory factory = ClientHttpRequestFactoryBuilder.jdk()
+                .withHttpClientCustomizer(http -> http.version(HttpClient.Version.HTTP_1_1))
                 .build(ClientHttpRequestFactorySettings.defaults()
                         .withConnectTimeout(connectTimeout)
                         .withReadTimeout(readTimeout));

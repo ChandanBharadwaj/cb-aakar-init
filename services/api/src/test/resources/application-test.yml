@@ -5,8 +5,8 @@ spring:
     username: ${AAKAR_TEST_DB_USER:${AAKAR_DB_USER:aakar}}
     password: ${AAKAR_TEST_DB_PASSWORD:${AAKAR_DB_PASSWORD:aakar}}
   flyway:
+    # clean-on-validation-error was removed in Flyway 11 (Teams only); TestFlywayConfig cleans then migrates instead.
     clean-disabled: false
-    clean-on-validation-error: true
 aakar:
   api:
     public-url: http://localhost:8080
