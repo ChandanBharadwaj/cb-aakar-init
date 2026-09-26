@@ -178,7 +178,7 @@ class DesignFlowIntegrationTest extends AbstractIntegrationTest {
         HttpResponse<String> stream = sse(jobId, null);
         assertThat(stream.statusCode()).isEqualTo(200);
         assertThat(stream.headers().firstValue("Content-Type").orElse("")).startsWith(MediaType.TEXT_EVENT_STREAM_VALUE);
-        assertThat(stream.body()).contains("event: stage");
+        assertThat(stream.body()).containsPattern("event:\\s*stage");
         assertThat(sseIds(stream.body())).containsExactly(1, 2, 3);
         List<JsonNode> events = sseEvents(stream.body());
         assertThat(events).extracting(n -> n.get("stage").asText()).containsExactly("queued", "pricing", "ready");
