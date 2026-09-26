@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { ContactShadows, OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
@@ -8,12 +8,27 @@ import type { MaterialPbr } from "@/lib/api/types";
 import { physicalMaterialFrom } from "@/lib/viewer/materials";
 import { environmentBackground, presetFor } from "@/lib/viewer/environments";
 import { ErrorBoundary } from "./ErrorBoundary";
-import { Model } from "./Model";
+import { Model, type ModelFrame } from "./Model";
 import { PlaceholderForm } from "./PlaceholderForm";
 import { StageEnvironment } from "./StageEnvironment";
 
+// Defaults for the stand-in form (a ~1 unit tall object on the floor). Once a real model reports its
+// bounding sphere, CameraRig re-frames from it: same viewing direction, distance from the sphere.
 const CAMERA_POS: [number, number, number] = [1.35, 0.95, 1.85];
 const TARGET: [number, number, number] = [0, 0.42, 0];
+const VIEW_DIR = new THREE.Vector3(...CAMERA_POS).sub(new THREE.Vector3(...TARGET)).normalize();
+const FRAME_MARGIN = 1.18;
+
+function framedCamera(frame: ModelFrame, fovDeg: number, aspect: number) {
+  // Distance at which the bounding sphere fits the narrower of the two view angles, plus margin.
+  const vFov = THREE.MathUtils.degToRad(fovDeg);
+  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
+  const fov = Math.min(vFov, hFov);
+  const distance = (frame.radius / Math.sin(fov / 2)) * FRAME_MARGIN;
+  const target = new THREE.Vector3(...frame.center);
+  const position = target.clone().addScaledVector(VIEW_DIR, distance);
+  return { target, position, distance };
+}
 
 export interface DesignViewerProps {
   /** Preview GLB URL from `latest_version.assets.glb.url`; none renders the stand-in form. */
@@ -27,15 +42,23 @@ export interface DesignViewerProps {
   className?: string;
 }
 
-function CameraRig({ resetKey }: { resetKey: number }) {
+function CameraRig({ resetKey, frame }: { resetKey: number; frame: ModelFrame | null }) {
   const controls = useRef<ComponentRef<typeof OrbitControls>>(null);
   const camera = useThree((s) => s.camera);
+  const aspect = useThree((s) => s.viewport.aspect);
+  const framed = useMemo(() => {
+    const fov = camera instanceof THREE.PerspectiveCamera ? camera.fov : 34;
+    return frame ? framedCamera(frame, fov, aspect) : null;
+  }, [frame, camera, aspect]);
+  // Re-frame whenever a model reports its size, and on double-click reset.
   useEffect(() => {
-    if (resetKey === 0) return;
-    camera.position.set(...CAMERA_POS);
-    controls.current?.target.set(...TARGET);
+    const target = framed ? framed.target : new THREE.Vector3(...TARGET);
+    const position = framed ? framed.position : new THREE.Vector3(...CAMERA_POS);
+    camera.position.copy(position);
+    controls.current?.target.copy(target);
     controls.current?.update();
-  }, [resetKey, camera]);
+  }, [resetKey, framed, camera]);
+  const distance = framed?.distance ?? 2.35;
   return (
     <OrbitControls
       ref={controls}
@@ -44,8 +67,8 @@ function CameraRig({ resetKey }: { resetKey: number }) {
       enablePan={false}
       enableDamping
       dampingFactor={0.08}
-      minDistance={0.9}
-      maxDistance={4.5}
+      minDistance={distance * 0.4}
+      maxDistance={distance * 2.4}
       minPolarAngle={0.25}
       maxPolarAngle={Math.PI / 2 + 0.04}
       rotateSpeed={0.7}
@@ -56,6 +79,14 @@ function CameraRig({ resetKey }: { resetKey: number }) {
 
 export function DesignViewer({ glbUrl, pbr, environment, dimmed, onModelError, className }: DesignViewerProps) {
   const [resetKey, setResetKey] = useState(0);
+  const [frame, setFrame] = useState<ModelFrame | null>(null);
+  const onFramed = useCallback((next: ModelFrame) => {
+    setFrame((prev) =>
+      prev && Math.abs(prev.radius - next.radius) < 1e-4 && prev.center.every((c, i) => Math.abs(c - (next.center[i] ?? 0)) < 1e-4)
+        ? prev
+        : next,
+    );
+  }, []);
   const material = useMemo(() => physicalMaterialFrom(pbr), [pbr]);
   useEffect(() => () => material.dispose(), [material]);
 
@@ -85,7 +116,7 @@ export function DesignViewer({ glbUrl, pbr, environment, dimmed, onModelError, c
           {glbUrl ? (
             <ErrorBoundary fallback={<PlaceholderForm material={material} />} onError={onModelError} resetKey={glbUrl}>
               <Suspense fallback={<PlaceholderForm material={material} ghost />}>
-                <Model url={glbUrl} material={material} />
+                <Model url={glbUrl} material={material} onFramed={onFramed} />
               </Suspense>
             </ErrorBoundary>
           ) : (
@@ -93,7 +124,7 @@ export function DesignViewer({ glbUrl, pbr, environment, dimmed, onModelError, c
           )}
         </group>
         <ContactShadows position={[0, -0.001, 0]} opacity={0.55} scale={3.2} blur={2.6} far={1.4} resolution={512} color="#0E1220" frames={60} />
-        <CameraRig resetKey={resetKey} />
+        <CameraRig resetKey={resetKey} frame={glbUrl ? frame : null} />
       </Canvas>
     </div>
   );

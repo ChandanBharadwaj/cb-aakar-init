@@ -84,6 +84,7 @@ exported) → assemble and validate the `design.completed` payload. Failures ret
 | `AAKAR_STORAGE` | `local` | `local` or `s3` |
 | `AAKAR_ASSET_DIR` | `./.aakar-assets` | Local asset root |
 | `AAKAR_PUBLIC_URL` | `http://localhost:8081` | URL base for local assets |
+| `AAKAR_CORS_ORIGINS` | `http://localhost:3000` | Comma-separated browser origins allowed to fetch `/assets` (local storage only) |
 | `AAKAR_S3_BUCKET`, `AAKAR_S3_ENDPOINT`, `AAKAR_S3_PUBLIC_URL`, `AWS_*` | — | S3 / MinIO |
 | `AAKAR_INSPECT_URL` | unset (in-process) | Remote inspect service, e.g. `http://inspect:8082` |
 | `AAKAR_AMQP_URL` | `amqp://aakar:aakar@localhost:5672/` | RabbitMQ for the worker |

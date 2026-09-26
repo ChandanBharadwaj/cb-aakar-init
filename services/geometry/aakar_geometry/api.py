@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
+import os
 import mimetypes
 from typing import Any
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
 from .exports import CONTENT_TYPES
@@ -18,6 +20,16 @@ from .errors import UnknownTemplate
 log = logging.getLogger("aakar.geometry.api")
 
 app = FastAPI(title="Aakar Geometry Service", version="1.0.0-phase0")
+
+# Browsers load GLBs straight from /assets when AAKAR_STORAGE=local, so the storefront origin
+# must be allowed. Comma-separated AAKAR_CORS_ORIGINS overrides the localhost default.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in os.environ.get("AAKAR_CORS_ORIGINS", "http://localhost:3000").split(",") if o.strip()],
+    allow_methods=["GET", "HEAD", "OPTIONS"],
+    allow_headers=["*"],
+    max_age=3600,
+)
 
 
 @app.get("/healthz")

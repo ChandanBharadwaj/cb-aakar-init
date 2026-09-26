@@ -690,6 +690,28 @@ Decisions needed from the product owner before Phase 0 ends. Recommendations are
 
 ---
 
+## Implementation status
+
+| Phase | State | Evidence |
+|---|---|---|
+| **0 — Foundations** | **Done** (this branch) | Monorepo, contracts, tokens, Compose stack, CI, ADRs; the Jharokha phone stand runs end to end: `make slice` builds it in ~3.5 s, the API generates, prices and edits it through the real geometry service, and the storefront viewer renders it with six finishes. Tests: inspect 21, geometry 57, API 32; web typecheck, lint and build clean. |
+| 1 — Shop + Remix-lite MVP | Not started | Needs the remaining eleven templates, text embossing, identity, cart, Razorpay, orders, fulfilment, farm agent. |
+| 2 — Create + Co-Designer | Not started | Needs `services/designer` (Claude agent), style variants, upsells, time-lapse, motifs, AR handoff. |
+| 3 — Freeform and immersive | Not started | |
+| 4 — Scale | Not started | |
+
+### What Phase 0 stubs or approximates (all documented in the service READMEs)
+
+- **Print time and filament** come from a heuristic estimator in `services/inspect`; the PrusaSlicer CLI backend is wired and tested against a canned G-code footer but no slicer is installed. Prices are therefore indicative until a slicer runs.
+- **Pricing rates** are placeholders derived from the checkout board (`packages/design-tokens/materials.json`); see ADR-0008.
+- **Overhang and load checks** report `skipped` by design (Phase 2 and 3).
+- **Only one Shop item is buildable**; the other five SKUs are seeded with `available=false` and show "Coming soon".
+- **Cart, checkout, orders, identity** are placeholder pages; **Create from a prompt** answers 422 `not_yet_available` until the agent lands.
+- **RabbitMQ path** is implemented and unit-tested on both sides but was exercised only through the direct HTTP profile here (no broker in the build container); the Compose stack runs the `rabbit` profile.
+- **Docker images** are defined but were not built in this environment (no Docker daemon).
+
+---
+
 ## 18. Repository layout and immediate next steps
 
 ### 18.1 Proposed layout
@@ -712,11 +734,12 @@ aakar/
 
 ### 18.2 Next two weeks
 
-1. Record the decisions in §17 as short ADRs in `docs/adr/`.
-2. Scaffold the monorepo and local docker compose stack.
-3. Unzip the design export into `design/` and remove the zip from git history going forward.
-4. Generate `packages/design-tokens` from §1.2.
-5. Build the Jharokha phone stand template end to end (build123d → GLB → viewer → slicer → price).
+1. ~~Record the decisions in §17 as short ADRs in `docs/adr/`.~~ Done as Proposed; the owner accepts or amends them.
+2. ~~Scaffold the monorepo and local docker compose stack.~~ Done.
+3. ~~Unzip the design export into `design/` and remove the zip.~~ Done.
+4. ~~Generate `packages/design-tokens` from §1.2.~~ Done.
+5. ~~Build the Jharokha phone stand template end to end.~~ Done; install PrusaSlicer on the dev box and set `AAKAR_SLICER_BIN` to replace the heuristic estimate.
 6. Open Razorpay and Delhivery sandbox accounts; confirm WhatsApp business verification lead time.
 7. Photograph the six launch finishes on a real print for material calibration.
 8. Draft the first 50 prompts of the eval set with a Hinglish and Telugu speaker.
+9. Print the Jharokha stand from `out/slice/model.3mf` on a real printer and compare against the preview: the first fidelity data point.

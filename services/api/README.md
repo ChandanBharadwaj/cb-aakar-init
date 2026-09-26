@@ -55,8 +55,10 @@ service is stubbed with WireMock (`support/GeometryStub`): one `jharokha_phone_s
 | `direct` (default) | `POST {aakar.geometry.url}/v1/build` on a dedicated executor; geometry posts progress to `POST {aakar.api.public-url}/internal/jobs/{jobId}/callback`; the synchronous 200/422/500 body is applied as `design.completed` / `design.failed`. Rabbit auto-configuration is excluded. | Local dev, the vertical slice, tests |
 | `rabbit` | Publishes the envelope to topic exchange `aakar.design` (routing key `design.generate`) and consumes `design.progress` / `design.completed` / `design.failed` from the durable queue `api.design.results`. Exchange, queue and bindings are declared on start. | `infra/docker-compose.yml`, production |
 
-`SPRING_PROFILES_ACTIVE=rabbit ./gradlew bootRun` switches. Result handling is shared and idempotent: a
-job row lock serialises deliveries, envelopes are de-duplicated on `event_id`, terminal jobs ignore late messages.
+`SPRING_PROFILES_ACTIVE=rabbit ./gradlew bootRun` switches. Exactly one of the two must be active (`direct` is the
+default when no profile is set; add it explicitly alongside other profiles, e.g. `direct,dev`) — without a dispatcher the
+application refuses to start. Result handling is shared and idempotent: a job row lock serialises deliveries, envelopes
+are de-duplicated on `event_id`, terminal jobs ignore late messages.
 
 ## Environment variables
 

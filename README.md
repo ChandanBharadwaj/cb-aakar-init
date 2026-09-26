@@ -50,6 +50,14 @@ make web          # :3000 → open /shop, click "Modify with AI" on the Jharokha
 
 Full instructions, without Docker too, in the [runbook](docs/runbook-local.md).
 
+| Home | Shop | The viewer |
+|---|---|---|
+| ![Home](docs/images/home.png) | ![Shop](docs/images/shop.png) | ![Viewer](docs/images/viewer.png) |
+
+The first template, straight out of `services/geometry`:
+
+![Jharokha phone stand preview](docs/images/jharokha-preview.png)
+
 ## Principles (from the plan)
 
 1. **Printable by construction.** Geometry comes from constrained parametric templates; every version passes a printability check before it can be priced.

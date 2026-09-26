@@ -246,9 +246,9 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
         </StageNav>
       }
     >
-      <div className="grid flex-1 grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)_312px]">
+      <div className="grid flex-1 grid-cols-1 lg:flex-none lg:h-[calc(100dvh-64px)] lg:min-h-0 lg:grid-cols-[280px_minmax(0,1fr)_312px] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden">
         {/* Left: title, karigar's note, params */}
-        <aside className="ak-panel order-3 grid content-start gap-5 border-t border-surface-border p-5 lg:order-1 lg:border-r lg:border-t-0">
+        <aside className="ak-panel order-3 grid content-start gap-5 border-t border-surface-border p-5 lg:order-1 lg:min-h-0 lg:overflow-y-auto lg:border-r lg:border-t-0">
           <div className="grid gap-1.5">
             <div className="ak-eyebrow">{design.source === "shop" ? "From the Shop" : design.source === "remix" ? "Remix" : "Create"}</div>
             <h1 className="font-display text-3xl font-semibold leading-tight">{design.title}</h1>
@@ -296,7 +296,7 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
         </aside>
 
         {/* Centre: the stage */}
-        <section className="relative order-1 min-h-[56dvh] lg:order-2 lg:min-h-[calc(100dvh-64px)]" aria-label="3D viewer">
+        <section className="relative order-1 min-h-[56dvh] lg:order-2 lg:h-full lg:min-h-0" aria-label="3D viewer">
           <div className="absolute inset-0">
             <DesignViewer
               glbUrl={model}
@@ -367,7 +367,7 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
         </section>
 
         {/* Right: finishes, stats, stability, price */}
-        <aside className="ak-panel order-2 grid content-start gap-4 border-t border-surface-border p-5 lg:order-3 lg:border-l lg:border-t-0">
+        <aside className="ak-panel order-2 grid content-start gap-4 border-t border-surface-border p-5 lg:order-3 lg:min-h-0 lg:overflow-y-auto lg:border-l lg:border-t-0">
           <FinishChips materials={store.materials} value={material?.id} onChange={(id) => useDesignStore.getState().selectMaterial(id)} allowed={template?.materials} disabled={sculpting} />
 
           <div className="ak-well grid gap-1.5 p-3.5">

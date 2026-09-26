@@ -196,6 +196,17 @@ class DesignFlowIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void openApiDocumentUsesTheContractsNaming() {
+        JsonNode docs = body(get("/v3/api-docs"));
+        assertThat(docs.get("info").get("title").asText()).isEqualTo("Aakar API");
+        assertThat(docs.get("paths").fieldNames()).toIterable().contains("/api/designs", "/api/jobs/{jobId}/events",
+                "/api/versions/{versionId}/price", "/internal/jobs/{jobId}/callback");
+        JsonNode request = docs.get("components").get("schemas").get("CreateDesignRequest").get("properties");
+        assertThat(request.fieldNames()).toIterable().contains("source", "catalog_item_slug", "template_id", "params", "material", "prompt", "title");
+        assertThat(get("/swagger-ui/index.html").getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
     void createFromPromptIsNotYetAvailable() {
         ResponseEntity<String> response = post("/api/designs", """
                 {"source": "create", "prompt": "a lotus lamp for my balcony"}
