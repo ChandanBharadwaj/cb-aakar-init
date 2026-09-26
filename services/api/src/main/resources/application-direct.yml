@@ -1,0 +1,6 @@
+# Direct profile (default): the studio POSTs builds to {aakar.geometry.url}/v1/build and receives
+# progress at {aakar.api.public-url}/internal/jobs/{jobId}/callback. No broker involved.
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration

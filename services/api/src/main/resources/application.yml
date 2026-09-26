@@ -1,0 +1,81 @@
+spring:
+  application:
+    name: aakar-api
+  profiles:
+    # Job dispatch to the geometry service: `direct` (HTTP, local dev) or `rabbit` (AMQP, compose/prod).
+    default: direct
+  datasource:
+    url: ${AAKAR_JDBC_URL:jdbc:postgresql://127.0.0.1:5432/aakar}
+    username: ${AAKAR_DB_USER:aakar}
+    password: ${AAKAR_DB_PASSWORD:aakar}
+    hikari:
+      maximum-pool-size: 10
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        jdbc.time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+  mvc:
+    problemdetails:
+      enabled: false
+
+server:
+  port: 8080
+  shutdown: graceful
+  error:
+    include-message: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
+
+aakar:
+  geometry:
+    url: ${AAKAR_GEOMETRY_URL:http://localhost:8081}
+  api:
+    public-url: ${AAKAR_API_PUBLIC_URL:http://localhost:8080}
+  cors:
+    allowed-origins:
+      - http://localhost:3000
+  # PLAN §7.10 · copied from packages/design-tokens/materials.json → pricing_policy
+  pricing:
+    version: 2026-09-phase0
+    machine-rate-paise-per-hour: 20000
+    finishing-fee-paise:
+      matte: 8000
+      silk: 12000
+    packaging-fee-paise: 0
+    margin-pct: 0
+    round-to-rupees-ending-in: 9
+    shipping-flat-paise: 7900
+    free-shipping-above-paise: 99900
+    shipping-label: "Shipping · Delhivery, 4 days"
+
+logging:
+  level:
+    studio.aakar: INFO

@@ -1,0 +1,10 @@
+# Rabbit profile: design.generate is published to the `aakar.design` topic exchange; results are
+# consumed from the durable `api.design.results` queue.
+spring:
+  rabbitmq:
+    addresses: ${AAKAR_AMQP_URL:amqp://aakar:aakar@localhost:5672/}
+    listener:
+      simple:
+        acknowledge-mode: auto
+        default-requeue-rejected: false
+        prefetch: 8

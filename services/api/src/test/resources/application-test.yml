@@ -1,0 +1,16 @@
+# Integration tests: real PostgreSQL (aakar_test), schema recreated by TestFlywayConfig on context start.
+spring:
+  datasource:
+    url: ${AAKAR_TEST_JDBC_URL:jdbc:postgresql://127.0.0.1:5432/aakar_test}
+    username: ${AAKAR_TEST_DB_USER:${AAKAR_DB_USER:aakar}}
+    password: ${AAKAR_TEST_DB_PASSWORD:${AAKAR_DB_PASSWORD:aakar}}
+  flyway:
+    clean-disabled: false
+    clean-on-validation-error: true
+aakar:
+  api:
+    public-url: http://localhost:8080
+logging:
+  level:
+    studio.aakar: DEBUG
+    org.springframework.web.servlet.mvc.method.annotation.SseEmitter: DEBUG

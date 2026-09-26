@@ -1,0 +1,39 @@
+{
+  "name": "@aakar/web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Aakar storefront: Shop, Create, Remix and the 3D viewer (Next.js App Router).",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "gen:api": "openapi-typescript ../../packages/contracts/openapi/aakar-api.v1.yaml -o src/lib/api/schema.d.ts",
+    "mock:api": "node scripts/mock-api.mjs 8080"
+  },
+  "dependencies": {
+    "@aakar/design-tokens": "workspace:*",
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.1",
+    "next": "^15.5.26",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "three": "^0.186.1",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.7",
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/three": "^0.186.0",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^9",
+    "eslint-config-next": "^15.5.26",
+    "openapi-typescript": "^7.13.0",
+    "postcss": "^8.5",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^5.9"
+  }
+}

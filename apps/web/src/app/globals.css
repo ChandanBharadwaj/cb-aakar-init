@@ -1,0 +1,384 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Surface-dependent extras that sit on top of @aakar/design-tokens/css/tokens.css. */
+:root {
+  --ak-accent-deep: var(--ak-terracotta-deep);
+  --ak-btn-bg: var(--ak-indigo);
+  --ak-btn-text: var(--ak-cream);
+  --ak-well: var(--ak-cream);
+  --ak-glow: rgba(216, 174, 91, 0.18);
+}
+
+[data-surface="stage"] {
+  --ak-accent-deep: #b08430;
+  --ak-btn-bg: var(--ak-marigold);
+  --ak-btn-text: var(--ak-indigo-deep);
+  --ak-well: rgba(27, 34, 56, 0.55);
+  --ak-glow: rgba(216, 174, 91, 0.12);
+  color-scheme: dark;
+}
+
+@layer base {
+  html {
+    background-color: var(--ak-bg);
+    color: var(--ak-text);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    font-family: var(--ak-font-ui);
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100dvh;
+  }
+
+  [data-surface] {
+    background-color: var(--ak-bg);
+    color: var(--ak-text);
+  }
+
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family: var(--ak-font-display);
+    text-wrap: pretty;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ak-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  button,
+  [role="button"] {
+    touch-action: manipulation;
+  }
+
+  ::selection {
+    background: var(--ak-marigold);
+    color: var(--ak-ink);
+  }
+}
+
+@layer components {
+  .ak-card {
+    background-color: var(--ak-card);
+    border: 1px solid var(--ak-border);
+    border-radius: var(--ak-radius-card);
+    box-shadow: var(--ak-shadow-card);
+  }
+
+  .ak-well {
+    background-color: var(--ak-well);
+    border-radius: var(--ak-radius-control);
+  }
+
+  .ak-eyebrow {
+    font-size: 12px;
+    line-height: 1.4;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--ak-accent);
+  }
+
+  .ak-label {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--ak-text-muted);
+  }
+
+  .ak-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 44px;
+    padding: 0.6rem 1.25rem;
+    border-radius: var(--ak-radius-control);
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 1.2;
+    border: 1px solid transparent;
+    transition:
+      background-color var(--ak-motion-base) var(--ak-ease),
+      color var(--ak-motion-base) var(--ak-ease),
+      border-color var(--ak-motion-base) var(--ak-ease),
+      transform var(--ak-motion-fast) var(--ak-ease),
+      opacity var(--ak-motion-base) var(--ak-ease);
+  }
+
+  .ak-btn:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  .ak-btn:disabled,
+  .ak-btn[aria-disabled="true"] {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .ak-btn-primary {
+    background-color: var(--ak-btn-bg);
+    color: var(--ak-btn-text);
+  }
+
+  .ak-btn-primary:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+
+  .ak-btn-secondary {
+    background-color: transparent;
+    color: var(--ak-text);
+    border-color: var(--ak-border);
+  }
+
+  .ak-btn-secondary:hover:not(:disabled) {
+    border-color: var(--ak-accent);
+    color: var(--ak-accent);
+  }
+
+  .ak-btn-pill {
+    border-radius: var(--ak-radius-pill);
+  }
+
+  .ak-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 36px;
+    padding: 0.35rem 0.8rem;
+    border-radius: var(--ak-radius-pill);
+    border: 1px solid var(--ak-border);
+    background-color: color-mix(in srgb, var(--ak-card) 70%, transparent);
+    color: var(--ak-text-muted);
+    font-size: 12.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    transition:
+      border-color var(--ak-motion-base) var(--ak-ease),
+      color var(--ak-motion-base) var(--ak-ease),
+      background-color var(--ak-motion-base) var(--ak-ease);
+  }
+
+  .ak-chip:hover:not(:disabled) {
+    border-color: var(--ak-accent);
+    color: var(--ak-text);
+  }
+
+  .ak-chip[aria-checked="true"],
+  .ak-chip[aria-pressed="true"],
+  .ak-chip[aria-current="true"] {
+    border-color: var(--ak-accent);
+    background-color: var(--ak-well);
+    color: var(--ak-text);
+    box-shadow: 0 0 0 1px var(--ak-accent) inset;
+  }
+
+  .ak-chip:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .ak-input {
+    width: 100%;
+    min-height: 44px;
+    padding: 0.6rem 0.9rem;
+    border-radius: var(--ak-radius-control);
+    border: 1px solid var(--ak-border);
+    background-color: var(--ak-card);
+    color: var(--ak-text);
+    font-size: 15px;
+  }
+
+  .ak-input::placeholder {
+    color: color-mix(in srgb, var(--ak-text-muted) 80%, transparent);
+  }
+
+  /* Range slider: marigold thumb on an indigo or terracotta track, on both surfaces. */
+  .ak-range {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 28px;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .ak-range:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  .ak-range::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--ak-accent) var(--ak-range-fill, 0%), var(--ak-border) var(--ak-range-fill, 0%));
+  }
+
+  .ak-range::-moz-range-track {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--ak-border);
+  }
+
+  .ak-range::-moz-range-progress {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--ak-accent);
+  }
+
+  .ak-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    margin-top: -7px;
+    border-radius: 50%;
+    background: var(--ak-card);
+    border: 2px solid var(--ak-accent);
+    box-shadow: 0 2px 8px rgba(42, 47, 58, 0.25);
+  }
+
+  .ak-range::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--ak-card);
+    border: 2px solid var(--ak-accent);
+    box-shadow: 0 2px 8px rgba(42, 47, 58, 0.25);
+  }
+
+  .ak-range:focus-visible::-webkit-slider-thumb {
+    outline: 2px solid var(--ak-accent);
+    outline-offset: 2px;
+  }
+
+  .ak-panel {
+    background-color: color-mix(in srgb, var(--ak-card) 60%, transparent);
+  }
+
+  .ak-ring-accent {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--ak-accent) 25%, transparent);
+  }
+
+  .ak-ribbon {
+    position: absolute;
+    top: 14px;
+    right: -34px;
+    transform: rotate(35deg);
+    padding: 4px 40px;
+    background: var(--ak-marigold);
+    color: var(--ak-ink);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    box-shadow: var(--ak-shadow-card);
+  }
+
+  .ak-hero-glow {
+    background: radial-gradient(700px 360px at 85% 45%, var(--ak-glow), transparent 70%);
+  }
+
+  .ak-stage-vignette {
+    background: radial-gradient(60% 55% at 50% 60%, rgba(216, 174, 91, 0.16), transparent 70%);
+  }
+}
+
+@layer utilities {
+  .ak-draw {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: ak-draw 1.8s var(--ak-ease) forwards;
+  }
+
+  .ak-draw-loop {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: ak-draw-loop 3.2s var(--ak-ease) infinite;
+  }
+
+  .ak-appear {
+    opacity: 0;
+    animation: ak-appear 3.2s var(--ak-ease) infinite;
+  }
+
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@keyframes ak-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes ak-draw-loop {
+  0% {
+    stroke-dashoffset: 1;
+    opacity: 1;
+  }
+  55% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  85% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  95% {
+    opacity: 0;
+  }
+  100% {
+    stroke-dashoffset: 1;
+    opacity: 0;
+  }
+}
+
+@keyframes ak-appear {
+  0%,
+  50% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  65%,
+  85% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  95%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ak-draw,
+  .ak-draw-loop {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+
+  .ak-appear {
+    animation: none;
+    opacity: 1;
+  }
+
+  .animate-mandala,
+  .animate-fade-in,
+  .animate-pulse-soft {
+    animation: none;
+  }
+}
