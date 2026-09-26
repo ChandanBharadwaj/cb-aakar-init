@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aakar.studio/schemas/events/envelope.v1.json",
+  "title": "Aakar Event Envelope v1",
+  "description": "Every message on RabbitMQ (exchange 'aakar.design', topic) uses this envelope. Routing key equals 'type'. Consumers must be idempotent on (job_id, type, sequence).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "version", "event_id", "job_id", "design_id", "occurred_at", "payload"],
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": ["design.generate", "design.progress", "design.completed", "design.failed"]
+    },
+    "version": { "const": 1 },
+    "event_id": { "type": "string", "format": "uuid" },
+    "job_id": { "type": "string", "format": "uuid" },
+    "design_id": { "type": "string", "format": "uuid" },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "sequence": { "type": "integer", "minimum": 0, "description": "Per-job monotonic counter for progress ordering." },
+    "payload": { "type": "object" }
+  }
+}

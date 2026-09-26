@@ -1,0 +1,14 @@
+{
+  "name": "@aakar/contracts",
+  "version": "1.0.0-phase0",
+  "private": true,
+  "description": "Contract-first schemas and OpenAPI documents shared by every Aakar service.",
+  "scripts": {
+    "validate": "node scripts/validate.mjs"
+  },
+  "devDependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "yaml": "^2.8.0"
+  }
+}

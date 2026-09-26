@@ -1,0 +1,32 @@
+name: python-services
+on:
+  pull_request:
+    paths: ["services/inspect/**", "services/geometry/**", "packages/contracts/**", ".github/workflows/python.yml"]
+  push:
+    branches: [main]
+    paths: ["services/inspect/**", "services/geometry/**", "packages/contracts/**"]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [inspect, geometry]
+    steps:
+      - uses: actions/checkout@v4
+      - name: OCCT runtime libs (geometry CAD kernel)
+        if: matrix.service == 'geometry'
+        run: sudo apt-get update -q && sudo apt-get install -y -q libgl1 libglu1-mesa libxrender1 libxext6 libsm6 libxi6 libfontconfig1
+      - uses: astral-sh/setup-uv@v5
+        with: { enable-cache: true }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - name: Sync and test
+        working-directory: services/${{ matrix.service }}
+        run: |
+          uv sync
+          uv run pytest -q
+      - name: Vertical slice smoke (build the Jharokha stand)
+        if: matrix.service == 'geometry'
+        working-directory: services/geometry
+        run: uv run aakar-geometry build ../../packages/contracts/examples/jharokha-phone-stand.spec.json --out /tmp/slice

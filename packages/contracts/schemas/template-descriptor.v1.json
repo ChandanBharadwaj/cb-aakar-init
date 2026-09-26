@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aakar.studio/schemas/template-descriptor.v1.json",
+  "title": "Aakar Template Descriptor v1",
+  "description": "What a parametric template publishes about itself: parameters with ranges, anchors for text and motifs, handles for morph nodes, constraints and allowed materials. Served by the geometry service and cached by the API.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "version", "family", "name", "params", "anchors", "constraints", "materials"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    "version": { "type": "integer", "minimum": 1 },
+    "family": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    "name": { "type": "string" },
+    "description": { "type": "string" },
+    "environment": {
+      "type": "string",
+      "enum": ["studio", "teak_table_candlelight", "desk_oak", "dashboard", "kitchen_marble", "balcony_daylight"],
+      "default": "studio"
+    },
+    "params": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/param" }
+    },
+    "anchors": { "type": "array", "items": { "$ref": "#/$defs/anchor" } },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min_wall_mm", "max_overhang_deg", "bed_mm"],
+      "properties": {
+        "min_wall_mm": { "type": "number" },
+        "max_overhang_deg": { "type": "number" },
+        "bed_mm": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 }
+      }
+    },
+    "materials": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+    "style_variants": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["jaipur_heritage", "modern_zen", "cyber_desi", "warli_line"] },
+      "default": []
+    },
+    "features_supported": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["emboss_text", "motif"] },
+      "default": []
+    }
+  },
+  "$defs": {
+    "param": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "label", "default"],
+      "properties": {
+        "type": { "type": "string", "enum": ["number", "integer", "boolean", "enum"] },
+        "label": { "type": "string" },
+        "description": { "type": "string" },
+        "unit": { "type": "string", "enum": ["mm", "deg", "count", ""] },
+        "default": {},
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "step": { "type": "number" },
+        "options": { "type": "array", "items": { "type": "string" } },
+        "handle": {
+          "type": "boolean", "default": false,
+          "description": "Exposed as a draggable morph handle in the viewer."
+        },
+        "group": { "type": "string", "description": "UI grouping, e.g. Size, Shape, Details." }
+      }
+    },
+    "anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "projection"],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "projection": { "type": "string", "enum": ["planar", "cylindrical", "conformal"] },
+        "max_text_height_mm": { "type": "number" }
+      }
+    }
+  }
+}

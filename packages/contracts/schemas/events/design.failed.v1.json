@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aakar.studio/schemas/events/design.failed.v1.json",
+  "title": "design.failed payload v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["job_id", "design_id", "code", "message"],
+  "properties": {
+    "job_id": { "type": "string", "format": "uuid" },
+    "design_id": { "type": "string", "format": "uuid" },
+    "code": {
+      "type": "string",
+      "enum": ["invalid_spec", "unknown_template", "unsupported_feature", "param_out_of_range", "not_printable", "build_error", "storage_error", "timeout"]
+    },
+    "message": { "type": "string", "description": "Customer-safe message." },
+    "detail": { "type": "object", "additionalProperties": true, "description": "Developer detail; never shown to customers." }
+  }
+}

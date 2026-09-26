@@ -1,0 +1,46 @@
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Node
+node_modules/
+.next/
+out/
+dist/
+*.tsbuildinfo
+.pnpm-store/
+
+# Java / Gradle
+.gradle/
+build/
+!**/src/**/build/
+*.class
+*.log
+hs_err_pid*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Local data and artefacts
+.env
+.env.*
+!.env.example
+/var/
+/tmp/
+**/.aakar-assets/
+**/out/slice/
+infra/.data/
+
+# Playwright
+test-results/
+playwright-report/

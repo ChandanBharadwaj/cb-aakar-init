@@ -1,0 +1,12 @@
+{
+  "name": "aakar",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "web:dev": "pnpm --filter @aakar/web dev",
+    "web:build": "pnpm --filter @aakar/web build",
+    "web:lint": "pnpm --filter @aakar/web lint",
+    "web:typecheck": "pnpm --filter @aakar/web typecheck",
+    "contracts:validate": "pnpm --filter @aakar/contracts validate"
+  }
+}

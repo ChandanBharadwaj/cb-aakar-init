@@ -1,0 +1,317 @@
+openapi: 3.1.0
+info:
+  title: Aakar API
+  version: 1.0.0-phase0
+  description: |
+    Storefront API served by `services/api` (Spring Boot). Phase 0 covers the vertical slice:
+    catalog + materials, designs from a template (Shop and Remix-lite paths), parameter edits,
+    job progress over SSE, printability and price per material.
+
+    Create-from-prompt (`prompt` on POST /api/designs) is accepted by the schema but answered
+    with 422 `not_yet_available` until the co-designer agent lands in Phase 2.
+
+    Errors use RFC 9457 Problem Details (`application/problem+json`) with a stable `code`.
+servers:
+  - url: http://localhost:8080
+paths:
+  /api/catalog/items:
+    get:
+      summary: List Shop items
+      tags: [catalog]
+      parameters:
+        - { name: category, in: query, schema: { type: string } }
+        - { name: q, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Items
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/CatalogItem' } }
+  /api/catalog/items/{slug}:
+    get:
+      summary: Shop item by slug
+      tags: [catalog]
+      parameters: [{ name: slug, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: Item, content: { application/json: { schema: { $ref: '#/components/schemas/CatalogItem' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+  /api/catalog/materials:
+    get:
+      summary: Digital materials with rendering presets and rates
+      tags: [catalog]
+      responses:
+        '200':
+          description: Materials
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Material' } }
+  /api/templates:
+    get:
+      summary: Template descriptors (cached from the geometry service)
+      tags: [templates]
+      responses:
+        '200':
+          description: Descriptors
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '../schemas/template-descriptor.v1.json' } }
+  /api/templates/{id}:
+    get:
+      tags: [templates]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: Descriptor, content: { application/json: { schema: { $ref: '../schemas/template-descriptor.v1.json' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+  /api/designs:
+    post:
+      summary: Start a design
+      description: |
+        Shop path: `catalog_item_slug` (template and defaults come from the item).
+        Remix-lite / direct path: `template_id` + optional `params`.
+        Create path: `prompt` → 422 until Phase 2.
+        Returns 202 with the design and the first generation job. Follow `/api/jobs/{id}/events`.
+      tags: [designs]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateDesignRequest' }
+      responses:
+        '202': { description: Accepted, content: { application/json: { schema: { $ref: '#/components/schemas/DesignAccepted' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /api/designs/{id}:
+    get:
+      tags: [designs]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Design with latest version, content: { application/json: { schema: { $ref: '#/components/schemas/Design' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+  /api/designs/{id}/versions:
+    get:
+      tags: [designs]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200':
+          description: Versions, newest first
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/DesignVersion' } }
+  /api/versions/{versionId}:
+    get:
+      tags: [versions]
+      parameters: [{ name: versionId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Version, content: { application/json: { schema: { $ref: '#/components/schemas/DesignVersion' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+  /api/versions/{versionId}/params:
+    post:
+      summary: Edit parameters → new version (new job)
+      tags: [versions]
+      parameters: [{ name: versionId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [params]
+              properties:
+                params: { type: object, additionalProperties: { type: [number, integer, boolean, string] } }
+                material: { type: string }
+      responses:
+        '202': { description: Accepted, content: { application/json: { schema: { $ref: '#/components/schemas/DesignAccepted' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /api/versions/{versionId}/printability:
+    get:
+      tags: [versions]
+      parameters: [{ name: versionId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Report, content: { application/json: { schema: { $ref: '../schemas/printability-report.v1.json' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { description: Version not ready yet, $ref: '#/components/responses/Problem' }
+  /api/versions/{versionId}/price:
+    get:
+      summary: Price breakdown for a material
+      tags: [versions]
+      parameters:
+        - { name: versionId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: material, in: query, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Breakdown, content: { application/json: { schema: { $ref: '../schemas/price-breakdown.v1.json' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { description: Version not ready yet, $ref: '#/components/responses/Problem' }
+  /api/jobs/{jobId}:
+    get:
+      tags: [jobs]
+      parameters: [{ name: jobId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Job, content: { application/json: { schema: { $ref: '#/components/schemas/Job' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+  /api/jobs/{jobId}/events:
+    get:
+      summary: Server-Sent Events stream of job stages
+      description: |
+        `text/event-stream`. Each event is `event: stage` with a JSON `data` body shaped like
+        `JobStageEvent`. The stream replays the current stage on connect and closes after
+        `ready` or `failed`. Clients reconnect with `Last-Event-ID` (the sequence number).
+      tags: [jobs]
+      parameters: [{ name: jobId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200':
+          description: Event stream
+          content:
+            text/event-stream:
+              schema: { type: string }
+  /internal/jobs/{jobId}/callback:
+    post:
+      summary: Direct-profile callback from the geometry service
+      description: Not exposed publicly. Accepts a `design.progress`, `design.completed` or `design.failed` envelope.
+      tags: [internal]
+      parameters: [{ name: jobId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '../schemas/events/envelope.v1.json' }
+      responses:
+        '204': { description: Recorded }
+components:
+  responses:
+    Problem:
+      description: Problem Details
+      content:
+        application/problem+json:
+          schema:
+            type: object
+            properties:
+              type: { type: string }
+              title: { type: string }
+              status: { type: integer }
+              detail: { type: string }
+              instance: { type: string }
+              code:
+                type: string
+                description: Stable machine code, e.g. not_found, not_yet_available, param_out_of_range, version_not_ready
+  schemas:
+    CatalogItem:
+      type: object
+      required: [slug, name, category, template_id, default_params, default_material, base_price_paise, specs_line]
+      properties:
+        slug: { type: string }
+        name: { type: string }
+        category: { type: string, enum: [home_decor, nameplates, kitchen, desk_tech, gifting] }
+        description: { type: string }
+        template_id: { type: string }
+        default_params: { type: object, additionalProperties: true }
+        default_material: { type: string }
+        base_price_paise: { type: integer }
+        specs_line: { type: string, description: "e.g. 'Fits phones to 6.9″ · 92 × 78 × 120 mm · 64 g'" }
+        environment: { type: string }
+        media: { type: array, items: { type: object, properties: { kind: { type: string }, url: { type: string } } } }
+    Material:
+      type: object
+      required: [id, name, filament, density_g_cm3, finish_class, rate_per_g_paise, pbr]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        filament: { type: string }
+        density_g_cm3: { type: number }
+        finish_class: { type: string, enum: [matte, silk] }
+        rate_per_g_paise: { type: integer }
+        heat_safe: { type: boolean }
+        pbr:
+          type: object
+          required: [color, roughness, metalness]
+          properties:
+            color: { type: string, description: sRGB hex }
+            roughness: { type: number }
+            metalness: { type: number }
+            clearcoat: { type: number }
+            clearcoat_roughness: { type: number }
+            sheen: { type: number }
+            sheen_color: { type: string }
+    CreateDesignRequest:
+      type: object
+      additionalProperties: false
+      required: [source]
+      properties:
+        source: { type: string, enum: [shop, create, remix] }
+        catalog_item_slug: { type: string }
+        template_id: { type: string }
+        params: { type: object, additionalProperties: { type: [number, integer, boolean, string] } }
+        material: { type: string }
+        prompt: { type: string, maxLength: 500 }
+        title: { type: string, maxLength: 80 }
+    DesignAccepted:
+      type: object
+      required: [design_id, version_no, job_id, events_url]
+      properties:
+        design_id: { type: string, format: uuid }
+        version_no: { type: integer }
+        job_id: { type: string, format: uuid }
+        events_url: { type: string }
+    Design:
+      type: object
+      required: [id, source, title, status, created_at, versions_count]
+      properties:
+        id: { type: string, format: uuid }
+        source: { type: string, enum: [shop, create, remix] }
+        catalog_item_slug: { type: [string, 'null'] }
+        title: { type: string }
+        status: { type: string, enum: [generating, ready, failed] }
+        created_at: { type: string, format: date-time }
+        versions_count: { type: integer }
+        latest_version: { $ref: '#/components/schemas/DesignVersion' }
+    DesignVersion:
+      type: object
+      required: [id, design_id, version_no, status, spec, created_by, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        design_id: { type: string, format: uuid }
+        version_no: { type: integer }
+        parent_version_id: { type: [string, 'null'], format: uuid }
+        status: { type: string, enum: [generating, ready, failed] }
+        spec: { $ref: '../schemas/design-spec.v1.json' }
+        template: { type: object, properties: { id: { type: string }, version: { type: integer } } }
+        assets: { type: object, additionalProperties: true }
+        geometry: { type: object, additionalProperties: true, description: bounds_mm, volume_cm3, surface_cm2, triangles }
+        printability: { $ref: '../schemas/printability-report.v1.json' }
+        print_estimate: { $ref: '../schemas/print-estimate.v1.json' }
+        price: { $ref: '../schemas/price-breakdown.v1.json', description: For spec.material }
+        karigar_note: { type: string }
+        job_id: { type: string, format: uuid }
+        created_by: { type: string, enum: [user, agent, system] }
+        created_at: { type: string, format: date-time }
+    Job:
+      type: object
+      required: [id, design_id, version_no, type, status, stage, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        design_id: { type: string, format: uuid }
+        version_id: { type: [string, 'null'], format: uuid }
+        version_no: { type: integer }
+        type: { type: string, enum: [generate] }
+        status: { type: string, enum: [queued, running, succeeded, failed] }
+        stage: { type: string, enum: [queued, understanding, sculpting, checking, pricing, ready, failed] }
+        message: { type: string }
+        error_code: { type: [string, 'null'] }
+        attempts: { type: integer }
+        created_at: { type: string, format: date-time }
+        started_at: { type: [string, 'null'], format: date-time }
+        finished_at: { type: [string, 'null'], format: date-time }
+    JobStageEvent:
+      type: object
+      required: [job_id, sequence, stage, message, at]
+      properties:
+        job_id: { type: string, format: uuid }
+        sequence: { type: integer }
+        stage: { type: string, enum: [queued, understanding, sculpting, checking, pricing, ready, failed] }
+        message: { type: string }
+        percent: { type: integer }
+        version_id: { type: [string, 'null'], format: uuid }
+        error_code: { type: [string, 'null'] }
+        at: { type: string, format: date-time }

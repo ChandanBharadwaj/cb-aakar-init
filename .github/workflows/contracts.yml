@@ -1,0 +1,20 @@
+name: contracts
+on:
+  pull_request:
+    paths: ["packages/contracts/**", "packages/design-tokens/**", ".github/workflows/contracts.yml"]
+  push:
+    branches: [main]
+    paths: ["packages/contracts/**", "packages/design-tokens/**"]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile --filter @aakar/contracts
+      - run: pnpm --filter @aakar/contracts validate
+      - name: design tokens are valid JSON
+        run: node -e "for (const f of ['tokens.json','materials.json']) JSON.parse(require('fs').readFileSync('packages/design-tokens/'+f,'utf8')); console.log('ok')"

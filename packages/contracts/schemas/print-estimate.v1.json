@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aakar.studio/schemas/print-estimate.v1.json",
+  "title": "Aakar Print Estimate v1",
+  "description": "Material-independent slicing estimate. Mass per material is derived by the API from extruded_volume_cm3 x material density, so a finish swap re-prices without re-slicing.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["method", "print_seconds", "extruded_volume_cm3", "layer_height_mm", "infill_pct"],
+  "properties": {
+    "method": { "type": "string", "enum": ["prusaslicer_cli", "orcaslicer_cli", "heuristic"] },
+    "slicer_version": { "type": "string" },
+    "print_seconds": { "type": "integer", "minimum": 0 },
+    "extruded_volume_cm3": { "type": "number", "minimum": 0, "description": "Filament volume actually deposited (walls, infill, top/bottom, supports)." },
+    "layer_height_mm": { "type": "number" },
+    "infill_pct": { "type": "number", "minimum": 0, "maximum": 100 },
+    "layers": { "type": "integer" },
+    "supports_required": { "type": "boolean" }
+  }
+}

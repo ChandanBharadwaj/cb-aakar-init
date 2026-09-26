@@ -1,0 +1,16 @@
+{
+  "name": "@aakar/design-tokens",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Aakar brand tokens, digital material presets and pricing policy placeholders.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./tokens.json": "./tokens.json",
+    "./materials.json": "./materials.json",
+    "./css/tokens.css": "./css/tokens.css",
+    "./tailwind.preset.cjs": "./tailwind.preset.cjs"
+  },
+  "files": ["src", "css", "tokens.json", "materials.json", "tailwind.preset.cjs"]
+}

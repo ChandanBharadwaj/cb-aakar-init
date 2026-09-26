@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aakar.studio/schemas/price-breakdown.v1.json",
+  "title": "Aakar Price Breakdown v1",
+  "description": "Computed by the API pricing module from a print estimate and a material. All amounts are integer paise (INR minor units). Snapshotted into cart and order so totals never drift.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["currency", "material_id", "mass_g", "print_seconds", "lines", "subtotal_paise", "shipping_paise", "total_paise", "policy_version"],
+  "properties": {
+    "currency": { "const": "INR" },
+    "material_id": { "type": "string" },
+    "mass_g": { "type": "number" },
+    "print_seconds": { "type": "integer" },
+    "lines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "label", "amount_paise"],
+        "properties": {
+          "code": { "type": "string", "enum": ["material", "machine_time", "finishing", "packaging"] },
+          "label": { "type": "string", "description": "Customer-facing, e.g. 'Material · 84 g' or 'Print time · 3 h 40 m'." },
+          "detail": { "type": "string" },
+          "amount_paise": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "subtotal_paise": { "type": "integer", "description": "Sum of lines with margin applied and rounded to a price ending in 9 rupees." },
+    "shipping_paise": { "type": "integer", "description": "0 when free." },
+    "shipping_label": { "type": "string" },
+    "total_paise": { "type": "integer" },
+    "policy_version": { "type": "string" }
+  }
+}

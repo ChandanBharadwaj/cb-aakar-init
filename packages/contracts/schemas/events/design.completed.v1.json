@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aakar.studio/schemas/events/design.completed.v1.json",
+  "title": "design.completed payload v1 (also the response body of POST /v1/build)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["job_id", "design_id", "version_no", "template", "spec", "assets", "printability", "print_estimate", "build_ms"],
+  "properties": {
+    "job_id": { "type": "string", "format": "uuid" },
+    "design_id": { "type": "string", "format": "uuid" },
+    "version_no": { "type": "integer" },
+    "template": {
+      "type": "object", "additionalProperties": false, "required": ["id", "version"],
+      "properties": { "id": { "type": "string" }, "version": { "type": "integer" } }
+    },
+    "spec": {
+      "$ref": "https://aakar.studio/schemas/design-spec.v1.json",
+      "description": "Normalised spec: defaults filled, params clamped to template ranges."
+    },
+    "assets": {
+      "type": "object",
+      "description": "Keyed by output kind.",
+      "additionalProperties": {
+        "type": "object", "additionalProperties": false, "required": ["key", "url", "bytes", "content_type"],
+        "properties": {
+          "key": { "type": "string", "description": "Storage key, e.g. designs/{design_id}/v{n}/model.glb" },
+          "url": { "type": "string", "description": "Fetchable URL (presigned or local static)." },
+          "bytes": { "type": "integer" },
+          "content_type": { "type": "string" },
+          "sha256": { "type": "string" }
+        }
+      }
+    },
+    "printability": { "$ref": "https://aakar.studio/schemas/printability-report.v1.json" },
+    "print_estimate": { "$ref": "https://aakar.studio/schemas/print-estimate.v1.json" },
+    "karigar_note": { "type": "string", "description": "Short human sentence about what was made or changed. Phase 2 fills this from the agent; Phase 0 templates may supply a fixed note." },
+    "build_ms": { "type": "integer" }
+  }
+}

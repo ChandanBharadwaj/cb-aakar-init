@@ -1,0 +1,18 @@
+{
+  "spec_version": "1.0",
+  "family": "phone_stand",
+  "template": "jharokha_phone_stand@1",
+  "params": {
+    "width_mm": 92,
+    "depth_mm": 78,
+    "height_mm": 120,
+    "tilt_deg": 70,
+    "lip_height_mm": 12,
+    "wall_mm": 3.2,
+    "arch_cusps": 5
+  },
+  "features": [],
+  "style": "none",
+  "material": "terracotta_silk",
+  "constraints": { "min_wall_mm": 1.2, "max_overhang_deg": 55, "bed_mm": [250, 250, 250] }
+}

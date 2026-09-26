@@ -1,0 +1,24 @@
+name: web
+on:
+  pull_request:
+    paths: ["apps/web/**", "packages/design-tokens/**", "packages/contracts/openapi/aakar-api.v1.yaml", ".github/workflows/web.yml"]
+  push:
+    branches: [main]
+    paths: ["apps/web/**", "packages/design-tokens/**"]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Generated API types are current
+        run: |
+          pnpm --filter @aakar/web gen:api
+          git diff --exit-code -- apps/web/src/lib/api/schema.d.ts
+      - run: pnpm --filter @aakar/web typecheck
+      - run: pnpm --filter @aakar/web lint
+      - run: pnpm --filter @aakar/web build

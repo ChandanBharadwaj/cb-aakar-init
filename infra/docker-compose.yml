@@ -1,0 +1,137 @@
+# Aakar local stack (PLAN §5, §18). Start everything:  docker compose -f infra/docker-compose.yml up --build
+# Infra only (then run services from your IDE): docker compose -f infra/docker-compose.yml up postgres rabbitmq minio minio-init
+name: aakar
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: aakar
+      POSTGRES_PASSWORD: aakar
+      POSTGRES_DB: aakar
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aakar -d aakar"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: aakar
+      RABBITMQ_DEFAULT_PASS: aakar
+    ports: ["5672:5672", "15672:15672"]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: aakar
+      MINIO_ROOT_PASSWORD: aakar-secret
+    ports: ["9000:9000", "9001:9001"]
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio: { condition: service_healthy }
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 aakar aakar-secret &&
+      mc mb --ignore-existing local/aakar-assets &&
+      mc anonymous set download local/aakar-assets &&
+      echo 'bucket ready'"
+
+  inspect:
+    build:
+      context: ..
+      dockerfile: services/inspect/Dockerfile
+    environment:
+      AAKAR_CONTRACTS_DIR: /contracts/schemas
+    ports: ["8082:8082"]
+
+  geometry:
+    build:
+      context: ..
+      dockerfile: services/geometry/Dockerfile
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
+    environment:
+      AAKAR_CONTRACTS_DIR: /contracts/schemas
+      AAKAR_STORAGE: s3
+      AAKAR_S3_BUCKET: aakar-assets
+      AAKAR_S3_ENDPOINT: http://minio:9000
+      AAKAR_S3_PUBLIC_URL: http://localhost:9000/aakar-assets
+      AWS_ACCESS_KEY_ID: aakar
+      AWS_SECRET_ACCESS_KEY: aakar-secret
+      AWS_DEFAULT_REGION: ap-south-1
+      AAKAR_PUBLIC_URL: http://localhost:8081
+      AAKAR_AMQP_URL: amqp://aakar:aakar@rabbitmq:5672/
+    ports: ["8081:8081"]
+
+  geometry-worker:
+    build:
+      context: ..
+      dockerfile: services/geometry/Dockerfile
+    command: ["aakar-geometry", "worker"]
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
+    environment:
+      AAKAR_CONTRACTS_DIR: /contracts/schemas
+      AAKAR_STORAGE: s3
+      AAKAR_S3_BUCKET: aakar-assets
+      AAKAR_S3_ENDPOINT: http://minio:9000
+      AAKAR_S3_PUBLIC_URL: http://localhost:9000/aakar-assets
+      AWS_ACCESS_KEY_ID: aakar
+      AWS_SECRET_ACCESS_KEY: aakar-secret
+      AWS_DEFAULT_REGION: ap-south-1
+      AAKAR_AMQP_URL: amqp://aakar:aakar@rabbitmq:5672/
+
+  api:
+    build:
+      context: ..
+      dockerfile: services/api/Dockerfile
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+      geometry: { condition: service_started }
+    environment:
+      SPRING_PROFILES_ACTIVE: rabbit
+      AAKAR_JDBC_URL: jdbc:postgresql://postgres:5432/aakar
+      AAKAR_DB_USER: aakar
+      AAKAR_DB_PASSWORD: aakar
+      AAKAR_AMQP_URL: amqp://aakar:aakar@rabbitmq:5672/
+      AAKAR_GEOMETRY_URL: http://geometry:8081
+      AAKAR_API_PUBLIC_URL: http://api:8080
+    ports: ["8080:8080"]
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    depends_on:
+      api: { condition: service_started }
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+    ports: ["3000:3000"]
+
+volumes:
+  pgdata:
+  miniodata:

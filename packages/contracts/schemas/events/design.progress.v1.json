@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aakar.studio/schemas/events/design.progress.v1.json",
+  "title": "design.progress payload v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["stage", "message"],
+  "properties": {
+    "stage": {
+      "type": "string",
+      "enum": ["understanding", "sculpting", "checking", "pricing", "ready", "failed"],
+      "description": "Customer-facing stage. UI copy: Understanding your idea / Weaving your design / Checking physics / Pricing / Ready."
+    },
+    "message": { "type": "string" },
+    "percent": { "type": "integer", "minimum": 0, "maximum": 100 }
+  }
+}

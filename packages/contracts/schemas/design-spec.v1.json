@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aakar.studio/schemas/design-spec.v1.json",
+  "title": "Aakar Design Spec v1",
+  "description": "The only thing the co-designer agent (or a viewer control) may hand to the geometry service. Geometry is produced by our own templates from this document; no executable code ever crosses this boundary.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["spec_version", "family", "template", "params"],
+  "properties": {
+    "spec_version": { "const": "1.0" },
+    "family": {
+      "type": "string",
+      "description": "Template family id, e.g. phone_stand, table_lamp.",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "template": {
+      "type": "string",
+      "description": "Template id with version, e.g. jharokha_phone_stand@1.",
+      "pattern": "^[a-z][a-z0-9_]*@[0-9]+$"
+    },
+    "params": {
+      "type": "object",
+      "description": "Parameter values. Keys and ranges are defined by the template descriptor.",
+      "additionalProperties": { "type": ["number", "integer", "boolean", "string"] }
+    },
+    "features": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/feature" }
+    },
+    "style": {
+      "type": "string",
+      "enum": ["none", "jaipur_heritage", "modern_zen", "cyber_desi", "warli_line"],
+      "default": "none"
+    },
+    "material": {
+      "type": "string",
+      "description": "Digital material id, e.g. terracotta_silk. Affects rendering and price, never geometry.",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "constraints": { "$ref": "#/$defs/constraints" }
+  },
+  "$defs": {
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "min_wall_mm": { "type": "number", "minimum": 0.8, "default": 1.2 },
+        "max_overhang_deg": { "type": "number", "minimum": 30, "maximum": 90, "default": 55 },
+        "bed_mm": {
+          "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 },
+          "minItems": 3, "maxItems": 3, "default": [250, 250, 250]
+        }
+      }
+    },
+    "feature": {
+      "oneOf": [
+        { "$ref": "#/$defs/emboss_text" },
+        { "$ref": "#/$defs/motif" }
+      ]
+    },
+    "emboss_text": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "text", "anchor"],
+      "properties": {
+        "type": { "const": "emboss_text" },
+        "text": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "script": {
+          "type": "string",
+          "enum": ["latin", "devanagari", "telugu", "tamil", "kannada", "bengali", "gujarati"],
+          "description": "Detected or chosen script; picks the shaping font."
+        },
+        "font": { "type": "string" },
+        "depth_mm": { "type": "number", "minimum": 0.4, "maximum": 3, "default": 1.2 },
+        "height_mm": { "type": "number", "minimum": 4, "maximum": 60 },
+        "anchor": { "type": "string", "description": "Anchor id from the template descriptor." },
+        "projection": { "type": "string", "enum": ["planar", "cylindrical", "conformal"], "default": "planar" },
+        "mode": { "type": "string", "enum": ["emboss", "deboss"], "default": "emboss" }
+      }
+    },
+    "motif": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "motif_id", "anchor"],
+      "properties": {
+        "type": { "const": "motif" },
+        "motif_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "anchor": { "type": "string" },
+        "scale": { "type": "number", "minimum": 0.2, "maximum": 3, "default": 1 },
+        "depth_mm": { "type": "number", "minimum": 0.4, "maximum": 3, "default": 1.0 },
+        "mode": { "type": "string", "enum": ["emboss", "deboss"], "default": "deboss" }
+      }
+    }
+  }
+}

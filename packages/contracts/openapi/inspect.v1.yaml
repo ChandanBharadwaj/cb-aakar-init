@@ -1,0 +1,59 @@
+openapi: 3.1.0
+info:
+  title: Aakar Inspect Service
+  version: 1.0.0-phase0
+  description: |
+    `services/inspect` (Python). Printability report v1 and a material-independent print estimate.
+    Used in-process by the geometry service by default; this HTTP surface exists so it can be
+    scaled separately later.
+servers:
+  - url: http://localhost:8082
+paths:
+  /healthz:
+    get:
+      responses: { '200': { description: OK } }
+  /v1/inspect:
+    post:
+      summary: Inspect a mesh
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [mesh]
+              properties:
+                mesh:
+                  type: object
+                  description: Exactly one of url or path.
+                  properties:
+                    url: { type: string }
+                    path: { type: string }
+                    format: { type: string, enum: [stl, glb, 3mf, obj] }
+                constraints:
+                  type: object
+                  properties:
+                    min_wall_mm: { type: number, default: 1.2 }
+                    max_overhang_deg: { type: number, default: 55 }
+                    bed_mm: { type: array, items: { type: number }, minItems: 3, maxItems: 3, default: [250, 250, 250] }
+                    min_tipping_margin_mm: { type: number, default: 5 }
+                slicing:
+                  type: object
+                  properties:
+                    layer_height_mm: { type: number, default: 0.2 }
+                    infill_pct: { type: number, default: 15 }
+                    nozzle_mm: { type: number, default: 0.4 }
+                    walls: { type: integer, default: 3 }
+      responses:
+        '200':
+          description: Report and estimate
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [printability, print_estimate]
+                properties:
+                  printability: { $ref: '../schemas/printability-report.v1.json' }
+                  print_estimate: { $ref: '../schemas/print-estimate.v1.json' }
+        '422': { description: Mesh could not be loaded }

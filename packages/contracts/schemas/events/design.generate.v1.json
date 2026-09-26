@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aakar.studio/schemas/events/design.generate.v1.json",
+  "title": "design.generate payload v1",
+  "description": "Published by the API studio module. Consumed by the geometry worker. Identical to the body of POST /v1/build on the geometry service (direct profile).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["job_id", "design_id", "version_no", "spec"],
+  "properties": {
+    "job_id": { "type": "string", "format": "uuid" },
+    "design_id": { "type": "string", "format": "uuid" },
+    "version_no": { "type": "integer", "minimum": 1 },
+    "parent_version_id": { "type": ["string", "null"], "format": "uuid" },
+    "spec": { "$ref": "https://aakar.studio/schemas/design-spec.v1.json" },
+    "outputs": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["glb", "3mf", "stl", "usdz", "thumb"] },
+      "default": ["glb", "3mf", "stl"]
+    },
+    "callback_url": {
+      "type": "string",
+      "description": "Direct profile only: geometry POSTs progress here. Absent when the message came over RabbitMQ."
+    }
+  }
+}

@@ -1,0 +1,52 @@
+openapi: 3.1.0
+info:
+  title: Aakar Geometry Service
+  version: 1.0.0-phase0
+  description: |
+    `services/geometry` (Python, FastAPI). Owns the template registry, turns a Design Spec into
+    printable geometry, exports GLB / 3MF / STL, runs the inspect service and returns a
+    `design.completed` payload. Also runs as a RabbitMQ worker consuming `design.generate`.
+servers:
+  - url: http://localhost:8081
+paths:
+  /healthz:
+    get:
+      responses: { '200': { description: OK } }
+  /v1/templates:
+    get:
+      summary: All template descriptors
+      responses:
+        '200':
+          description: Descriptors
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '../schemas/template-descriptor.v1.json' } }
+  /v1/templates/{id}:
+    get:
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: Descriptor, content: { application/json: { schema: { $ref: '../schemas/template-descriptor.v1.json' } } } }
+        '404': { description: Unknown template }
+  /v1/build:
+    post:
+      summary: Build a design version synchronously
+      description: |
+        Validates the spec against the schema and the template descriptor (clamping is NOT silent:
+        out-of-range values fail with `param_out_of_range`), builds geometry, exports the requested
+        outputs to storage, runs inspect, and returns the `design.completed` payload.
+        If `callback_url` is present, `design.progress` envelopes are POSTed there as stages advance.
+        Typical duration for a parametric template: 2–15 s.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '../schemas/events/design.generate.v1.json' }
+      responses:
+        '200': { description: Built, content: { application/json: { schema: { $ref: '../schemas/events/design.completed.v1.json' } } } }
+        '422': { description: Failed, content: { application/json: { schema: { $ref: '../schemas/events/design.failed.v1.json' } } } }
+        '500': { description: Failed, content: { application/json: { schema: { $ref: '../schemas/events/design.failed.v1.json' } } } }
+  /assets/{path}:
+    get:
+      summary: Static assets when AAKAR_STORAGE=local
+      parameters: [{ name: path, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: File } }

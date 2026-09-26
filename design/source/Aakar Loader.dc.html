@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<template id="__bundler_thumbnail"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#34426B"/><g transform="translate(15 15) scale(0.7)"><g fill="none" stroke="#F5F0E6" stroke-width="6" stroke-linejoin="round"><path d="M80 52 L60 62 L52 52 L60 42 Z"/><path d="M52 80 L42 60 L52 52 L62 60 Z"/><path d="M24 52 L44 42 L52 52 L44 62 Z"/></g><path d="M52 24 L62 44 L52 52 L42 44 Z" fill="#D8AE5B" stroke="#D8AE5B" stroke-width="6" stroke-linejoin="round"/></g></svg></template>
+<x-dc>
+<helmet><meta name="design_doc_mode" content="canvas"><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Manrope:wght@400;600&display=swap" rel="stylesheet"><style>body{margin:0;background:#ECE6D9;font-family:Manrope,system-ui,sans-serif;color:#2A2F3A}a{color:#B56E52}a:hover{color:#8F5238}</style></helmet>
+
+<section id="t0" style="padding:44px 44px 30px;border-bottom:1px solid rgba(42,47,58,.08)">
+  <div style="display:grid;gap:8px"><div style="font:600 46px/1.05 'Cormorant Garamond',serif">Aakar <span style="color:#B56E52">·</span> loading mark</div><div style="font-size:14px;color:#646A78">Aakar means taking form. Scattered print layers settle into three petals, the fourth is lifted into place, the mark holds, then dissolves to begin again.</div></div>
+</section>
+
+<section id="t1" style="padding:36px 44px 48px;display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start">
+  <div id="1a" style="display:grid;gap:12px"><div style="display:flex;align-items:baseline;gap:8px;font-size:12px;color:#646A78"><a href="#1a" style="font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:#2A2F3A;color:#F5F0E6;border-radius:5px;text-decoration:none">1a</a>Full-screen, on indigo</div>
+    <div style="width:520px;height:520px;border-radius:18px;background:#131A3D;display:grid;place-items:center;align-content:center;gap:30px">{{ loaderDark }}<div style="font:italic 600 18px 'Cormorant Garamond',serif;color:rgba(245,240,230,.7)">Taking shape</div></div>
+  </div>
+  <div id="1b" style="display:grid;gap:12px"><div style="display:flex;align-items:baseline;gap:8px;font-size:12px;color:#646A78"><a href="#1b" style="font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:#2A2F3A;color:#F5F0E6;border-radius:5px;text-decoration:none">1b</a>Inline, on cream</div>
+    <div style="width:520px;height:520px;border-radius:18px;background:#F5F0E6;border:1px solid #E3DACA;display:grid;place-items:center;align-content:center;gap:30px">{{ loaderLight }}<div style="font:italic 600 18px 'Cormorant Garamond',serif;color:#646A78">Taking shape</div></div>
+  </div>
+  <div id="1c" style="display:grid;gap:12px"><div style="display:flex;align-items:baseline;gap:8px;font-size:12px;color:#646A78"><a href="#1c" style="font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:#2A2F3A;color:#F5F0E6;border-radius:5px;text-decoration:none">1c</a>Small sizes</div>
+    <div style="width:300px;height:520px;border-radius:18px;background:#131A3D;display:grid;place-items:center;align-content:center;gap:40px">{{ loaderMid }}{{ loaderSmall }}{{ loaderTiny }}</div>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  loader(size, dark, key) {
+    const e = React.createElement;
+    const D = 3.6, id = 'bn' + key;
+    const ink = dark ? '#F5F0E6' : '#2A2F3A', acc = dark ? '#D8AE5B' : '#B56E52', accShade = dark ? '#B08430' : '#8F5238';
+    const neon = '#4FA3FF', neonCore = '#DDF0FF', neonDeep = '#1E5BFF';
+    const ease = (kt) => kt.split(';').slice(1).map(() => '.45 0 .25 1').join(';');
+    const anim = (attr, values, keyTimes, extra) => e('animate', Object.assign({ attributeName: attr, values, keyTimes, dur: D + 's', repeatCount: 'indefinite', calcMode: 'spline', keySplines: ease(keyTimes) }, extra || {}));
+    // Exact logo geometry. The three outlined petals are one closed loop drawn from the centre; the lifted petal is a second loop.
+    const RING = 'M52 52 L60 42 L80 52 L60 62 L52 52 L62 60 L52 80 L42 60 L52 52 L44 62 L24 52 L44 42 Z';
+    const TOP = 'M52 8 L62 28 L52 36 L42 28 Z';
+    // one neon tube = wide blue halo + mid glow + pale core, all on the same path, all growing together
+    const tube = (d, t0, t1, key) => e('g', { key },
+      [[14, neonDeep, 0.22, 'soft'], [7, neon, 0.85, 'glow'], [3, neonCore, 1, null]].map(([w, c, o, f], i) =>
+        e('path', { key: i, d, fill: 'none', stroke: c, strokeWidth: w, strokeLinecap: 'round', strokeLinejoin: 'round', pathLength: 1, strokeDasharray: 1, strokeDashoffset: 1, opacity: o, filter: f ? `url(#${id}${f})` : undefined },
+          anim('stroke-dashoffset', '1;1;0;0;1', `0;${t0};${t1};0.99;1`),
+          anim('opacity', `${o};${o};${o};0;0;${o}`, `0;${t0};0.7;0.8;0.99;1`))));
+    return e('svg', { width: size, height: size, viewBox: '0 0 100 100', style: { display: 'block', overflow: 'visible' } },
+      e('defs', null,
+        e('filter', { id: id + 'glow', x: '-60%', y: '-60%', width: '220%', height: '220%' }, e('feGaussianBlur', { stdDeviation: 1.8 })),
+        e('filter', { id: id + 'soft', x: '-80%', y: '-80%', width: '260%', height: '260%' }, e('feGaussianBlur', { stdDeviation: 5 })),
+        e('clipPath', { id: id + 'wipe' }, e('rect', { x: 38, y: 6, width: 28, height: 0 }, anim('height', '0;0;32;32;0;0', '0;0.74;0.84;0.96;0.995;1')))),
+      // neon draws the ring in one pass, then the lifted petal
+      tube(RING, 0.02, 0.5, 'ring'),
+      tube(TOP, 0.5, 0.64, 'top'),
+      // the finished logo emerges under the neon as it cools: ink outline, centre dot, terracotta petal
+      e('g', { opacity: 0 },
+        anim('opacity', '0;0;1;1;0;0', '0;0.66;0.78;0.96;0.995;1'),
+        e('path', { d: RING, fill: 'none', stroke: ink, strokeWidth: 4.5, strokeLinejoin: 'round' }),
+        e('path', { d: TOP, fill: 'none', stroke: ink, strokeWidth: 4.5, strokeLinejoin: 'round' }),
+        e('circle', { cx: 52, cy: 52, r: 2.2, fill: ink })),
+      e('g', { clipPath: `url(#${id}wipe)` },
+        e('path', { d: TOP, fill: acc, stroke: acc, strokeWidth: 4.5, strokeLinejoin: 'round' }),
+        e('path', { d: 'M52 8 L62 28 L52 36 Z', fill: accShade, opacity: 0.45 })),
+      // afterglow pulse on the finished mark
+      e('path', { d: RING + ' ' + TOP, fill: 'none', stroke: neon, strokeWidth: 9, strokeLinejoin: 'round', opacity: 0, filter: `url(#${id}soft)` },
+        anim('opacity', '0;0;.5;0;0', '0;0.66;0.74;0.9;1')));
+  }
+  loaderPens(size, dark, key) {
+    const e = React.createElement;
+    const D = 3.2, id = 'mp' + key;
+    const ink = dark ? '#F5F0E6' : '#2A2F3A', acc = dark ? '#D8AE5B' : '#B56E52', accShade = dark ? '#B08430' : '#8F5238';
+    const ease = (kt) => kt.split(';').slice(1).map(() => '.4 0 .3 1').join(';');
+    const anim = (attr, values, keyTimes, extra) => e('animate', Object.assign({ attributeName: attr, values, keyTimes, dur: D + 's', repeatCount: 'indefinite', calcMode: 'spline', keySplines: ease(keyTimes) }, extra || {}));
+    // Each petal outline is split into two hand-inked halves that start at the centre and meet at the tip, so three pens work at once and every petal closes from both sides.
+    const H = [
+      ['M52 52 C55 48 57 45 60.5 41.5 C67 45 74 48.5 80 52.2', 'M52 52 C54.5 55 57 59 59.8 62.2 C67 59 74 55.5 80 52.2'],
+      ['M52 52 C56 54.5 59 57 62.2 60.4 C59 67 55.5 74 52 80', 'M52 52 C48 54.5 45 57 41.8 60 C45 67 48.5 74 52 80'],
+      ['M52 52 C49 55.5 47 58 43.8 61.8 C37 58.5 30 55 24.2 52', 'M52 52 C49.5 48 47 45 44.2 41.8 C37 45 30 48.5 24.2 52'],
+    ];
+    const T = [[0.04, 0.3], [0.1, 0.36], [0.16, 0.42]]; // staggered starts, all drawing together
+    const pen = (d, t0, t1, k) => e('g', { key: k },
+      e('path', { d, fill: 'none', stroke: ink, strokeWidth: 1, strokeLinecap: 'round', opacity: 0.2, pathLength: 1, strokeDasharray: 1, strokeDashoffset: 1 },
+        anim('stroke-dashoffset', '1;1;0;0;1', `0;${t0 - 0.03};${t1 - 0.03};0.88;1`)),
+      e('path', { d, fill: 'none', stroke: ink, strokeWidth: 4.4, strokeLinecap: 'round', strokeLinejoin: 'round', pathLength: 1, strokeDasharray: 1, strokeDashoffset: 1, filter: `url(#${id}rough)` },
+        anim('stroke-dashoffset', '1;1;0;0;1', `0;${t0};${t1};0.88;1`),
+        anim('opacity', '1;1;0;0;1', '0;0.88;0.94;0.99;1')),
+      // pen tip light
+      e('circle', { r: 6, fill: '#FFD98A', opacity: 0, filter: `url(#${id}soft)` },
+        e('animateMotion', { dur: D + 's', repeatCount: 'indefinite', keyPoints: `0;0;1;1`, keyTimes: `0;${t0};${t1};1`, calcMode: 'linear', path: d }),
+        anim('opacity', `0;0;.75;.75;0;0`, `0;${t0};${t0 + 0.01};${t1 - 0.01};${t1 + 0.02};1`)));
+    return e('svg', { width: size, height: size, viewBox: '0 0 100 100', style: { display: 'block', overflow: 'visible' } },
+      e('defs', null,
+        e('filter', { id: id + 'rough', x: '-20%', y: '-20%', width: '140%', height: '140%' },
+          e('feTurbulence', { type: 'fractalNoise', baseFrequency: 0.9, numOctaves: 2, seed: 3, result: 'n' }),
+          e('feDisplacementMap', { in: 'SourceGraphic', in2: 'n', scale: 1.6, xChannelSelector: 'R', yChannelSelector: 'G' })),
+        e('filter', { id: id + 'soft', x: '-100%', y: '-100%', width: '300%', height: '300%' }, e('feGaussianBlur', { stdDeviation: 3.2 })),
+        e('clipPath', { id: id + 'wipe' }, e('rect', { x: 38, y: 6, width: 28, height: 0 }, anim('height', '0;0;32;32;0', '0;0.42;0.56;0.88;0.89')))),
+      H.flatMap((pair, i) => pair.map((d, j) => pen(d, T[i][0], T[i][1], i + '' + j))),
+      e('circle', { cx: 52, cy: 52, r: 2.3, fill: ink, opacity: 0 }, anim('opacity', '0;0;1;1;0;0', '0;0.38;0.44;0.88;0.94;1')),
+      // lifted petal: two pen halves from the tip down, then brush-filled terracotta
+      pen('M52 8.5 C55.5 14.5 58.5 21 61.8 28 C58.5 30.8 55.2 33.5 52 36', 0.3, 0.46, 't0'),
+      pen('M52 8.5 C48.5 14.5 45.5 21 42.2 28 C45.5 30.8 48.8 33.5 52 36', 0.3, 0.46, 't1'),
+      e('g', { clipPath: `url(#${id}wipe)`, filter: `url(#${id}rough)` },
+        e('path', { d: 'M52 8.5 C55.5 14.5 58.5 21 61.8 28 C58.5 30.8 55.2 33.5 52 36 C48.8 33.5 45.5 30.8 42.2 28 C45.5 21 48.5 14.5 52 8.5 Z', fill: acc, stroke: acc, strokeWidth: 3.5, strokeLinejoin: 'round' }),
+        e('path', { d: 'M52 8.5 C55.5 14.5 58.5 21 61.8 28 C58.5 30.8 55.2 33.5 52 36 Z', fill: accShade, opacity: 0.45 })));
+  }
+  loaderSinglePen(size, dark, key) {
+    const e = React.createElement;
+    const D = 4.6, id = 'hd' + key;
+    const ink = dark ? '#F5F0E6' : '#2A2F3A', acc = dark ? '#D8AE5B' : '#B56E52', accShade = dark ? '#B08430' : '#8F5238';
+    const ease = (kt) => kt.split(';').slice(1).map(() => '.4 0 .3 1').join(';');
+    const anim = (attr, values, keyTimes, extra) => e('animate', Object.assign({ attributeName: attr, values, keyTimes, dur: D + 's', repeatCount: 'indefinite', calcMode: 'spline', keySplines: ease(keyTimes) }, extra || {}));
+    // Hand-inked petal outlines: slightly wobbly quads, drawn as one pen stroke each (E, S, W), tip first.
+    const P = [
+      'M52 52 C55 48 57 45 60.5 41.5 C67 45 74 48.5 80 52.2 C74 55.5 67 59 59.8 62.2 C57 59 54.5 55 52 52',
+      'M52 52 C56 54.5 59 57 62.2 60.4 C59 67 55.5 74 52 80 C48.5 74 45 67 41.8 60 C45 57 48 54.5 52 52',
+      'M52 52 C49 55.5 47 58 43.8 61.8 C37 58.5 30 55 24.2 52 C30 48.5 37 45 44.2 41.8 C47 45 49.5 48 52 52',
+    ];
+    const tip = [[52, 52], [80, 52], [52, 80], [24, 52]]; // pen rests at centre, ends of each stroke
+    const stroke = (d, t0, t1) => e('g', { key: d },
+      // pencil ghost first, then ink over it
+      e('path', { d, fill: 'none', stroke: ink, strokeWidth: 1, strokeLinecap: 'round', opacity: 0.18, pathLength: 1, strokeDasharray: 1, strokeDashoffset: 1 },
+        anim('stroke-dashoffset', `1;1;0;0;1`, `0;${t0 - 0.05};${t1 - 0.03};0.9;1`)),
+      e('path', { d, fill: 'none', stroke: ink, strokeWidth: 4.4, strokeLinecap: 'round', strokeLinejoin: 'round', pathLength: 1, strokeDasharray: 1, strokeDashoffset: 1, filter: `url(#${id}rough)` },
+        anim('stroke-dashoffset', `1;1;0;0;1`, `0;${t0};${t1};0.9;1`),
+        anim('opacity', `1;1;1;0;0;1`, `0;${t0};0.9;0.95;0.99;1`)));
+    // warm lamp-light that rides the pen tip
+    const light = e('g', null,
+      e('animateMotion', { dur: D + 's', repeatCount: 'indefinite', keyPoints: '0;0;0.33;0.33;0.66;0.66;1;1', keyTimes: '0;0.06;0.2;0.24;0.38;0.42;0.56;1', calcMode: 'linear', path: 'M52 52 L60.5 41.5 L80 52.2 L59.8 62.2 L52 52 L62.2 60.4 L52 80 L41.8 60 L52 52 L43.8 61.8 L24.2 52 L44.2 41.8 L52 52' }),
+      e('circle', { r: 9, fill: '#FFD98A', opacity: 0, filter: `url(#${id}soft)` }, anim('opacity', '0;.7;.7;0;0', '0;0.06;0.56;0.62;1')),
+      e('circle', { r: 2.2, fill: '#FFF3D0', opacity: 0 }, anim('opacity', '0;1;1;0;0', '0;0.06;0.56;0.6;1')));
+    return e('svg', { width: size, height: size, viewBox: '0 0 100 100', style: { display: 'block', overflow: 'visible' } },
+      e('defs', null,
+        e('filter', { id: id + 'rough', x: '-20%', y: '-20%', width: '140%', height: '140%' },
+          e('feTurbulence', { type: 'fractalNoise', baseFrequency: 0.9, numOctaves: 2, seed: 3, result: 'n' }),
+          e('feDisplacementMap', { in: 'SourceGraphic', in2: 'n', scale: 1.6, xChannelSelector: 'R', yChannelSelector: 'G' })),
+        e('filter', { id: id + 'soft', x: '-100%', y: '-100%', width: '300%', height: '300%' }, e('feGaussianBlur', { stdDeviation: 4 }))),
+      stroke(P[0], 0.06, 0.22), stroke(P[1], 0.24, 0.4), stroke(P[2], 0.42, 0.58),
+      light,
+      e('circle', { cx: 52, cy: 52, r: 2.3, fill: ink, opacity: 0 }, anim('opacity', '0;0;1;1;0;0', '0;0.58;0.62;0.9;0.95;1')),
+      // brush fill for the lifted petal: painted with a wipe from tip to base
+      e('clipPath', { id: id + 'wipe' }, e('rect', { x: 38, y: 6, width: 28, height: 0 }, anim('height', '0;0;32;32;0', '0;0.64;0.78;0.9;0.91'))),
+      e('g', { clipPath: `url(#${id}wipe)`, filter: `url(#${id}rough)` },
+        e('path', { d: 'M52 8.5 C55.5 14.5 58.5 21 61.8 28 C58.5 30.8 55.2 33.5 52 36 C48.8 33.5 45.5 30.8 42.2 28 C45.5 21 48.5 14.5 52 8.5 Z', fill: acc, stroke: acc, strokeWidth: 3.5, strokeLinejoin: 'round' }),
+        e('path', { d: 'M52 8.5 C55.5 14.5 58.5 21 61.8 28 C58.5 30.8 55.2 33.5 52 36 Z', fill: accShade, opacity: 0.45 })));
+  }
+  loaderLayers(size, dark, key) {
+    const e = React.createElement;
+    const D = 4.4;
+    const ink = dark ? '#F5F0E6' : '#2A2F3A', acc = dark ? '#D8AE5B' : '#B56E52', accShade = dark ? '#B08430' : '#8F5238';
+    const ease = (kt) => kt.split(';').slice(1).map(() => '.5 0 .15 1').join(';');
+    const anim = (attr, values, keyTimes, extra) => e('animate', Object.assign({ attributeName: attr, values, keyTimes, dur: D + 's', repeatCount: 'indefinite', calcMode: 'spline', keySplines: ease(keyTimes) }, extra || {}));
+    const move = (values, keyTimes) => e('animateTransform', { attributeName: 'transform', type: 'translate', values, keyTimes, dur: D + 's', repeatCount: 'indefinite', calcMode: 'spline', keySplines: ease(keyTimes) });
+    const rot = (values, keyTimes) => e('animateTransform', { attributeName: 'transform', type: 'rotate', values, keyTimes, dur: D + 's', repeatCount: 'indefinite', calcMode: 'spline', keySplines: ease(keyTimes) });
+    // Petal built from 5 horizontal print layers inside its diamond (local coords: tip 0,0 pointing up, base at y=28, centre at y=0..28)
+    const layers = [[6, 4.3], [12, 8.6], [18, 12.9], [24, 12.4], [28, 8]]; // [y, halfWidth]
+    const petal = (angle, scatter, delay) => {
+      const kt = `0;${delay};${delay + 0.28};0.88;1`;
+      return e('g', { transform: `rotate(${angle} 52 52)` },
+        e('g', { transform: 'translate(52 24)' },
+          // each layer drifts in from a scattered offset and rotation, settling into the stack
+          layers.map(([y, hw], i) => {
+            const [sx, sy, sr] = scatter[i];
+            return e('g', { key: i },
+              move(`${sx} ${sy};${sx} ${sy};0 0;0 0;${sx} ${sy}`, kt),
+              e('g', null,
+                rot(`${sr} 0 ${y};${sr} 0 ${y};0 0 ${y};0 0 ${y};${sr} 0 ${y}`, kt),
+                e('line', { x1: -hw, y1: y, x2: hw, y2: y, stroke: ink, strokeWidth: 3.2, strokeLinecap: 'round', opacity: 0.35 },
+                  anim('opacity', `.35;.35;.35;0;0;.35`, `0;${delay};${delay + 0.28};${delay + 0.36};0.96;1`))));
+          }),
+          // outline hardens once layers are in place
+          e('path', { d: 'M0 0 L10 20 L0 28 L-10 20 Z', fill: 'none', stroke: ink, strokeWidth: 4.5, strokeLinejoin: 'round', opacity: 0 },
+            anim('opacity', `0;0;1;1;0;0`, `0;${delay + 0.24};${delay + 0.34};0.9;0.96;1`))));
+    };
+    const S1 = [[-14, -10, -40], [12, -6, 35], [-9, 8, -25], [14, 10, 20], [-4, 16, -50]];
+    const S2 = [[10, -14, 30], [-13, -4, -35], [12, 6, 40], [-10, 12, -20], [6, 18, 45]];
+    const S3 = [[-12, -12, 50], [8, -10, -30], [-14, 4, 25], [11, 12, -45], [-6, 18, 30]];
+    return e('svg', { width: size, height: size, viewBox: '0 0 100 100', style: { display: 'block', overflow: 'visible' } },
+      // three outlined petals: east, south, west, forming one after another
+      petal(90, S1, 0.04), petal(180, S2, 0.16), petal(270, S3, 0.28),
+      // centre dot appears when petals meet
+      e('circle', { cx: 52, cy: 52, r: 2.2, fill: ink, opacity: 0 }, anim('opacity', '0;0;1;1;0;0', '0;0.5;0.58;0.9;0.96;1')),
+      // fourth petal: solid, drops in from above and settles just clear of the flower
+      e('g', { opacity: 0 },
+        anim('opacity', '0;0;1;1;0;0', '0;0.56;0.64;0.9;0.96;1'),
+        move('0 -26;0 -26;0 2;0 0;0 0;0 -26', '0;0.56;0.7;0.76;0.96;1'),
+        e('path', { d: 'M52 8 L62 28 L52 36 L42 28 Z', fill: acc }),
+        e('path', { d: 'M52 8 L62 28 L52 36 Z', fill: accShade, opacity: 0.45 })));
+  }
+  renderVals() {
+    return {
+      loaderDark: this.loader(220, true, 'a'),
+      loaderLight: this.loader(220, false, 'b'),
+      loaderMid: this.loader(96, true, 'c'),
+      loaderSmall: this.loader(48, true, 'd'),
+      loaderTiny: this.loader(24, true, 'e'),
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aakar.studio/schemas/printability-report.v1.json",
+  "title": "Aakar Printability Report v1",
+  "description": "Produced by the inspect service for every design version. The checkout stability card renders directly from this.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["report_version", "passed", "checks", "geometry", "check_duration_ms"],
+  "properties": {
+    "report_version": { "const": "1.0" },
+    "passed": { "type": "boolean", "description": "True when every check with severity 'fail' passed." },
+    "geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bounds_mm", "volume_cm3", "surface_cm2", "triangles"],
+      "properties": {
+        "bounds_mm": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3, "description": "Width, depth, height." },
+        "volume_cm3": { "type": "number" },
+        "surface_cm2": { "type": "number" },
+        "triangles": { "type": "integer" }
+      }
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifold", "fits_bed", "thinnest_wall", "centre_of_gravity", "tipping_margin"],
+      "properties": {
+        "manifold": { "$ref": "#/$defs/check" },
+        "fits_bed": { "$ref": "#/$defs/check" },
+        "thinnest_wall": { "$ref": "#/$defs/check" },
+        "centre_of_gravity": { "$ref": "#/$defs/check" },
+        "tipping_margin": { "$ref": "#/$defs/check" },
+        "overhangs": { "$ref": "#/$defs/check" },
+        "load_capacity": { "$ref": "#/$defs/check" }
+      }
+    },
+    "check_duration_ms": { "type": "integer", "minimum": 0 }
+  },
+  "$defs": {
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "summary"],
+      "properties": {
+        "status": { "type": "string", "enum": ["pass", "warn", "fail", "skipped"] },
+        "summary": { "type": "string", "description": "Customer-facing sentence, e.g. 'Inside base · 3 mm'." },
+        "value": { "type": ["number", "boolean", "null"] },
+        "unit": { "type": "string" },
+        "threshold": { "type": ["number", "null"] },
+        "detail": { "type": "object", "additionalProperties": true }
+      }
+    }
+  }
+}

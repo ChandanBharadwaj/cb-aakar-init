@@ -1,0 +1,56 @@
+/* Generated from tokens.json — keep in sync (PLAN §8.4). Two surfaces, one palette. */
+:root {
+  --ak-cream: #F5F0E6;
+  --ak-paper: #FBF8F1;
+  --ak-sand: #ECE3D2;
+  --ak-line: #E3DACA;
+  --ak-ink: #2A2F3A;
+  --ak-ink-muted: #646A78;
+  --ak-indigo: #34426B;
+  --ak-indigo-deep: #1B2238;
+  --ak-indigo-surface: #232C48;
+  --ak-terracotta: #B56E52;
+  --ak-terracotta-deep: #8F5238;
+  --ak-marigold: #D8AE5B;
+  --ak-sage: #7E9A7B;
+
+  --ak-font-display: 'Cormorant Garamond', Georgia, serif;
+  --ak-font-ui: Manrope, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --ak-radius-control: 10px;
+  --ak-radius-card: 14px;
+  --ak-radius-pill: 999px;
+
+  --ak-shadow-card: 0 8px 30px rgba(42,47,58,.08);
+  --ak-shadow-float: 0 24px 60px rgba(42,47,58,.14);
+  --ak-shadow-stage-glow: 0 0 24px rgba(216,174,91,.35);
+
+  --ak-motion-fast: 120ms;
+  --ak-motion-base: 220ms;
+  --ak-motion-slow: 420ms;
+  --ak-ease: cubic-bezier(.2,.8,.2,1);
+
+  --ak-jaali: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Cpath d='M24 0L48 24L24 48L0 24Z' fill='none' stroke='%232A2F3A' stroke-opacity='.06'/%3E%3C/svg%3E");
+
+  /* paper surface (default) */
+  --ak-bg: var(--ak-cream);
+  --ak-card: var(--ak-paper);
+  --ak-border: var(--ak-line);
+  --ak-text: var(--ak-ink);
+  --ak-text-muted: var(--ak-ink-muted);
+  --ak-accent: var(--ak-terracotta);
+}
+
+[data-surface="stage"] {
+  --ak-bg: var(--ak-indigo-deep);
+  --ak-card: var(--ak-indigo-surface);
+  --ak-border: #33406A;
+  --ak-text: var(--ak-cream);
+  --ak-text-muted: #B8BDD0;
+  --ak-accent: var(--ak-marigold);
+  --ak-jaali: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Cpath d='M24 0L48 24L24 48L0 24Z' fill='none' stroke='%23F5F0E6' stroke-opacity='.07'/%3E%3C/svg%3E");
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --ak-motion-fast: 0ms; --ak-motion-base: 0ms; --ak-motion-slow: 0ms; }
+}
