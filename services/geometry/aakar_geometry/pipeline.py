@@ -122,7 +122,16 @@ def _check_spec_against_template(template: type[Template], spec: Mapping[str, An
         )
     material = spec.get("material")
     if material and material not in template.materials():
-        raise InvalidSpec(f"Unknown material {material}", {"material": material, "materials": template.materials()})
+        from .materials import load_materials
+
+        names = {m["id"]: m.get("name") or m["id"] for m in load_materials()}
+        allowed = template.materials()
+        if material in names:  # a real finish that this family's material rules leave out (Roshni: white only)
+            raise InvalidSpec(
+                f"{template.name} comes in {', '.join(names.get(m, m) for m in allowed)} only",
+                {"material": material, "materials": allowed},
+            )
+        raise InvalidSpec(f"Unknown material {material}", {"material": material, "materials": allowed})
 
 
 def _build_with_timeout(

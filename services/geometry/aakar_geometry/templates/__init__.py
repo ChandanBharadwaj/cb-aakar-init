@@ -11,7 +11,12 @@ from .desk_nameplate import DeskNameplate
 from .fridge_magnet import FridgeMagnet
 from .hanging_ornament import HangingOrnament
 from .jharokha_phone_stand import JharokhaPhoneStand
+from .keycap_mx import KeycapMx
 from .keychain_tag import KeychainTag
+from .lithophane_plate import LithophanePlate
+from .pet_tag import PetTag
+from .photo_frame_std import PhotoFrameStd
+from .plinth_round import PlinthRound
 from .raw_print import RawPrint
 
 _REF_RE = re.compile(r"^([a-z][a-z0-9_]*)@([0-9]+)$")
@@ -37,6 +42,12 @@ register(FridgeMagnet)
 register(HangingOrnament)
 register(DeskNameplate)
 register(RawPrint)
+# PR 8: the keepsakes (Roshni, Pratima, Saathi Pet) and the second wave (Chaukhat, Kunji)
+register(LithophanePlate)
+register(PlinthRound)
+register(PetTag)
+register(PhotoFrameStd)
+register(KeycapMx)
 
 
 def list_templates() -> list[type[Template]]:
@@ -71,8 +82,13 @@ __all__ = [
     "HangingOrnament",
     "HardwareRef",
     "JharokhaPhoneStand",
+    "KeycapMx",
     "KeychainTag",
+    "LithophanePlate",
     "Param",
+    "PetTag",
+    "PhotoFrameStd",
+    "PlinthRound",
     "REGISTRY",
     "RawPrint",
     "Template",

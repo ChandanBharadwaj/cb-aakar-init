@@ -1,9 +1,11 @@
 """Watertight heightfield solids: a height grid on top, a flat bottom at z = 0, closed side walls.
 
 ``heights[j, i]`` is the height above the base at ``x = x_i`` (columns, +x) and ``y = y_j``
-(rows, +y, so row 0 is the *bottom* of the picture). The grid is centred on the origin in x and y
-with square cells of ``cell_mm``. The bottom is a fan from the centre point so no triangle is
-degenerate, and every edge is shared by exactly two faces by construction.
+(rows, +y, so row 0 is the *bottom* of the picture). ``heightfield_solid`` centres the grid on the
+origin in x and y with square cells of ``cell_mm``; ``grid_solid`` takes any strictly increasing
+column and row positions (a lithophane plate: frame, bevel and photo samples in one surface). The
+bottom is a fan from the grid's centre point so no triangle is degenerate, and every edge is shared
+by exactly two faces by construction.
 """
 
 from __future__ import annotations
@@ -31,10 +33,30 @@ def heightfield_solid(heights: np.ndarray, cell_mm: float, base_mm: float) -> tr
     ny, nx = h.shape
     xs = (np.arange(nx) - (nx - 1) / 2.0) * cell
     ys = (np.arange(ny) - (ny - 1) / 2.0) * cell
+    return _grid_solid(xs, ys, base + h)
+
+
+def grid_solid(xs: np.ndarray, ys: np.ndarray, top: np.ndarray) -> trimesh.Trimesh:
+    """Solid over a rectilinear grid: the bottom is the plane z = 0 and the top is ``top[j, i]`` (> 0) at
+    ``(xs[i], ys[j])``. ``xs`` and ``ys`` must be strictly increasing; the cells need not be square or equal."""
+    x = np.asarray(xs, dtype=np.float64).reshape(-1)
+    y = np.asarray(ys, dtype=np.float64).reshape(-1)
+    z = np.asarray(top, dtype=np.float64)
+    if x.size < 2 or y.size < 2 or z.shape != (y.size, x.size):
+        raise ValueError(f"top must be (len(ys), len(xs)) with at least 2 × 2 samples, got {z.shape} for {y.size} × {x.size}")
+    if not (np.all(np.diff(x) > 0) and np.all(np.diff(y) > 0)):
+        raise ValueError("xs and ys must be strictly increasing")
+    if not np.all(np.isfinite(z)) or float(z.min()) <= 0:
+        raise ValueError("top must be finite and above the bottom plane (> 0)")
+    return _grid_solid(x, y, z)
+
+
+def _grid_solid(xs: np.ndarray, ys: np.ndarray, top_z: np.ndarray) -> trimesh.Trimesh:
+    nx, ny = len(xs), len(ys)
     gx, gy = np.meshgrid(xs, ys)  # (ny, nx)
 
     # top vertices: index t(i, j) = j * nx + i
-    top = np.column_stack([gx.ravel(), gy.ravel(), base + h.ravel()])
+    top = np.column_stack([gx.ravel(), gy.ravel(), top_z.ravel()])
 
     # perimeter ring, counter-clockwise seen from +z, starting at (i=0, j=0)
     ring_i = np.concatenate([np.arange(0, nx), np.full(ny - 2, nx - 1), np.arange(nx - 1, -1, -1), np.zeros(ny - 2, dtype=int)])
@@ -43,7 +65,7 @@ def heightfield_solid(heights: np.ndarray, cell_mm: float, base_mm: float) -> tr
     n_ring = len(ring_top)
 
     bottom_ring = np.column_stack([xs[ring_i], ys[ring_j], np.zeros(n_ring)])
-    centre = np.array([[0.0, 0.0, 0.0]])
+    centre = np.array([[(xs[0] + xs[-1]) / 2.0, (ys[0] + ys[-1]) / 2.0, 0.0]])  # the origin for a centred grid
     vertices = np.vstack([top, bottom_ring, centre])
     ring_bot = nx * ny + np.arange(n_ring)
     centre_id = nx * ny + n_ring
@@ -74,7 +96,7 @@ def heightfield_solid(heights: np.ndarray, cell_mm: float, base_mm: float) -> tr
     if not (mesh.is_watertight and mesh.is_winding_consistent and mesh.volume > 0):
         raise GeometryError(
             "Heightfield solid is not closed",
-            {"shape": list(h.shape), "watertight": bool(mesh.is_watertight), "volume": float(mesh.volume)},
+            {"shape": [ny, nx], "watertight": bool(mesh.is_watertight), "volume": float(mesh.volume)},
         )
     return mesh
 
@@ -90,4 +112,4 @@ def heightfield_volume(heights: np.ndarray, cell_mm: float, base_mm: float) -> f
     return float(cell_area * ((a + b + c) / 3.0 + (a + c + d) / 3.0).sum())
 
 
-__all__ = ["heightfield_solid", "heightfield_volume"]
+__all__ = ["grid_solid", "heightfield_solid", "heightfield_volume"]

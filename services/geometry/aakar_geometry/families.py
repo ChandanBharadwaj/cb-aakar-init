@@ -7,9 +7,10 @@ template declares its ``family``; the registry refuses templates whose family is
 ``content_slot`` (``accepts``, ``max_text_chars``).
 
 Loaded from ``AAKAR_FAMILIES_FILE`` when set (the Dockerfile copies the seed to
-``/design-tokens/families.json``), else the repo-relative path, else the built-in copy of the launch
-families so the registry still resolves when the design tokens are not mounted (wheels). A mounted
-file is validated against ``template-family.v1.json`` so a drifted seed fails loudly at import.
+``/design-tokens/families.json``), else the repo-relative path, else the built-in copy of every
+family that has a template, so the registry still resolves when the design tokens are not mounted
+(wheels). A mounted file is validated against ``template-family.v1.json`` so a drifted seed fails
+loudly at import.
 """
 
 from __future__ import annotations
@@ -71,7 +72,7 @@ def _row(
     return row
 
 
-# Built-in copy of the launch-tier rows (ids, kinds, content slots, size envelopes, hardware and material
+# Built-in copy of the rows that have templates (ids, kinds, content slots, size envelopes, hardware and material
 # rules only; brand copy lives in the seed). Keep in step with packages/design-tokens/families.json.
 BUILTIN_FAMILIES: list[dict[str, Any]] = [
     _row("keychain", "carrier", "keychain_tag", ["relief_image", "emboss_text", "motif"], ["face", "back"],
@@ -88,6 +89,12 @@ BUILTIN_FAMILIES: list[dict[str, Any]] = [
     _row("figurine_base", "carrier", "plinth_round", ["hero_mesh", "emboss_text"], ["top", "base_front"],
          hero_volume=True, max_text_chars=16, available=False, envelope=(50, 200)),
     _row("raw_print", "raw", "raw_print", ["hero_mesh"], ["body"], hero_volume=True, envelope=(20, 240)),
+    # tier next, templates in PR 8 (Chaukhat, Kunji): the registry must resolve them without the seed too
+    _row("photo_frame", "carrier", "photo_frame_std", ["emboss_text", "motif"], ["base_front", "border"],
+         max_text_chars=24, hardware=[{"sku": "acrylic_4x6", "qty": 1}], shape_tolerance="constrained", available=False,
+         envelope=(120, 220)),
+    _row("keycap", "carrier", "keycap_mx", ["relief_image", "emboss_text"], ["top"],
+         max_text_chars=3, shape_tolerance="strict", available=False, envelope=(18, 20)),
     _row("phone_stand", "object", "jharokha_phone_stand", ["emboss_text", "motif"], ["side_left", "side_right", "back"],
          max_text_chars=16, shape_tolerance="strict", envelope=(80, 160)),
 ]

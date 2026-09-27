@@ -15,7 +15,7 @@ from aakar_geometry.contracts import validate
 from conftest import content_source
 
 
-def descriptor_matches_family(template) -> dict:
+def descriptor_matches_family(template, min_feature_mm: float = 0.8) -> dict:
     """The descriptor validates, stays inside its family's content slot and names the slot's anchors."""
     desc = template.descriptor()
     validate("template-descriptor", desc)
@@ -28,19 +28,20 @@ def descriptor_matches_family(template) -> dict:
             assert len(anchor["size_mm"]) == 2 and min(anchor["size_mm"]) >= 8, anchor
         else:
             assert len(anchor["bounds_mm"]) == 3, anchor
-    assert desc["min_feature_mm"] == 0.8
+    assert desc["min_feature_mm"] == min_feature_mm
     assert desc["environment"] == families.family(template.family).get("environment", "studio")
     return desc
 
 
-def check_body(template, params) -> trimesh.Trimesh:
-    """Watertight, on Z = 0, centred in X/Y, longest side inside the family envelope, fits the bed."""
+def check_body(template, params, envelope: tuple[float, float] | None = None) -> trimesh.Trimesh:
+    """Watertight, on Z = 0, centred in X/Y, longest side inside the family envelope (or ``envelope`` where a
+    template deliberately differs from the seed), fits the bed."""
     mesh = template.build_body(params)
     assert mesh.is_watertight and mesh.is_winding_consistent and mesh.volume > 0, (template.ref(), params)
     lo, hi = mesh.bounds
     assert lo[2] == pytest.approx(0.0, abs=1e-6)
     assert (lo[0] + hi[0]) / 2 == pytest.approx(0.0, abs=1e-6) and (lo[1] + hi[1]) / 2 == pytest.approx(0.0, abs=1e-6)
-    envelope = families.size_envelope(template.family)
+    envelope = envelope or families.size_envelope(template.family)
     assert envelope is not None
     longest = float(max(mesh.extents))
     assert envelope[0] - 1e-6 <= longest <= envelope[1] + 1e-6, (template.ref(), params, longest, envelope)
@@ -48,12 +49,19 @@ def check_body(template, params) -> trimesh.Trimesh:
     return mesh
 
 
-def check_frames(template, params, mesh: trimesh.Trimesh, tolerance_mm: float = 0.05) -> None:
-    """Every surface anchor is a right-handed frame whose centre and corners lie on the skin, facing out."""
+def check_frames(template, params, mesh: trimesh.Trimesh, tolerance_mm: float = 0.05, min_size_mm: float = 8.0) -> None:
+    """Every anchor is a right-handed frame whose origin lies on the skin, facing out; a surface anchor's corners
+    lie on the skin too, a volume anchor's origin is the middle of the face its form stands on."""
     for anchor in template.anchors:
         frame = template.anchor_frame(anchor.id, params)
         assert np.allclose(np.cross(frame.u, frame.v), frame.normal), anchor.id
-        assert frame.size_mm is not None and min(frame.size_mm) >= 8, (anchor.id, frame.size_mm)
+        if anchor.kind == "volume":
+            assert frame.bounds_mm is not None and len(frame.bounds_mm) == 3, anchor.id
+            _, distance, triangle = closest_point(mesh, frame.origin[None, :])
+            assert distance[0] < tolerance_mm, (anchor.id, distance)
+            assert float(np.dot(mesh.face_normals[triangle[0]], frame.normal)) > 0.999, anchor.id
+            continue
+        assert frame.size_mm is not None and min(frame.size_mm) >= min_size_mm, (anchor.id, frame.size_mm)
         points = np.vstack([frame.origin[None, :], frame.corners()])
         _, distance, triangle = closest_point(mesh, points)
         assert distance.max() < tolerance_mm, (anchor.id, distance)
