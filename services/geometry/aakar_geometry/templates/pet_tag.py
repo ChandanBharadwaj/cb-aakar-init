@@ -18,7 +18,8 @@ takes either face where it fits, the lettering and motif rules refuse what would
   back  the same rectangle on the underside, seen with the tag turned over left to right, so the hole stays
         at the top of the picture (normal −Z).
 A cut-in name, motif or photo must leave ``MIN_SKIN_MM`` of plastic behind it; cut-ins on both faces add up.
-Tags of 25–35 mm sit below the keychain family's 30 mm floor on purpose (the seed's envelope is 30–60 mm).
+Tags of 25–29 mm sit below the keychain family's envelope (families.json: 30–60 mm), whose floor should come
+down to 25 mm for pet tags.
 """
 
 from __future__ import annotations

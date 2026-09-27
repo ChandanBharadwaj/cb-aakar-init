@@ -24,9 +24,11 @@ Stability (``build``, after the form is fused): with the inspect service's own c
 (``aakar_inspect.checks.stability``) the combined centre of gravity must sit at least
 ``MIN_TIPPING_MARGIN_MM`` inside the plinth's footprint, and the piece must stand a ``MIN_TIP_ANGLE_DEG``
 nudge (the angle it can lean before its centre of gravity passes the footprint's edge). A form that
-leans off the plinth, or a tall form on a narrow plinth, is refused (``param_out_of_range``) with the
-plinth size that would hold it. A plinth alone (or with only a name) always stands; the form is not
-required. No hardware.
+leans off the plinth, or a tall form on a narrow plinth, is refused (``param_out_of_range``) naming the
+narrowest plinth that would hold it, worked out rather than guessed (``_wider_plinth``: a wider plinth is
+heavier, and a form fitted with ``contain`` grows with its room), or asking for a smaller form when no
+plinth on offer would. A plinth alone (or with only a name) always stands; the form is not required.
+No hardware.
 """
 
 from __future__ import annotations

@@ -30,11 +30,19 @@ in `families.json`.
 | `hanging_ornament@1` | `ornament` (Jhoomar) | `silhouette` disc · star · bauble (disc); `diameter_mm` 50–90 (70), longest side; `thickness_mm` 3–5 (4); `border_mm` 0–6 (3), 0 or ≥ 1.5 | `face_front` (+Z) and `face_back` (−Z): photo, name, motif; 48.7 × 36.6 mm | `cord_200` ×1 |
 | `desk_nameplate@1` | `nameplate` (Pehchaan) | `width_mm` 120–250 (180); `height_mm` 40–100 (60), face up the slope; `tilt_deg` 60–80 (70); `base_depth_mm` 30–60 (40); `thickness_mm` 4–8 (5) | `face` (tilted): name, motif, photo; 176 × 56 mm, text ≤ 36 mm; `base_front` (−Y): name, photo; 178 × 8 mm | `adhesive_pads` ×1 |
 | `raw_print@1` | `raw_print` (Swaroop) | none: size and orientation live on the `hero_mesh` feature | `body` (volume): 240 × 240 × 240 mm | — |
+| `lithophane_plate@1` | `lithophane` (Roshni) | `size` square 100 × 100 · portrait 104 × 140 (portrait); `min_mm` 0.8–1.8 (0.8), the lightest parts; `max_mm` 2–3 (3), the darkest, at least 1.2 more; `stand` none · night_light (night_light) | `plate` (−Y standing, +Z lying): the photo in `lithophane` mode only; 95 × 131 mm (square 91 × 91) | `led_base_usb` ×1 with the night light; none for the plate alone |
+| `plinth_round@1` | `figurine_base` (Pratima) | `shape` round · rounded_square (round); `diameter_mm` 40–120 (70); `height_mm` 6–20 (12) | `top` (volume): your form, `diameter_mm` × `diameter_mm` × 180 mm; `base_front` (−Y): name; 39 × 11 mm | — |
+| `pet_tag@1` | `keychain` (Saathi) | `shape` bone · disc (bone); `size_mm` 25–35 (30), longest side; `thickness_mm` 3–4 (3.5); the ring hole is 4 mm | `face` (+Z) and `back` (−Z): name first, motif, photo; 23.1 × 10.8 mm | `split_ring_25` ×1 |
+| `photo_frame_std@1` | `photo_frame` (Chaukhat) | `orientation` portrait · landscape (portrait), for a 4 × 6 in photo; `border_mm` 12–25 (18); `stand` easel · hanger (easel) | `border` (the top rail): motif, name; `base_front` (the bottom rail): name; 121.9 × 15 mm; cut in, never raised | `acrylic_4x6` ×1 |
+| `keycap_mx@1` | `keycap` (Kunji) | `stem_slop_mm` 0.3–0.5 (0.4) | `top` (+Z, dished): photo relief or 1–3 letters, at most 0.6 mm; 11.1 × 11.1 mm | — |
 
-All five carriers publish `min_feature_mm` 0.8, constraints min wall 1.2 / overhang 55° / bed 250³,
+The first four carriers publish `min_feature_mm` 0.8, constraints min wall 1.2 / overhang 55° / bed 250³,
 and take names and motifs besides photos (`features_supported`: `relief_image`, `emboss_text`,
 `motif`; the nameplate lists `emboss_text` first, its primary content), every surface anchor with a
 relief or letter depth up to `max_relief_mm` 1.5 (the Jharokha's 1.2); `raw_print` takes one `hero_mesh`.
+The keepsakes and the second wave (PR 8, below) keep the 250³ bed; the lithophane's and the keycap's
+minimum wall is 0.8 mm (the contract's floor: a lithophane is 0.8 mm where the photo is lightest, and an MX
+stem is thinner still at its cross's tips), and the keycap's letters keep 1 mm strokes (`min_feature_mm`).
 Descriptors publish anchor sizes at the default parameters; `anchor_frame(anchor_id, params)` gives
 the exact frame for any parameters.
 
@@ -124,6 +132,64 @@ insists on `fit: longest` (so a raw print is never silently bed-sized), and refu
 outside the family envelope 20–240 mm (`param_out_of_range` on `features[i].longest_mm`, never
 clamped; the contract itself allows 5–250). A model with walls under the printability threshold
 still completes, with `printability.passed=false`.
+
+### The keepsakes and the second wave (PR 8)
+
+**`lithophane_plate@1` (family `lithophane`, Roshni).** The photo becomes the plate: a `relief_image` in
+`lithophane` mode is required (a spec without it is `invalid_spec` "Add the photo that becomes your Roshni
+night light"; a photo raised or cut in is `unsupported_feature`), and the template's `lithophane` hook
+turns its heightmap into the plate: the darkest pixel `max_mm`, the lightest `min_mm` (`invert` swaps them
+upstream), a photo that does not fill the plate edged dark at `max_mm`. The feature's `relief_mm` does not
+apply. The plate is one closed heightfield over a 4 mm frame (`max_mm` + 1 mm, proud of the photo on the
+front), a 0.5 mm bevel and the photo (`features.heightfield.grid_solid`, at the photo's own spacing, at most
+120k samples ≈ 240k triangles), so no boolean touches the photo. With `stand: night_light` (default) the
+plate stands fused 3 mm into a 12 mm base: **one print**, printed standing as modelled (the thickness is
+then drawn by the nozzle rather than stepped by layers), no supports; behind it a 70.6 mm pocket, 8 mm
+deep, takes the 70 mm USB LED puck face up, with a 12 mm cable notch out through the back. The portrait
+night light is 116 × 88 × 149 mm, inside the family's 100–150 mm envelope. With `stand: none` the plate
+lies on its flat back and ships without the light (`hardware_for` returns no `led_base_usb`). Constraints
+min wall 0.8 mm; the lightest pixel is 0.02 mm thicker than `min_mm`, because the printability check
+measures walls from 0.01 mm inside the skin and would read a 0.8 mm light area a hair under 0.8. The family
+allows `basic_white` only; any other finish is `invalid_spec` "Roshni photo night light comes in Basic White
+only". The karigar's note asks for white, 0.1–0.12 mm layers and 100% infill.
+
+**`plinth_round@1` (family `figurine_base`, Pratima).** A round plinth (flat at the front, a D-shaped
+footprint, so the name has a flat face) or a rounded square. The `top` volume anchor sits at the footprint's
+centroid with `bounds_mm` = diameter × diameter × 180, so plinth and form stay under the family's 200 mm
+(20 + 180 − 0.5); the customer's form (`fit: contain`, or `longest`, refused and never shrunk when it does
+not fit) is seated centred and fused. After fusing, `build` runs the inspect service's stability check on
+the whole piece: the centre of gravity must sit 5 mm inside the footprint and the piece must stand a 10°
+nudge, or it is refused (`param_out_of_range` on `diameter_mm`, and `longest_mm` for a set size) with the
+narrowest plinth that would hold it, worked out rather than guessed (a wider plinth is heavier, and a
+contained form grows with its room), or a request for a smaller form. `base_front` takes a name; below
+7 mm tall the plinth leaves under 4 mm for letters and a name is refused as too long. No hardware.
+
+**`pet_tag@1` (family `keychain`, "Saathi Pet").** A bone (end to end `size_mm`, the ring hole in a tab
+between the top lobes) or a disc (the hole inside it at the top), 25–35 mm, 3–4 mm thick; the hole is
+4 mm cut 4.2 mm with a 2 mm rim for the 25 mm split ring. `face` and `back` take a name first, and a motif
+or photo where the lettering and motif rules allow; the text area is the largest 2:1 rectangle clear of the
+hole. The skin rule of the flat carriers applies. The karigar's note asks for PETG. 25–29 mm tags sit below
+the keychain family's 30 mm floor (the seed needs 25).
+
+**`photo_frame_std@1` (family `photo_frame`, Chaukhat).** For a 4 × 6 in photo (101.6 × 152.4 mm; the only
+pane in the seed is `acrylic_4x6`, so 5 × 7 waits for a new hardware SKU), portrait or landscape. The
+framer's rules: the lip overlaps the photo by 1/4 in (6.35 mm) on every side (window 88.9 × 139.7 mm) and
+the rabbet is the photo + 1/16 in (1.6 mm), 3/8 in (9.5 mm) deep, behind a 3 mm lip. `border_mm` 12–25
+is the face round the window. `easel`: two feet behind the side walls, clear of the rabbet's opening, stand
+it leaning back 15° (built standing so, stability checked); `hanger`: a tab with a 5 mm nail hole on top
+(built lying on its back). Both print face down with no supports, so names and motifs are cut in, never
+raised (`unsupported_feature` "cut into the face, not raised"); `border` (the top rail: motif or name) and
+`base_front` (the bottom rail: a line of text) lie on the rails outside the window, and a cut of at most
+1.5 mm leaves 1.5 mm of lip over the rabbet. Hardware `acrylic_4x6` ×1.
+
+**`keycap_mx@1` (family `keycap`, Kunji).** A 1u DSA-like cap: 18.16 mm at the rim, straight for 1.2 mm,
+tapering to a 12.7 mm top 7.4 mm up with a 0.3 mm spherical dish; 1.5 mm walls square to the slope, a
+2.2 mm top. A 5.5 mm round stem carries KeyV2's Cherry MX cross, (4.03 + s) × (1.25 + s/3) and
+(1.15 + s/3) × (4.23 + s/3) with `stem_slop_mm` s (0.3–0.5, 0.4 for FDM), 4 mm deep (at least the 3.6 mm
+the switch needs). Printed stem down as modelled. The `top` anchor sits at the bottom of the dish: a
+photo relief (an emblem) or 1–3 letters, raised or cut at most 0.6 mm; letters keep 1 mm strokes, so three
+wide letters ("Esc") are refused as too fine. The MX stem is about 0.5 mm thick beyond the cross's tips by
+the standard, under FDM's 0.8 mm: the karigar's note recommends resin and a test fit on a switch.
 
 ## Pipeline (`build_design`)
 
@@ -263,13 +329,14 @@ In practice a name needs about 5.5–6.5 mm of lettering height in Latin, Devana
 Bengali and Gujarati, and about 9–10 mm in Kannada, whose strokes are finer.
 
 **Families** (`aakar_geometry/families.py`) load `packages/design-tokens/families.json`
-(`AAKAR_FAMILIES_FILE` in the image; a built-in copy of the launch rows otherwise), validated against
-`template-family.v1.json`. The registry refuses a template whose family is unknown;
+(`AAKAR_FAMILIES_FILE` in the image; a built-in copy of every family that has a template otherwise),
+validated against `template-family.v1.json`. The registry refuses a template whose family is unknown;
 `Template.materials()` applies the family's `material_rules` (`allowed`, `heat_safe_only`,
-`excluded_finish_classes`); the content slot (`accepts`, `anchors`, `max_text_chars`) bounds the
-features; `size_envelope(family)` is the longest-side range that the templates' tests hold them to
-and that `raw_print` enforces; `default_hardware(family)` is what the family promises the customer
-(a test holds every template to it).
+`excluded_finish_classes`; a finish the rules leave out is refused by name, "… comes in Basic White
+only"); the content slot (`accepts`, `anchors`, `max_text_chars`) bounds the features;
+`size_envelope(family)` is the longest-side range that the templates' tests hold them to and that
+`raw_print` enforces; `default_hardware(family)` is what the family promises the customer (a test holds
+every template to it).
 
 **Recipe hook points** for a new carrier (`templates/<template_id>.py`, copied from
 `keychain_tag.py` or `jharokha_phone_stand.py`):
@@ -283,7 +350,9 @@ and that `raw_print` enforces; `default_hardware(family)` is what the family pro
 | `validate_content(params, features)` | limits coupling parameters and content, before any CAD (skin under a cut-in, a raw print's model) |
 | `build_body(params)` | watertight mesh in mm, Z up, on Z = 0, centred in X/Y (empty only for `raw_print`) |
 | `anchor_frame(anchor_id, params)` | a right-handed `AnchorFrame` (u = the viewer's right, v = up the picture, normal out of the body; origin on the skin, or the bottom centre of a volume) |
-| `lithophane(...)` | only for templates whose plate *is* the photo |
+| `lithophane(...)` | only for templates whose plate *is* the photo (`lithophane_plate`: the heightmap becomes the plate) |
+| `build(...)` override | a rule on the finished piece after the content is fused (`plinth_round`: stability with the customer's form) |
+| `karigar_note_for(...)` override | a note that depends on the content (`plinth_round`: a line on the form only when there is one) |
 | `karigar_note(params)` | one or two lines in the craft register (the pipeline's `karigar_note_for(params, features)` appends the names and motifs set into the piece) |
 
 Then register it in `templates/__init__.py` and add `tests/test_templates_<id>.py` using the shared

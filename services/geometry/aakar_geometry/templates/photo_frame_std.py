@@ -28,7 +28,7 @@ Anchors (surface, the front face; u = the viewer's right, v = up the picture, no
               ``ANCHOR_MARGIN_MM`` inside both and the frame's sides: a motif (Buti) or a name (Naam).
   base_front  the bottom rail, the same band below the window: a line of text.
 Decoration never reaches the rabbet: the bands start outside the window, and a cut is at most
-``MAX_RELIEF_MM`` (1.5 mm) into the 3 mm lip, leaving ``MIN_SKIN_MM`` (1.2 mm) and more over the rabbet.
+``MAX_RELIEF_MM`` (1.5 mm) into the 3 mm lip, leaving 1.5 mm over the rabbet (the minimum skin is 1.2 mm).
 """
 
 from __future__ import annotations

@@ -10,7 +10,7 @@ import trimesh
 from aakar_geometry.errors import ContentUnusable, GeometryError, InvalidSpec, ParamOutOfRange, UnsupportedFeature
 from aakar_geometry.features import AnchorFrame, apply_features, booleans, hero_mesh, relief_image
 from aakar_geometry.features.fetch import HttpFetcher, LocalFileFetcher, format_from_url, resolve_format, sniff_format
-from aakar_geometry.features.heightfield import heightfield_solid, heightfield_volume
+from aakar_geometry.features.heightfield import grid_solid, heightfield_solid, heightfield_volume
 from aakar_geometry.features.relief_image import ReliefMap, relief_heightmap
 from aakar_geometry.features.validate import check, check_features, normalise_features, text_length
 from aakar_geometry.templates.base import Anchor, HardwareRef, Template
@@ -81,6 +81,26 @@ def test_heightfield_rejects_bad_input():
         heightfield_solid(np.full((3, 3), -0.1), 1.0, 1.0)
     with pytest.raises(ValueError):
         heightfield_solid(np.zeros((3, 3)), 1.0, 0.0)
+
+
+def test_grid_solid_takes_uneven_columns_and_rows():
+    """A lithophane plate: a thick frame, a narrow bevel and the photo, one closed surface over uneven cells."""
+    xs = np.array([-10.0, -8.0, -7.5, 0.0, 7.5, 8.0, 10.0])
+    ys = np.array([0.0, 2.0, 2.5, 20.0, 22.5, 23.0, 25.0])
+    top = np.full((len(ys), len(xs)), 4.0)
+    top[2:-2, 2:-2] = 1.0  # the inner area, 15 × 20 mm, is 1 mm thick
+    solid = grid_solid(xs, ys, top)
+    assert solid.is_watertight and solid.is_winding_consistent and solid.is_volume
+    assert np.allclose(solid.bounds, [[-10.0, 0.0, 0.0], [10.0, 25.0, 4.0]])
+    # 20 × 25 × 4, less the 3 mm the inner 15 × 20 mm drops, less half the drop over the 0.5 mm bevels
+    bevels = 3.0 / 2.0 * 0.5 * (2 * 15.0 + 2 * 20.0) + 4 * (3.0 / 3.0) * 0.5 * 0.5
+    assert solid.volume == pytest.approx(20 * 25 * 4 - 3.0 * 15 * 20 - bevels, rel=1e-3)
+    with pytest.raises(ValueError):
+        grid_solid(xs[::-1], ys, top)  # columns must increase
+    with pytest.raises(ValueError):
+        grid_solid(xs, ys, np.zeros_like(top))  # the top must stand above the bottom
+    with pytest.raises(ValueError):
+        grid_solid(xs, ys[:-1], top)  # one height per sample
 
 
 # --------------------------------------------------------------------------- booleans

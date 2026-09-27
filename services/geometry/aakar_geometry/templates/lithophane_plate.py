@@ -25,7 +25,8 @@ Pieces
          (``lithophane``); a photo that does not fill the area (``fit: contain``) is edged at ``max_mm``
          (dark), like the frame. The lightest pixel is ``LIGHT_ALLOWANCE_MM`` thicker than ``min_mm`` (see
          the constant). The plate is one closed heightfield surface over frame, bevel and photo
-         (``features.heightfield.grid_solid``), so no boolean touches the photo.
+         (``features.heightfield.grid_solid``), so no boolean touches the photo; the photo is sampled at its
+         own spacing (≈ 0.25–0.33 mm), at most ``MAX_PLATE_SAMPLES`` samples.
   base   (night light) ``BASE_DEPTH_MM`` deep, ``BASE_HEIGHT_MM`` tall, ``SIDE_MARGIN_MM`` wider than the
          plate on each side. The plate stands ``FRONT_LIP_MM`` behind its front edge; the puck pocket
          (70 mm + 0.6 mm, ``POCKET_DEPTH_MM`` deep) sits ``BACK_WALL_MM`` inside its back edge, and a
