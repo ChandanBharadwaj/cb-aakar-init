@@ -1,15 +1,18 @@
 package studio.aakar.api.identity.internal;
 
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
-import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import studio.aakar.api.shared.ProblemCodes;
 
 /**
@@ -31,9 +34,20 @@ class SecurityConfig {
         "/v3/api-docs/**", "/error"
     };
 
+    /**
+     * Customers sign in with OTP and bearer tokens, never a password. Declaring an {@link AuthenticationManager}
+     * keeps Boot from wiring its default in-memory user (and logging a generated password on every start).
+     */
+    @Bean
+    AuthenticationManager noPasswordAuthentication() {
+        return authentication -> {
+            throw new BadCredentialsException("Password authentication is not offered; sign in with a phone OTP");
+        };
+    }
+
     @Bean
     SecurityFilterChain apiSecurity(HttpSecurity http, SessionService sessions, ProblemResponses problems,
-            CorsConfigurationSource cors) throws Exception {
+            UrlBasedCorsConfigurationSource cors) throws Exception {
         http.csrf(AbstractHttpConfigurer::disable)
                 .cors(c -> c.configurationSource(cors))
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -47,6 +61,9 @@ class SecurityConfig {
                         .accessDeniedHandler((request, response, ex) -> problems.write(response, HttpStatus.FORBIDDEN,
                                 ProblemCodes.FORBIDDEN, "Forbidden", "You are not allowed to do that")))
                 .authorizeHttpRequests(a -> a
+                        // SSE emitters complete through an ASYNC re-dispatch that carries no security context; the
+                        // original REQUEST dispatch was already authorised.
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR, DispatcherType.FORWARD).permitAll()
                         .requestMatchers(AUTHENTICATED).authenticated()
                         .requestMatchers(PUBLIC).permitAll()
                         .anyRequest().permitAll())

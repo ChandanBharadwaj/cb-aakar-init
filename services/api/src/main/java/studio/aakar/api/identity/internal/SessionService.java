@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import studio.aakar.api.shared.Identity;
@@ -17,6 +18,7 @@ class SessionService {
     private final IdentityProperties properties;
     private final Clock clock;
 
+    @Autowired
     SessionService(SessionRepository sessions, IdentityProperties properties, Clock clock) {
         this(sessions, new JwtTokens(properties.jwtSecret()), properties, clock);
     }

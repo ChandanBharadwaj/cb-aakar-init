@@ -6,7 +6,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /**
@@ -25,8 +24,9 @@ public class WebConfig {
         }
     }
 
+    /** Typed as the concrete class: Spring MVC's {@code HandlerMappingIntrospector} is a {@code CorsConfigurationSource} too. */
     @Bean
-    CorsConfigurationSource corsConfigurationSource(CorsProperties cors) {
+    UrlBasedCorsConfigurationSource corsConfigurationSource(CorsProperties cors) {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(cors.allowedOrigins());
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));

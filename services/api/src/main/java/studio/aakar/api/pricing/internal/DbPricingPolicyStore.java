@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -41,6 +42,7 @@ class DbPricingPolicyStore implements PricingPolicyStore {
     private final TransactionTemplate transactions;
     private final Cache<String, PricingPolicy> cache;
 
+    @Autowired
     DbPricingPolicyStore(PricingPolicyRepository repository, PricingPolicyProperties seed, ObjectMapper json,
             TransactionTemplate transactions) {
         this(repository, seed, json, transactions, CACHE_TTL);
@@ -75,14 +77,20 @@ class DbPricingPolicyStore implements PricingPolicyStore {
     @Override
     @Transactional
     public PricingPolicy publish(PricingPolicy policy, String createdBy) {
+        PricingPolicy published = activateNew(policy, createdBy);
+        cache.invalidate(ACTIVE_KEY);
+        return published;
+    }
+
+    private PricingPolicy activateNew(PricingPolicy policy, String createdBy) {
         if (repository.findByVersion(policy.version()).isPresent()) {
             throw ApiProblemException.conflict(ProblemCodes.POLICY_VERSION_EXISTS, "Policy version exists",
                     "Pricing policy version '" + policy.version() + "' already exists; publish under a new version");
         }
         repository.findByActiveTrue().forEach(PricingPolicyEntity::deactivate);
+        repository.flush(); // the UPDATE must reach the partial unique index before the new active row is inserted
         repository.saveAndFlush(new PricingPolicyEntity(policy.version(), true, json.convertValue(policy, MAP), Instant.now(),
                 createdBy == null || createdBy.isBlank() ? "unknown" : createdBy));
-        cache.invalidate(ACTIVE_KEY);
         log.info("Pricing policy {} published by {}", policy.version(), createdBy);
         return policy;
     }
@@ -97,7 +105,7 @@ class DbPricingPolicyStore implements PricingPolicyStore {
         return transactions.execute(status -> {
             Optional<PricingPolicyEntity> existing = repository.findByVersion(policy.version());
             if (existing.isEmpty()) {
-                return publish(policy, SEED_AUTHOR);
+                return activateNew(policy, SEED_AUTHOR); // inside the cache loader: the returned value is what gets cached
             }
             // The seed version exists but was deactivated by hand: re-activate it rather than duplicating it.
             repository.findByActiveTrue().forEach(PricingPolicyEntity::deactivate);

@@ -4,6 +4,7 @@ import java.security.SecureRandom;
 import java.util.HexFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import studio.aakar.api.payment.GatewayPayment;
@@ -28,6 +29,7 @@ class MockPaymentGateway implements PaymentGateway {
 
     private final String webUrl;
 
+    @Autowired
     MockPaymentGateway(AakarProperties properties) {
         this(properties.web().url());
     }

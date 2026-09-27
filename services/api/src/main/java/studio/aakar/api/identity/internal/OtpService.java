@@ -8,6 +8,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import studio.aakar.api.identity.OtpSender;
@@ -33,6 +34,7 @@ class OtpService {
     private final boolean exposeDevCode;
     private final Clock clock;
 
+    @Autowired
     OtpService(OtpRequestRepository requests, OtpSender sender, IdentityProperties properties,
             studio.aakar.api.shared.AakarProperties aakar, Clock clock) {
         this(requests, sender, properties.otp(), properties.otp().exposeDevCode() && !aakar.production(), clock);

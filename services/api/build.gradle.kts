@@ -43,7 +43,6 @@ dependencies {
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.modulith:spring-modulith-starter-test")
-    testImplementation("org.springframework.security:spring-security-test")
     testImplementation("org.wiremock:wiremock-standalone:$wiremockVersion")
     testImplementation("org.awaitility:awaitility")
     testImplementation("com.networknt:json-schema-validator:$jsonSchemaValidatorVersion")
