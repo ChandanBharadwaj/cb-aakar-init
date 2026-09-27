@@ -1,6 +1,6 @@
 """``relief_image`` (Chhavi): a photo becomes a heightfield relief on a surface anchor.
 
-Pipeline: Pillow decode (HEIC through pillow-heif) → grayscale (alpha multiplies in, so transparent
+Pipeline: Pillow decode (HEIC through pi-heif) → grayscale (alpha multiplies in, so transparent
 pixels have no height; ``invert`` swaps light and dark) → fit into ``size_mm − 2·bleed_mm`` (``contain`` letterboxes,
 ``cover`` centre-crops) at ≈5 px/mm capped at 400 px on the long side → light gaussian smoothing
 (scipy, else a numpy box blur) → normalised heights of ``relief_mm`` → ``heightfield_solid`` in the
@@ -14,6 +14,7 @@ is coplanar with the body's skin.
 
 from __future__ import annotations
 
+import importlib
 import io
 import logging
 from dataclasses import dataclass
@@ -52,16 +53,21 @@ class ReliefMap:
         return (int(self.heights.shape[0]), int(self.heights.shape[1]))
 
 
+HEIF_DECODERS = ("pi_heif", "pillow_heif")  # pi-heif ships (decode-only, LGPL libs); pillow-heif is dev-only (GPLv2 wheels)
+
+
 @lru_cache(maxsize=1)
-def register_heif() -> bool:
-    """Teach Pillow to open HEIC/HEIF (every iPhone photo) through pillow-heif; False when it is missing."""
-    try:
-        from pillow_heif import register_heif_opener
-    except ImportError:  # pragma: no cover - pillow-heif is a declared dependency
-        log.warning("pillow-heif is not installed; HEIC photos cannot be read")
-        return False
-    register_heif_opener()
-    return True
+def register_heif() -> str | None:
+    """Teach Pillow to open HEIC/HEIF (every iPhone photo); returns the module used, None when neither is installed."""
+    for module in HEIF_DECODERS:
+        try:
+            opener = importlib.import_module(module).register_heif_opener
+        except ImportError:
+            continue
+        opener()
+        return module
+    log.warning("neither pi-heif nor pillow-heif is installed; HEIC photos cannot be read")  # pragma: no cover
+    return None  # pragma: no cover
 
 
 def decode_image(data: bytes, fmt: str | None = None) -> np.ndarray:
@@ -248,6 +254,7 @@ def _fuse(operation: Any, body: trimesh.Trimesh, tool: trimesh.Trimesh, feature:
 __all__ = [
     "EMBED_MM",
     "FLOOR_MM",
+    "HEIF_DECODERS",
     "MAX_PX",
     "PX_PER_MM",
     "ReliefMap",

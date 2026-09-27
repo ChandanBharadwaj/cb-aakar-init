@@ -207,7 +207,8 @@ def test_templates(monkeypatch):
 
 @pytest.fixture
 def content_dir(tmp_path):
-    """A folder with photo.png, alpha.png, flat.png, sphere.stl, open.stl and soup.stl for LocalFileFetcher."""
+    """A folder with photo.png, alpha.png, flat.png, sphere.stl, open.stl, soup.stl and garbage.stl (words, not a
+    model) for LocalFileFetcher."""
     folder = tmp_path / "content"
     folder.mkdir()
     (folder / "photo.png").write_bytes(gradient_png())
@@ -216,5 +217,6 @@ def content_dir(tmp_path):
     (folder / "sphere.stl").write_bytes(sphere_stl())
     (folder / "open.stl").write_bytes(open_sphere_stl())
     (folder / "soup.stl").write_bytes(soup_stl())
+    (folder / "garbage.stl").write_bytes(b"this is not a model file at all, only words " * 4)
     (folder / "notes.txt").write_bytes(b"not a photo, not a model")
     return folder

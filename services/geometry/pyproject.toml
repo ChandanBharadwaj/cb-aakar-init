@@ -25,14 +25,16 @@ dependencies = [
   "manifold3d>=3.0,<4",
   "pillow>=10",
   "fast-simplification>=0.1.9",
-  "pillow-heif>=0.18",
+  "pi-heif>=1.0",
 ]
 
 [project.scripts]
 aakar-geometry = "aakar_geometry.cli:main"
 
 [dependency-groups]
-dev = ["pytest>=8.0", "pytest-cov>=5.0"]
+# pillow-heif only encodes the HEIC test fixture: its wheels are GPLv2 (bundled x265), so the image
+# decodes with pi-heif (decode-only, LGPL libheif/libde265) and never ships it (`uv sync --no-dev`)
+dev = ["pytest>=8.0", "pytest-cov>=5.0", "pillow-heif>=0.18"]
 
 [tool.uv.sources]
 aakar-inspect = { path = "../inspect", editable = true }

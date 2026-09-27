@@ -273,6 +273,7 @@ def test_hero_mesh_spec_completes_on_a_volume_anchor_and_as_raw_print(test_templ
     [
         ("test_plinth@1", "figurine_base", {}, {"type": "hero_mesh", "source": content_source("soup.stl", "stl"), "anchor": "top"}, "content_unusable"),
         ("test_plinth@1", "figurine_base", {}, {"type": "hero_mesh", "source": content_source("open.stl", "stl"), "anchor": "top"}, "content_unusable"),
+        ("test_plinth@1", "figurine_base", {}, {"type": "hero_mesh", "source": content_source("garbage.stl", "stl"), "anchor": "top"}, "content_unusable"),
         ("test_plate@1", "keychain", {}, {"type": "relief_image", "source": content_source("flat.png", "png"), "anchor": "face"}, "content_unusable"),
         ("test_plate@1", "keychain", {}, {"type": "relief_image", "source": content_source("notes.txt"), "anchor": "face"}, "content_unusable"),
         ("test_plate@1", "keychain", {}, {"type": "relief_image", "source": content_source("missing.png", "png"), "anchor": "face"}, "content_unusable"),
@@ -291,3 +292,45 @@ def test_content_failures_surface_as_design_failed(test_templates, content_dir, 
     visible = re.sub(r"\.[A-Za-z0-9]{2,4}\b", "", payload["message"])  # ".stl, .obj" extension lists are fine
     for word in ("mesh", "STL", "stl"):
         assert word not in visible, payload["message"]
+
+
+def test_a_failed_relief_boolean_is_the_photos_problem_told_plainly(test_templates, content_dir, local_storage, monkeypatch):
+    """A boolean that cannot close the relief reaches the customer as content_unusable, never as engine text."""
+    from aakar_geometry.errors import GeometryError
+
+    def broken(a, b):
+        raise GeometryError("Boolean union did not produce a closed volume", {"a": {"faces": 12}})
+
+    monkeypatch.setattr("aakar_geometry.features.relief_image.union", broken)
+    feature = {"type": "relief_image", "source": content_source("photo.png", "png"), "anchor": "face"}
+    payload = build_design(_request("test_plate@1", "keychain", {}, [feature]), storage=local_storage, fetcher=LocalFileFetcher(content_dir))
+    validate("design.failed", payload)
+    assert payload["code"] == "content_unusable" and http_status_for(payload) == 422
+    assert "photo" in payload["message"] and "Boolean" not in payload["message"] and "volume" not in payload["message"]
+    assert payload["detail"]["error"] == "Boolean union did not produce a closed volume"
+
+
+def test_an_empty_build_is_never_exported(generate_request, local_storage, monkeypatch):
+    from aakar_geometry.templates import JharokhaPhoneStand
+
+    monkeypatch.setattr(JharokhaPhoneStand, "build", staticmethod(lambda params: trimesh.Trimesh()))
+    payload = build_design(generate_request, storage=local_storage)
+    validate("design.failed", payload)
+    assert payload["code"] == "build_error" and "came out empty" in payload["message"]
+    assert not local_storage.root.exists() or not any(local_storage.root.rglob("model.*"))  # nothing was exported
+
+
+def test_validate_content_runs_before_any_building(test_templates, content_dir, local_storage, monkeypatch):
+    """Template.validate_content sees the validated params and normalised features, even when there are none."""
+    Plate, _, _ = test_templates
+    seen = []
+
+    def spy(cls, params, features):
+        seen.append((dict(params), [f["mode"] for f in features]))
+
+    monkeypatch.setattr(Plate, "validate_content", classmethod(spy))
+    feature = {"type": "relief_image", "source": content_source("photo.png", "png"), "anchor": "face"}
+    assert is_completed(build_design(_request("test_plate@1", "keychain", {}, [feature]), storage=local_storage, fetcher=LocalFileFetcher(content_dir)))
+    assert is_completed(build_design(_request("test_plate@1", "keychain", {"thickness_mm": 4}, []), storage=local_storage))
+    # once before the build thread starts and once inside Template.build
+    assert seen == [({"thickness_mm": 3.0}, ["emboss"])] * 2 + [({"thickness_mm": 4.0}, [])] * 2

@@ -472,3 +472,60 @@ def test_descriptor_publishes_anchor_fields_and_hardware():
     with pytest.raises(ValueError):
         Anchor("x", "X", "planar", kind="blob")
     assert HardwareRef("cord_200", 2).descriptor() == {"sku": "cord_200", "qty": 2}
+
+
+@pytest.mark.parametrize("mode, op", [("emboss", "union"), ("deboss", "difference")])
+def test_relief_boolean_failure_is_reported_as_unusable_content(monkeypatch, mode, op):
+    def broken(a, b):
+        raise GeometryError(f"Boolean {op} did not produce a closed volume", {"result": {"watertight": False}})
+
+    monkeypatch.setattr(f"aakar_geometry.features.relief_image.{op}", broken)
+    with pytest.raises(ContentUnusable) as exc:
+        relief_image.apply(box_on_bed(40, 30, 4), top_frame(4, size=(36, 26)), {"anchor": "face", "mode": mode}, gradient_png(), bleed_mm=2)
+    assert exc.value.code == "content_unusable"
+    assert "photo" in exc.value.message and "Boolean" not in exc.value.message and "mesh" not in exc.value.message
+    assert exc.value.detail["error"] == f"Boolean {op} did not produce a closed volume" and exc.value.detail["mode"] == mode
+
+
+def _heic_or_skip(png: bytes) -> bytes:
+    """The PNG re-encoded as HEIC (an iPhone photo) with pillow-heif, a dev-only dependency: the service
+    itself decodes with pi-heif, which cannot encode. Skips when this platform has no encoder wheel."""
+    import io
+
+    from PIL import Image
+
+    try:
+        import pillow_heif
+    except ImportError:  # pragma: no cover - dev dependency missing on this platform
+        pytest.skip("pillow-heif (dev dependency, for encoding the test HEIC) is not installed on this platform")
+    if not pillow_heif.libheif_info().get("HEIF"):  # pragma: no cover - wheel without an HEVC encoder
+        pytest.skip("this pillow-heif wheel has no HEVC encoder to make a test HEIC")
+    buf = io.BytesIO()
+    # encode through pillow-heif's own API, without registering it with Pillow, so decoding below goes
+    # through the decoder the service ships
+    pillow_heif.from_pillow(Image.open(io.BytesIO(png)).convert("RGB")).save(buf, quality=95)
+    return buf.getvalue()
+
+
+def test_heic_photos_decode_and_become_a_relief(content_dir):
+    png = gradient_png()
+    heic = _heic_or_skip(png)
+    assert sniff_format(heic) == "heic"
+    assert relief_image.register_heif() == "pi_heif"  # the decode-only, LGPL decoder the image ships
+    arr = relief_image.decode_image(heic, "heic")
+    ref = relief_image.decode_image(png, "png")
+    assert arr.shape == ref.shape
+    assert float(np.abs(arr - ref).mean()) < 0.03  # lossy, but the same picture
+    relief = relief_heightmap(heic, (40, 30), bleed_mm=2, relief_mm=0.6, fmt="heic")
+    assert relief.heights[:, -1].mean() > relief.heights[:, 0].mean()  # the ramp survives
+    # end to end: an iPhone photo named .heic, fetched and fused onto the test plate
+    (content_dir / "iphone.heic").write_bytes(heic)
+    Plate, _, _ = make_test_templates()
+    params = Plate.validate({})
+    body = Plate.build_body(params)
+    mesh, _ = apply_features(Plate, body, params, [relief_feature_for("iphone.heic")], LocalFileFetcher(content_dir))
+    assert mesh.is_watertight and mesh.volume > body.volume
+
+
+def relief_feature_for(name: str) -> dict:
+    return {"type": "relief_image", "source": content_source(name), "anchor": "face"}

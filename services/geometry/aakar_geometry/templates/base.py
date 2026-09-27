@@ -148,7 +148,8 @@ class TemplateConstraints:
 
 class Template:
     """A parametric template. Subclasses set the class attributes and implement ``build_body`` (and
-    ``anchor_frame`` for every anchor that accepts content)."""
+    ``anchor_frame`` for every anchor that accepts content); ``validate_combination`` and
+    ``validate_content`` hold coupled limits, ``hardware_for`` varies quantities with the params."""
 
     id: ClassVar[str]
     version: ClassVar[int]

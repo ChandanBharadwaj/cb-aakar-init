@@ -91,7 +91,7 @@ class Layout:
         hole_y = plate_top + self.loop_r
         tab = box(-self.loop_r, plate_top - self.loop_r, self.loop_r, hole_y)
         loop = plates.hole(0.0, hole_y, 2.0 * self.loop_r).union(tab)
-        outline = plates._largest(plate.union(loop))
+        outline = plates.largest_polygon(plate.union(loop))
         dy = -(outline.bounds[1] + outline.bounds[3]) / 2.0
         self.outline: Polygon = affinity.translate(outline, 0.0, dy)
         self.hole_xy = (0.0, hole_y + dy)

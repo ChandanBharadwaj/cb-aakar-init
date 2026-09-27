@@ -202,8 +202,9 @@ class HangingOrnament(Template):
     def karigar_note(cls, params: Mapping[str, Any]) -> str:
         L = Layout(params)
         border = f"a {L.border:g} mm raised border on the front" if L.border > 0 else "a plain front"
+        shape = {"disc": "round", "star": "star-shaped", "bauble": "bauble-shaped"}[L.silhouette]
         return (
-            f"A {L.silhouette} Jhoomar ornament, {L.D:g} mm across and {L.T:g} mm thick, with {border} and a "
+            f"A {shape} Jhoomar ornament, {L.D:g} mm across and {L.T:g} mm thick, with {border} and a "
             f"{HANG_HOLE_MM:g} mm hanging hole at the top (cut {L.hole_cut:.1f} mm). Thread the 200 mm cotton cord "
             "through the hole and knot it before packing."
         )

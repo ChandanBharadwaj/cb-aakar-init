@@ -38,7 +38,7 @@ COPY services/geometry/aakar_geometry ./aakar_geometry
 RUN uv sync --no-dev
 
 ENV PATH="/app/services/geometry/.venv/bin:${PATH}"
-RUN mkdir -p /data/assets && python -c "import build123d, manifold3d, aakar_geometry.templates, aakar_geometry.features"  # warm import + sanity
+RUN mkdir -p /data/assets && python -c "import build123d, manifold3d, pi_heif, aakar_geometry.templates, aakar_geometry.features"  # warm import + sanity (pi_heif: iPhone HEIC photos)
 
 EXPOSE 8081
 HEALTHCHECK --interval=15s --timeout=3s --retries=5 CMD curl -fsS http://localhost:8081/healthz || exit 1

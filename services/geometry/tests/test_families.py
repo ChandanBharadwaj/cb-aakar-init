@@ -10,7 +10,7 @@ from aakar_geometry import families
 from aakar_geometry.contracts import validate
 from aakar_geometry.materials import load_materials
 from aakar_geometry.templates import REGISTRY, list_templates, register
-from aakar_geometry.templates.base import Template
+from aakar_geometry.templates.base import HardwareRef, Template
 
 
 def test_seed_loads_from_the_repo_and_validates():
@@ -139,6 +139,7 @@ def test_builtin_rows_match_the_seed_on_geometry_fields():
         assert row["content_slot"].get("max_text_chars") == real["content_slot"].get("max_text_chars"), row["id"]
         assert row["hardware"] == real["hardware"], row["id"]
         assert row["material_rules"] == real["material_rules"], row["id"]
+        assert row.get("size_envelope_mm") == real.get("size_envelope_mm"), row["id"]
 
 
 def test_drifted_seed_fails_loudly(monkeypatch, tmp_path):
@@ -151,3 +152,62 @@ def test_drifted_seed_fails_loudly(monkeypatch, tmp_path):
             families.load_families_doc()
     finally:
         families.load_families_doc.cache_clear()
+
+
+# ----------------------------------------------------------------------------- hardware the family promises
+
+# The override rule. A template ships every SKU of its family's default hardware (families.json `hardware`:
+# the split ring, the magnet, the cord that the customer was promised), both in its descriptor and in
+# `hardware_for(defaults)`, the list the completed payload carries. Quantities may differ (a magnet with two
+# pockets packs two). A template may deliberately pack something else instead (a pet tag with an S-hook
+# rather than a split ring) only by being listed here with the reason; forgetting `hardware` fails.
+HARDWARE_OVERRIDES: dict[str, str] = {}
+
+
+def missing_family_hardware(template: type[Template]) -> set[str]:
+    """Family default SKUs the template would not pack (empty when it complies or is an allowed override)."""
+    if template.ref() in HARDWARE_OVERRIDES:
+        return set()
+    promised = {h["sku"] for h in families.default_hardware(template.family)}
+    declared = {h.sku for h in template.hardware}
+    built = {h["sku"] for h in template.hardware_for(template.validate({}))}
+    return (promised - declared) | (promised - built)
+
+
+def test_every_template_packs_its_familys_default_hardware():
+    checked = []
+    for template in list_templates():
+        assert not missing_family_hardware(template), (template.ref(), families.default_hardware(template.family))
+        if families.default_hardware(template.family):
+            checked.append(template.id)
+    assert {"keychain_tag", "fridge_magnet", "hanging_ornament", "desk_nameplate"} <= set(checked)
+    assert all(ref in {t.ref() for t in list_templates()} for ref in HARDWARE_OVERRIDES)  # no stale entries
+
+
+def test_a_template_that_forgets_its_hardware_is_caught():
+    class Forgetful(Template):
+        id = "forgetful_tag"
+        version = 1
+        family = "keychain"  # promises split_ring_25
+        name = "Forgetful tag"
+
+    assert missing_family_hardware(Forgetful) == {"split_ring_25"}
+
+    class Miscounted(Template):
+        id = "miscounted_magnet"
+        version = 1
+        family = "fridge_magnet"
+        name = "Miscounted magnet"
+        hardware = (HardwareRef("magnet_d10x3", 1),)
+
+        @classmethod
+        def hardware_for(cls, params):
+            return []  # declares the magnet but would ship without it
+
+    assert missing_family_hardware(Miscounted) == {"magnet_d10x3"}
+
+
+def test_size_envelopes_come_from_the_seed():
+    assert families.size_envelope("keychain") == (30.0, 60.0)
+    assert families.size_envelope("raw_print") == (20.0, 240.0)
+    assert families.size_envelope("nameplate") == (120.0, 300.0)

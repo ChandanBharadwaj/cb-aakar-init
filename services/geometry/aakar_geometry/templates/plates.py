@@ -7,8 +7,8 @@ Profiles are shapely polygons in mm on the XY plane, seen from above with the pi
   full diameter (a ring, cord or magnet always passes);
 * ``rounded_rect``, ``heart_unit``, ``star_unit``, ``bauble_unit``: outlines (the ``*_unit`` ones are
   one unit wide or across and are scaled by the templates);
-* ``symmetric_rect``: the largest rectangle centred on x = 0 inside a profile, i.e. the printable
-  area of a face (a template subtracts its holes and margins from the profile first);
+* ``symmetric_rect``: the rectangle centred on x = 0 inside a profile that holds the largest 4:3
+  picture, i.e. the printable area of a face (a template subtracts its holes and margins first);
 * ``cut_in_depth`` / ``check_skin``: the skin rule. A cut-in (deboss) photo, name or motif must leave
   ``MIN_SKIN_MM`` of plastic behind it; raised (emboss) content adds plastic and never counts.
 """
@@ -57,7 +57,8 @@ def rounded_rect(w: float, h: float, r: float, quad_segs: int = 16) -> Polygon:
     return core.buffer(r, quad_segs=quad_segs)
 
 
-def _largest(geom: BaseGeometry) -> Polygon:
+def largest_polygon(geom: BaseGeometry) -> Polygon:
+    """The largest polygon of an area (a union or buffer can leave slivers beside the main piece)."""
     if isinstance(geom, Polygon):
         return geom
     if isinstance(geom, MultiPolygon) or hasattr(geom, "geoms"):
@@ -71,7 +72,7 @@ def soften(poly: Polygon, radius: float) -> Polygon:
     """Round the convex points (tips) of ``poly`` to ``radius``; concave corners such as a heart's notch stay crisp."""
     if radius <= 0:
         return poly
-    return _largest(poly.buffer(-radius, quad_segs=8).buffer(radius, quad_segs=8))
+    return largest_polygon(poly.buffer(-radius, quad_segs=8).buffer(radius, quad_segs=8))
 
 
 @lru_cache(maxsize=None)
@@ -81,7 +82,7 @@ def heart_unit() -> Polygon:
     x = 16.0 * np.sin(t) ** 3
     y = 13.0 * np.cos(t) - 5.0 * np.cos(2 * t) - 2.0 * np.cos(3 * t) - np.cos(4 * t)
     poly = Polygon(np.column_stack([x, y]) / 32.0).buffer(0)
-    poly = soften(_largest(poly), 0.03)
+    poly = soften(largest_polygon(poly), 0.03)
     return affinity.translate(poly, -(poly.bounds[0] + poly.bounds[2]) / 2.0, 0.0)
 
 
@@ -100,7 +101,7 @@ def bauble_unit() -> Polygon:
     ball = disc(0.0, 0.0, 0.5, 144)
     crown = rounded_rect(0.30, 0.16, 0.03)
     crown = affinity.translate(crown, 0.0, 0.5)  # 0.08 above the ball, 0.08 sunk into it
-    return _largest(ball.union(crown))
+    return largest_polygon(ball.union(crown))
 
 
 def top_at(poly: BaseGeometry, x: float = 0.0) -> float | None:
@@ -248,6 +249,7 @@ __all__ = [
     "HOLE_ALLOWANCE_MM",
     "MIN_PRINTABLE_MM",
     "MIN_SKIN_MM",
+    "PHOTO_ASPECT",
     "RIM_MM",
     "bauble_unit",
     "check_skin",
@@ -255,6 +257,7 @@ __all__ = [
     "disc",
     "heart_unit",
     "hole",
+    "largest_polygon",
     "rounded_rect",
     "soften",
     "star_unit",

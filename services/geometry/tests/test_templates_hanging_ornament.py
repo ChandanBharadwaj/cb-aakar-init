@@ -85,4 +85,5 @@ def test_both_faces_add_up_for_cut_in_photos():
 
 def test_karigar_note_mentions_the_cord():
     note = HangingOrnament.karigar_note(HangingOrnament.validate({"silhouette": "star", "border_mm": 0}))
-    assert note.startswith("A star Jhoomar ornament, 70 mm across") and "plain front" in note and "cotton cord" in note
+    assert note.startswith("A star-shaped Jhoomar ornament, 70 mm across") and "plain front" in note and "cotton cord" in note
+    assert HangingOrnament.karigar_note(HangingOrnament.validate({})).startswith("A round Jhoomar ornament, 70 mm across and 4 mm thick, with a 3 mm raised border")
