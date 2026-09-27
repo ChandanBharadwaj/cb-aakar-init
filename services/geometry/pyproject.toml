@@ -25,6 +25,7 @@ dependencies = [
   "manifold3d>=3.0,<4",
   "pillow>=10",
   "fast-simplification>=0.1.9",
+  "pillow-heif>=0.18",
 ]
 
 [project.scripts]

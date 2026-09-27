@@ -250,6 +250,12 @@ class Template:
         """Hook for coupled constraints between parameters (raise ``ParamOutOfRange``)."""
 
     @classmethod
+    def validate_content(cls, params: Mapping[str, Any], features: Sequence[Mapping[str, Any]]) -> None:
+        """Hook for limits that couple parameters and content (Chhaap), run before any CAD with the validated
+        params and the normalised features, even when there are none: a cut-in photo must leave enough
+        plastic behind it, a raw print needs its model. Raise ``ParamOutOfRange`` / ``InvalidSpec``."""
+
+    @classmethod
     def anchor_frame(cls, anchor_id: str, params: Mapping[str, Any]) -> AnchorFrame:
         """Where content lands for ``anchor_id`` at these params (see ``features.frames.AnchorFrame``)."""
         raise NotImplementedError(f"{cls.ref()} does not place anchor {anchor_id!r}")
@@ -267,13 +273,26 @@ class Template:
         features: Sequence[Mapping[str, Any]] = (),
         fetcher: Any | None = None,
     ) -> trimesh.Trimesh:
-        """``build_body`` + ``features.apply_features``. With no features the body is returned untouched."""
+        """``validate_content`` → ``build_body`` → ``features.apply_features``.
+
+        ``validate_content`` runs even without features (a raw print with no model is refused here, not
+        exported as nothing). With no features the body is returned untouched. Content on the underside
+        (a raised photo on a keychain's back) can reach below the bed; the finished piece is lifted back
+        onto Z = 0 so it still rests on the bed.
+        """
+        from ..features.validate import check_features
+
+        normalised = check_features(cls, features)
+        cls.validate_content(params, normalised)
         body = cls.build_body(params)
-        if not features:
+        if not normalised:
             return body
         from ..features import apply_features
 
-        mesh, _hardware = apply_features(cls, body, params, features, fetcher)
+        mesh, _hardware = apply_features(cls, body, params, normalised, fetcher)
+        lowest = float(mesh.bounds[0][2])
+        if lowest < -1e-9:
+            mesh.apply_translation([0.0, 0.0, -lowest])
         return mesh
 
     @classmethod

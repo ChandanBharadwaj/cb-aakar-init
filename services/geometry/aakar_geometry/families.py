@@ -47,11 +47,12 @@ def _row(
     heat_safe_only: bool = False,
     shape_tolerance: str = "any",
     available: bool = True,
+    envelope: tuple[float, float] | None = None,
 ) -> dict[str, Any]:
     slot: dict[str, Any] = {"accepts": list(accepts), "anchors": list(anchors), "hero_volume": hero_volume}
     if max_text_chars is not None:
         slot["max_text_chars"] = max_text_chars
-    return {
+    row: dict[str, Any] = {
         "id": id,
         "codename": id,
         "name": id.replace("_", " "),
@@ -65,26 +66,30 @@ def _row(
         "content_slot": slot,
         "available": available,
     }
+    if envelope is not None:
+        row["size_envelope_mm"] = {"min_longest_mm": envelope[0], "max_longest_mm": envelope[1]}
+    return row
 
 
-# Built-in copy of the launch-tier rows (ids, kinds, content slots, hardware and material rules only;
-# brand copy lives in the seed). Keep in step with packages/design-tokens/families.json.
+# Built-in copy of the launch-tier rows (ids, kinds, content slots, size envelopes, hardware and material
+# rules only; brand copy lives in the seed). Keep in step with packages/design-tokens/families.json.
 BUILTIN_FAMILIES: list[dict[str, Any]] = [
     _row("keychain", "carrier", "keychain_tag", ["relief_image", "emboss_text", "motif"], ["face", "back"],
-         max_text_chars=16, hardware=[{"sku": "split_ring_25", "qty": 1}]),
+         max_text_chars=16, hardware=[{"sku": "split_ring_25", "qty": 1}], envelope=(30, 60)),
     _row("fridge_magnet", "carrier", "fridge_magnet", ["relief_image", "emboss_text", "motif"], ["face"],
-         max_text_chars=12, hardware=[{"sku": "magnet_d10x3", "qty": 1}]),
+         max_text_chars=12, hardware=[{"sku": "magnet_d10x3", "qty": 1}], envelope=(40, 70)),
     _row("ornament", "carrier", "hanging_ornament", ["relief_image", "emboss_text", "motif"], ["face_front", "face_back"],
-         max_text_chars=12, hardware=[{"sku": "cord_200", "qty": 1}]),
+         max_text_chars=12, hardware=[{"sku": "cord_200", "qty": 1}], envelope=(50, 90)),
     _row("nameplate", "carrier", "desk_nameplate", ["emboss_text", "motif", "relief_image"], ["face", "base_front"],
-         max_text_chars=24, hardware=[{"sku": "adhesive_pads", "qty": 1}]),
+         max_text_chars=24, hardware=[{"sku": "adhesive_pads", "qty": 1}], envelope=(120, 300)),
     _row("lithophane", "carrier", "lithophane_plate", ["relief_image"], ["plate"],
-         hardware=[{"sku": "led_base_usb", "qty": 1}], allowed=["basic_white"], shape_tolerance="strict", available=False),
+         hardware=[{"sku": "led_base_usb", "qty": 1}], allowed=["basic_white"], shape_tolerance="strict", available=False,
+         envelope=(100, 150)),
     _row("figurine_base", "carrier", "plinth_round", ["hero_mesh", "emboss_text"], ["top", "base_front"],
-         hero_volume=True, max_text_chars=16, available=False),
-    _row("raw_print", "raw", "raw_print", ["hero_mesh"], ["body"], hero_volume=True),
+         hero_volume=True, max_text_chars=16, available=False, envelope=(50, 200)),
+    _row("raw_print", "raw", "raw_print", ["hero_mesh"], ["body"], hero_volume=True, envelope=(20, 240)),
     _row("phone_stand", "object", "jharokha_phone_stand", ["emboss_text", "motif"], ["side_left", "side_right", "back"],
-         max_text_chars=16, shape_tolerance="strict"),
+         max_text_chars=16, shape_tolerance="strict", envelope=(80, 160)),
 ]
 
 BUILTIN_HARDWARE: list[dict[str, Any]] = [
@@ -162,6 +167,14 @@ def material_rules(family_id: str) -> dict[str, Any]:
     }
 
 
+def size_envelope(family_id: str) -> tuple[float, float] | None:
+    """``(min_longest_mm, max_longest_mm)``: the longest side a piece of this family may have (None when unset)."""
+    envelope = family(family_id).get("size_envelope_mm")
+    if not envelope:
+        return None
+    return (float(envelope["min_longest_mm"]), float(envelope["max_longest_mm"]))
+
+
 def default_hardware(family_id: str) -> list[dict[str, Any]]:
     """The family's default bill of materials, ``[{sku, qty}]`` (a template's ``hardware`` overrides it)."""
     return [{"sku": h["sku"], "qty": int(h["qty"])} for h in family(family_id).get("hardware") or []]
@@ -222,4 +235,5 @@ __all__ = [
     "load_families",
     "load_families_doc",
     "material_rules",
+    "size_envelope",
 ]

@@ -11,7 +11,9 @@ from conftest import EXAMPLE_SPEC
 def test_cli_templates(capsys):
     assert main(["templates"]) == 0
     descriptors = json.loads(capsys.readouterr().out)
-    assert descriptors[0]["id"] == "jharokha_phone_stand"
+    assert [d["id"] for d in descriptors] == ["desk_nameplate", "fridge_magnet", "hanging_ornament", "jharokha_phone_stand", "keychain_tag", "raw_print"]
+    for descriptor in descriptors:
+        validate("template-descriptor", descriptor)
 
 
 def test_cli_build_writes_files_and_summary(tmp_path, capsys):

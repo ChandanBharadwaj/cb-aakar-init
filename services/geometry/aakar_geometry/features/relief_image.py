@@ -1,7 +1,7 @@
 """``relief_image`` (Chhavi): a photo becomes a heightfield relief on a surface anchor.
 
-Pipeline: Pillow decode → grayscale (alpha multiplies in, so transparent pixels have no height;
-``invert`` swaps light and dark) → fit into ``size_mm − 2·bleed_mm`` (``contain`` letterboxes,
+Pipeline: Pillow decode (HEIC through pillow-heif) → grayscale (alpha multiplies in, so transparent
+pixels have no height; ``invert`` swaps light and dark) → fit into ``size_mm − 2·bleed_mm`` (``contain`` letterboxes,
 ``cover`` centre-crops) at ≈5 px/mm capped at 400 px on the long side → light gaussian smoothing
 (scipy, else a numpy box blur) → normalised heights of ``relief_mm`` → ``heightfield_solid`` in the
 anchor frame → ``emboss`` unions it with the body, ``deboss`` subtracts it. ``lithophane`` does not
@@ -17,6 +17,7 @@ from __future__ import annotations
 import io
 import logging
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Any, Mapping
 
 import numpy as np
@@ -51,12 +52,26 @@ class ReliefMap:
         return (int(self.heights.shape[0]), int(self.heights.shape[1]))
 
 
+@lru_cache(maxsize=1)
+def register_heif() -> bool:
+    """Teach Pillow to open HEIC/HEIF (every iPhone photo) through pillow-heif; False when it is missing."""
+    try:
+        from pillow_heif import register_heif_opener
+    except ImportError:  # pragma: no cover - pillow-heif is a declared dependency
+        log.warning("pillow-heif is not installed; HEIC photos cannot be read")
+        return False
+    register_heif_opener()
+    return True
+
+
 def decode_image(data: bytes, fmt: str | None = None) -> np.ndarray:
-    """Photo bytes → float32 array in 0..1 (luminance × alpha), EXIF orientation applied, or ``ContentUnusable``."""
+    """Photo bytes (PNG, JPEG, WebP, HEIC) → float32 array in 0..1 (luminance × alpha), EXIF orientation
+    applied, or ``ContentUnusable``."""
     try:
         from PIL import Image, ImageOps, UnidentifiedImageError
     except ImportError as exc:  # pragma: no cover
         raise GeometryError("Pillow is not installed", {"error": str(exc)}) from exc
+    register_heif()
 
     try:
         img = Image.open(io.BytesIO(data))
@@ -191,7 +206,8 @@ def apply(
     bleed_mm: float = 0.0,
     fmt: str | None = None,
 ) -> trimesh.Trimesh:
-    """Fuse (emboss) or cut (deboss) the photo relief into ``body`` at ``frame``. Returns a new watertight mesh."""
+    """Fuse (emboss) or cut (deboss) the photo relief into ``body`` at ``frame``. Returns a new watertight mesh;
+    a boolean that fails is reported as ``ContentUnusable`` with a customer-safe message."""
     if body is None or body.is_empty:
         raise GeometryError("A relief needs a body to sit on", {"anchor": feature.get("anchor")})
     if frame.size_mm is None:
@@ -211,11 +227,34 @@ def apply(
     if mode == "emboss":
         solid = relief_solid(relief, EMBED_MM)
         placed = frame.offset(-EMBED_MM).place(solid)  # skin at local z = EMBED, so the solid starts inside the body
-        return union(body, placed)
+        return _fuse(union, body, placed, feature)
     # deboss: mirror the picture left-right and look into the body, starting EMBED above the skin
     cutter = heightfield_solid(np.ascontiguousarray(relief.heights[:, ::-1]), relief.cell_mm, EMBED_MM)
     placed = frame.offset(EMBED_MM).flipped().place(cutter)
-    return difference(body, placed)
+    return _fuse(difference, body, placed, feature)
 
 
-__all__ = ["EMBED_MM", "FLOOR_MM", "MAX_PX", "PX_PER_MM", "ReliefMap", "apply", "decode_image", "grid_for", "relief_heightmap", "relief_solid"]
+def _fuse(operation: Any, body: trimesh.Trimesh, tool: trimesh.Trimesh, feature: Mapping[str, Any]) -> trimesh.Trimesh:
+    """Run the boolean; a failure is the photo's to report (``ContentUnusable``, customer-safe), not a build error."""
+    try:
+        return operation(body, tool)
+    except GeometryError as exc:
+        raise ContentUnusable(
+            "We couldn't set this photo into the piece; try another photo or a different depth",
+            {"error": exc.message, "anchor": feature.get("anchor"), "mode": feature.get("mode", "emboss"), **exc.detail},
+        ) from exc
+
+
+__all__ = [
+    "EMBED_MM",
+    "FLOOR_MM",
+    "MAX_PX",
+    "PX_PER_MM",
+    "ReliefMap",
+    "apply",
+    "decode_image",
+    "grid_for",
+    "register_heif",
+    "relief_heightmap",
+    "relief_solid",
+]

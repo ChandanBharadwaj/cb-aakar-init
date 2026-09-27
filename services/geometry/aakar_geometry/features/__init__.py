@@ -25,6 +25,7 @@ from .validate import check, check_features, normalise_features
 log = logging.getLogger("aakar.geometry.features")
 
 _NEEDS = {"relief_image": "image", "hero_mesh": "model"}
+_NOUNS = {"relief_image": "photo", "hero_mesh": "model", "emboss_text": "text", "motif": "motif"}
 
 
 def _frame_for(template: Any, anchor: Any, params: Mapping[str, Any]) -> AnchorFrame:
@@ -119,8 +120,8 @@ def apply_features(
             raise UnsupportedFeature(f"Unknown feature {ftype}", {"type": ftype})
         if mesh is None or mesh.is_empty or not mesh.is_watertight:
             raise GeometryError(
-                f"Applying {ftype} on {anchor.id} did not leave a closed solid",
-                {"type": ftype, "anchor": anchor.id, "feature": index},
+                f"Something went wrong while adding your {_NOUNS.get(ftype, 'content')}; please try again",
+                {"type": ftype, "anchor": anchor.id, "feature": index, "reason": f"applying {ftype} on {anchor.id} did not leave a closed solid"},
             )
     return mesh, hardware
 

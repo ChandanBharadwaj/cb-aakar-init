@@ -37,7 +37,7 @@ EMBED_MM = 0.5
 Y_UP_FORMATS = ("glb", "gltf")
 _Y_UP_TO_Z_UP = trimesh.transformations.rotation_matrix(np.pi / 2.0, [1.0, 0.0, 0.0])
 
-UNREADABLE = "We couldn't read this model; please export it again as STL, OBJ or 3MF"
+UNREADABLE = "We couldn't read this model file; export it from your 3D program as .stl, .obj or .3mf"
 OPEN = "This model has gaps we couldn't close; please repair it in your 3D program and try again"
 NO_VOLUME = "This model has no volume to print; please check it in your 3D program"
 TOO_DETAILED = "This model is too detailed for us to work with; please export it with fewer triangles"

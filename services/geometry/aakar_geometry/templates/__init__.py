@@ -7,7 +7,12 @@ import re
 from ..errors import UnknownTemplate
 from ..families import UnknownFamily, family_ids
 from .base import Anchor, HardwareRef, Param, Template, TemplateConstraints
+from .desk_nameplate import DeskNameplate
+from .fridge_magnet import FridgeMagnet
+from .hanging_ornament import HangingOrnament
 from .jharokha_phone_stand import JharokhaPhoneStand
+from .keychain_tag import KeychainTag
+from .raw_print import RawPrint
 
 _REF_RE = re.compile(r"^([a-z][a-z0-9_]*)@([0-9]+)$")
 
@@ -27,6 +32,11 @@ def register(template: type[Template]) -> type[Template]:
 
 
 register(JharokhaPhoneStand)
+register(KeychainTag)
+register(FridgeMagnet)
+register(HangingOrnament)
+register(DeskNameplate)
+register(RawPrint)
 
 
 def list_templates() -> list[type[Template]]:
@@ -56,10 +66,15 @@ def latest_by_id(template_id: str) -> type[Template] | None:
 
 __all__ = [
     "Anchor",
+    "DeskNameplate",
+    "FridgeMagnet",
+    "HangingOrnament",
     "HardwareRef",
     "JharokhaPhoneStand",
+    "KeychainTag",
     "Param",
     "REGISTRY",
+    "RawPrint",
     "Template",
     "TemplateConstraints",
     "get_template",

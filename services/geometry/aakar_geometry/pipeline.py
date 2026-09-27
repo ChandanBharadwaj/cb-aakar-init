@@ -1,10 +1,11 @@
 """``build_design``: design.generate payload -> design.completed (or design.failed) payload.
 
 Steps (PLAN §7.11): validate request + spec → resolve template → check family / features / style /
-material → validate params → progress ``understanding`` → progress ``sculpting`` → CAD body +
-features (Chhaap: photo reliefs and hero forms fetched through the ``ContentFetcher``) → export +
-store → progress ``checking`` → inspect → assemble and validate the completed payload (with the
-template's ``hardware``). Every failure becomes a ``design.failed`` payload with the matching code;
+material → validate params → ``Template.validate_content`` (limits coupling params and content) →
+progress ``understanding`` → progress ``sculpting`` → CAD body + features (Chhaap: photo reliefs and
+hero forms fetched through the ``ContentFetcher``) → refuse an empty result → export + store →
+progress ``checking`` → inspect → assemble and validate the completed payload (with the template's
+``hardware_for(params)``). Every failure becomes a ``design.failed`` payload with the matching code;
 nothing raises out of this function.
 """
 
@@ -186,6 +187,8 @@ def build_design(
         _check_spec_against_template(template, spec)
         params = template.validate(spec.get("params"))
         normalised = normalise_spec(template, spec, params)
+        # limits that couple params and content (skin under a cut-in photo, a raw print's model), before any CAD
+        template.validate_content(params, normalised["features"])
         outputs = list(dict.fromkeys(request.get("outputs") or DEFAULT_OUTPUTS))
         skipped = [o for o in outputs if o not in SUPPORTED_OUTPUTS]
         if skipped:
@@ -201,6 +204,11 @@ def build_design(
         sink.emit("design.progress", progress_payload("understanding", 10))
         sink.emit("design.progress", progress_payload("sculpting", 35))
         mesh = _build_with_timeout(template, params, timeout_s, normalised["features"], fetcher)
+        if not isinstance(mesh, trimesh.Trimesh) or mesh.is_empty or len(mesh.faces) == 0:
+            raise GeometryError(
+                "Something went wrong while shaping this design: it came out empty",
+                {"template": template.ref(), "reason": "the build returned no geometry"},
+            )
 
         files = export_all(mesh, outputs, name=f"{template.id}_v{template.version}")
         normalised_design_id = _uuid_or_nil(design_id)

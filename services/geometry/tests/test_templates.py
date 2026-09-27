@@ -32,7 +32,9 @@ def test_descriptor_validates_and_matches_plan():
 
 
 def test_registry_lookup():
-    assert [t.ref() for t in list_templates()] == ["jharokha_phone_stand@1"]
+    assert [t.ref() for t in list_templates()] == [
+        "desk_nameplate@1", "fridge_magnet@1", "hanging_ornament@1", "jharokha_phone_stand@1", "keychain_tag@1", "raw_print@1",
+    ]
     assert get_template("jharokha_phone_stand@1") is JharokhaPhoneStand
     assert parse_ref("jharokha_phone_stand@1") == ("jharokha_phone_stand", 1)
     with pytest.raises(UnknownTemplate):
