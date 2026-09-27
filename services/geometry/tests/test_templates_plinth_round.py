@@ -22,18 +22,19 @@ from conftest import DESIGN_ID, JOB_ID, content_source
 
 @pytest.fixture
 def forms(content_dir):
-    """column.stl (6 × 6 × 150), corner.stl (a heavy column in one corner of a 40 mm square, a thin rod in the
-    opposite corner) and lollipop.stl (a 40 mm ball on a 3 mm stick, 170 mm tall) beside the conftest content."""
+    """column.stl (6 × 6 × 150), wall.stl (a 40 × 4 × 150 slab at the front of a 40 mm square, a thin rod at its
+    back: nearly all its weight at the front) and lollipop.stl (a 40 mm ball on a 3 mm stick, 170 mm tall) beside
+    the conftest content."""
     column = trimesh.creation.box(extents=[6, 6, 150])
-    heavy = trimesh.creation.box(extents=[12, 12, 150])
-    heavy.apply_translation([-14, -14, 0])
+    heavy = trimesh.creation.box(extents=[40, 4, 150])
+    heavy.apply_translation([0, -18, 0])
     rod = trimesh.creation.box(extents=[2, 2, 150])
-    rod.apply_translation([19, 19, 0])
+    rod.apply_translation([0, 19, 0])
     stick = trimesh.creation.cylinder(radius=1.5, height=150)
     ball = trimesh.creation.icosphere(subdivisions=3, radius=20)
     ball.apply_translation([0, 0, 75])
     lollipop = trimesh.boolean.union([stick, ball], engine="manifold")
-    for name, mesh in (("column.stl", column), ("corner.stl", trimesh.util.concatenate([heavy, rod])), ("lollipop.stl", lollipop)):
+    for name, mesh in (("column.stl", column), ("wall.stl", trimesh.util.concatenate([heavy, rod])), ("lollipop.stl", lollipop)):
         (content_dir / name).write_bytes(mesh.export(file_type="stl"))
     return content_dir
 
@@ -105,15 +106,19 @@ def test_a_form_too_big_for_its_room_is_refused_never_shrunk(forms):
     assert mesh.extents[0] == pytest.approx(50.0, abs=1e-3)
 
 
-def test_a_form_that_leans_off_the_plinth_is_refused_with_a_wider_plinth_to_try(forms):
+def test_a_form_that_leans_off_the_plinth_is_refused_with_a_plinth_that_would_hold_it(forms):
     params = PlinthRound.validate({"diameter_mm": 40, "height_mm": 6})
     with pytest.raises(ParamOutOfRange) as exc:
-        PlinthRound.build(params, [hero("corner.stl")], LocalFileFetcher(forms))
+        PlinthRound.build(params, [hero("wall.stl")], LocalFileFetcher(forms))
     detail = exc.value.detail
     assert exc.value.keys == ["diameter_mm"]
-    assert exc.value.message.startswith("Your form would lean off a 40 mm plinth; choose a plinth at least ")
+    wider = detail["suggested_diameter_mm"]
+    assert exc.value.message == f"Your form would lean off a 40 mm plinth; choose a plinth at least {wider:g} mm across, or a smaller size for your form."
     assert detail["tipping_margin_mm"] < MIN_TIPPING_MARGIN_MM
-    assert detail["suggested_diameter_mm"] > 40 and "mesh" not in exc.value.message.lower()
+    # the suggestion is worked out, not guessed: the form grows with a wider plinth's room (contain), and still stands
+    assert PlinthRound.build(PlinthRound.validate({"diameter_mm": wider, "height_mm": 6}), [hero("wall.stl")], LocalFileFetcher(forms)).is_watertight
+    with pytest.raises(ParamOutOfRange):
+        PlinthRound.build(PlinthRound.validate({"diameter_mm": wider - 5, "height_mm": 6}), [hero("wall.stl")], LocalFileFetcher(forms))
 
 
 def test_a_tall_form_on_a_narrow_plinth_is_refused_and_stands_on_a_wide_one(forms):
