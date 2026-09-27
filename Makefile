@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 COMPOSE := docker compose -f infra/docker-compose.yml
 
-.PHONY: help infra infra-down api geometry inspect web admin slice test test-api test-python test-web contracts descriptors
+.PHONY: help infra infra-down api geometry inspect web admin slice test test-api test-python test-web contracts descriptors smoke-avatars
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -30,6 +30,9 @@ admin: ## Run the management portal (port 3100)
 
 slice: ## Build the Jharokha phone stand from the example spec into out/slice
 	cd services/geometry && uv run aakar-geometry build ../../packages/contracts/examples/jharokha-phone-stand.spec.json --out ../../out/slice
+
+smoke-avatars: ## Live Avatar order smoke (needs `make api` and `make geometry` running)
+	python3 scripts/smoke-avatar-order.py
 
 descriptors: ## Export live template descriptors to packages/contracts/examples (mocks and API fixtures read them)
 	cd services/geometry && uv run aakar-geometry templates > ../../packages/contracts/examples/template-descriptors.json
