@@ -16,7 +16,7 @@ Anchors (content lands on these, see ``anchor_frame``)
   base_front  the foot's front edge, a strip ``BASE_HEIGHT_MM`` tall (normal −Y): a line of text.
 The piece must stand: the combined centre of gravity keeps at least ``MIN_TIPPING_MARGIN_MM`` (the
 inspect service's own threshold) plus ``TIP_SAFETY_MM`` inside the foot, or the combination is refused.
-Width is capped at the 250 mm bed (the Pehchaan family envelope reaches 300 mm).
+Width is capped at the 250 mm bed, which is also the Pehchaan family envelope's longest side (120–250 mm).
 """
 
 from __future__ import annotations

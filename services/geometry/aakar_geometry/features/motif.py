@@ -157,7 +157,7 @@ def _load(folder: str) -> MotifLibrary:
         raise _library_error("index.json is missing", {"path": str(index_path)}) from exc
     except json.JSONDecodeError as exc:
         raise _library_error(f"index.json is not JSON: {exc}", {"path": str(index_path)}) from exc
-    entries = index.get("motifs")
+    entries = index.get("motifs") if isinstance(index, Mapping) else None
     if not isinstance(entries, list) or not entries:
         raise _library_error("index.json lists no motifs", {"path": str(index_path)})
     motifs: dict[str, Motif] = {}
@@ -166,7 +166,10 @@ def _load(folder: str) -> MotifLibrary:
         if not isinstance(motif_id, str) or not ID_RE.match(motif_id) or motif_id in motifs:
             raise _library_error("a motif id is missing, malformed or repeated", {"entry": entry})
         file = entry.get("file") or f"{motif_id}.svg"
-        min_scale = float(entry.get("min_scale", 0.2))
+        try:
+            min_scale = float(entry.get("min_scale", 0.2))
+        except (TypeError, ValueError):
+            min_scale = float("nan")
         if not 0.2 <= min_scale <= MAX_SCALE:
             raise _library_error("min_scale must be between 0.2 and 1", {"motif": motif_id, "min_scale": min_scale})
         try:
@@ -185,12 +188,12 @@ def _load(folder: str) -> MotifLibrary:
             vb,
             region,
         )
-    return MotifLibrary(
-        str(root),
-        float(index.get("reference_mm", 30.0)),
-        float(index.get("min_stroke_mm", outlines.DEFAULT_MIN_FEATURE_MM)),
-        motifs,
-    )
+    try:
+        reference = float(index.get("reference_mm", 30.0))
+        min_stroke = float(index.get("min_stroke_mm", outlines.DEFAULT_MIN_FEATURE_MM))
+    except (TypeError, ValueError) as exc:
+        raise _library_error("reference_mm and min_stroke_mm must be numbers", {"path": str(index_path)}) from exc
+    return MotifLibrary(str(root), reference, min_stroke, motifs)
 
 
 def load_library() -> MotifLibrary:

@@ -40,7 +40,6 @@ from functools import lru_cache
 from importlib import resources
 from typing import Any, Mapping
 
-import numpy as np
 import trimesh
 import uharfbuzz as hb
 from shapely import affinity
@@ -138,9 +137,13 @@ def fonts_available() -> dict[str, bool]:
 
 
 def normalise_text(text: Any) -> str:
-    """NFC, surrounding spaces trimmed (the storefront trims too); one line only."""
-    value = unicodedata.normalize("NFC", str(text or "")).strip()
-    return value
+    """NFC with the surrounding spaces trimmed (the storefront trims too)."""
+    return unicodedata.normalize("NFC", str(text or "")).strip()
+
+
+def _mm(value: float) -> str:
+    """A length for a message: one decimal at most, "36" rather than "36.0"."""
+    return f"{value:.1f}".rstrip("0").rstrip(".")
 
 
 def _is_letter(ch: str) -> bool:
@@ -206,7 +209,8 @@ def resolve_script(text: str, script: str | None = None, font: Any = None, key: 
             {"key": f"{key}.text", "letters": foreign[:10]},
         )
     if len(scripts) > 1:
-        labels = " and ".join(SCRIPTS[s].label for s in scripts[:2]) if len(scripts) == 2 else ", ".join(SCRIPTS[s].label for s in scripts)
+        names = [SCRIPTS[s].label for s in scripts]
+        labels = ", ".join(names[:-1]) + " and " + names[-1]
         raise InvalidSpec(
             f"Please write the name in one script: this mixes {labels} letters. Each can go on its own spot",
             {"key": f"{key}.text", "scripts": scripts},
@@ -322,7 +326,7 @@ def _shape_cached(text: str, script_id: str) -> ShapedText:
             buf.script, buf.language = SCRIPTS[LATIN].ot_script, SCRIPTS[LATIN].language
         hb.shape(font, buf, {})
         tolerance = FLATTEN_EM * upem
-        for info, pos in zip(buf.glyph_infos, buf.glyph_positions):
+        for info, pos in zip(buf.glyph_infos, buf.glyph_positions, strict=True):
             x = pen_x + pos.x_offset
             y = float(pos.y_offset)
             if info.codepoint == 0:
@@ -388,14 +392,14 @@ def fit_text(
         if height > tallest + 1e-9:
             raise ParamOutOfRange(
                 [f"{key}.height_mm"],
-                f"The {place} has room for letters up to {tallest:.0f} mm tall; {height:g} mm was asked",
+                f"The {place} has room for letters up to {_mm(tallest)} mm tall; {height:g} mm was asked",
                 {"height_mm": height, "max_height_mm": round(tallest, 2)},
             )
         width = height * ink_w / ink_h
         if width > box_w + 1e-9:
             raise ParamOutOfRange(
                 [f"{key}.height_mm"],
-                f"At {height:g} mm tall this text is {width:.0f} mm long, but the {place} has room for {box_w:.0f} mm; "
+                f"At {height:g} mm tall this text is {_mm(width)} mm long, but the {place} has room for {_mm(box_w)} mm; "
                 "make the letters smaller or the text shorter",
                 {"height_mm": height, "width_mm": round(width, 2), "room_mm": [round(box_w, 2), round(box_h, 2)]},
             )
@@ -457,11 +461,6 @@ def apply(body: trimesh.Trimesh, frame: AnchorFrame, feature: Mapping[str, Any],
         noun="name",
         detail={"anchor": feature.get("anchor"), "text": feature.get("text")},
     )
-
-
-def local_extent(fitted: FittedText) -> np.ndarray:
-    """``(x0, y0, x1, y1)`` of the fitted lettering in the anchor frame (tests and layout checks)."""
-    return np.asarray(fitted.region.bounds, dtype=np.float64)
 
 
 __all__ = [

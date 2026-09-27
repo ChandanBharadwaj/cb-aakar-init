@@ -397,7 +397,7 @@ def test_apply_features_relief_returns_mesh_and_hardware(content_dir):
     assert apply_features(Plate, body, params, [], None)[0] is body
 
 
-def test_apply_features_rejects_wrong_content_kind_and_text_features(content_dir):
+def test_apply_features_rejects_wrong_content_kind_and_sets_names_without_fetching(content_dir):
     Plate, Plinth, Raw = make_test_templates()
     params = Plate.validate({})
     body = Plate.build_body(params)

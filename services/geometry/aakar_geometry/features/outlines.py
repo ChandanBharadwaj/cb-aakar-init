@@ -46,7 +46,6 @@ EMBED_MM = 0.5  # raised content starts this far inside the body; a cutter start
 MAX_THIN_SHARE = 0.05  # share of an outline's area allowed to be thinner than the smallest printable stroke
 STROKE_SLACK_MM = 0.01  # a stroke exactly min_feature_mm wide passes
 DEFAULT_MIN_FEATURE_MM = 0.8  # a 0.4 mm nozzle prints two lines side by side at the least
-SIMPLIFY_MM = 0.002  # drops collinear points left by flattening, far below what a printer resolves
 _EPS_AREA = 1e-9
 
 
@@ -311,7 +310,6 @@ __all__ = [
     "FILL_RULES",
     "MAX_THIN_SHARE",
     "OutlinePen",
-    "SIMPLIFY_MM",
     "StrokeCheck",
     "clean",
     "fill",

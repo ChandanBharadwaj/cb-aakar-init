@@ -31,7 +31,7 @@ def test_descriptor():
     desc = DeskNameplate.descriptor()
     assert (desc["id"], desc["family"], desc["name"]) == ("desk_nameplate", "nameplate", "Pehchaan desk nameplate")
     p = desc["params"]
-    # 250 is the bed: the family envelope reaches 300 mm but a longer plate cannot be printed in one piece here
+    # 250 is the bed, and the family envelope stops there too (120–250 mm since PR 5)
     assert (p["width_mm"]["min"], p["width_mm"]["max"], p["width_mm"]["default"]) == (120, 250, 180.0)
     assert p["width_mm"]["max"] <= min(desc["constraints"]["bed_mm"])
     assert (p["height_mm"]["min"], p["height_mm"]["max"], p["height_mm"]["default"]) == (40, 100, 60.0)

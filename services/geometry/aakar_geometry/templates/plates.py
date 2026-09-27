@@ -180,7 +180,7 @@ def symmetric_rect(
     return None
 
 
-_CUT_NOUN = {"relief_image": "photo", "emboss_text": "name", "motif": "motif"}
+_CUT_NOUN = {"relief_image": "picture", "emboss_text": "name", "motif": "motif"}
 
 
 def cut_in_depth(features: Sequence[Mapping[str, Any]], anchors: Iterable[str]) -> tuple[float, list[str]]:
@@ -239,7 +239,7 @@ def check_skin(
     """Raise ``ParamOutOfRange`` when cut-in content leaves less than ``min_skin_mm`` of plastic.
 
     ``behind`` is solid already taken away behind the face (a 3.2 mm magnet pocket); ``behind_what``
-    names it for the message ("the magnet"). The message names what is cut in (photo, name, motif).
+    names it for the message ("the magnet"). The message names what is cut in (picture, name, motif).
     """
     anchors = tuple(anchors)
     depth, keys = cut_in_depth(features, anchors)

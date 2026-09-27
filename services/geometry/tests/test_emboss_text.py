@@ -260,7 +260,10 @@ def test_fit_to_the_printable_area_and_max_text_height():
     assert exc.value.keys == ["features[0].height_mm"] and "up to 36 mm tall" in exc.value.message
     with pytest.raises(ParamOutOfRange) as exc:
         fit_text(asha, box=(0, 0, 30, 21.5), height_mm=20, anchor_label="Back", key="features[0]")
-    assert exc.value.keys == ["features[0].height_mm"] and "62 mm long, but the back has room for 30 mm" in exc.value.message
+    assert exc.value.keys == ["features[0].height_mm"] and "61.6 mm long, but the back has room for 30 mm" in exc.value.message
+    with pytest.raises(ParamOutOfRange) as exc:  # the room is reported as it is, never rounded up
+        fit_text(asha, box=(0, 0, 74, 8.6), height_mm=8.8, anchor_label="Back of the rest")
+    assert "The back of the rest has room for letters up to 8.6 mm tall; 8.8 mm was asked" == exc.value.message
 
 
 def test_text_too_long_for_its_anchor_is_refused_before_it_gets_unreadable():

@@ -210,4 +210,4 @@ def test_a_template_that_forgets_its_hardware_is_caught():
 def test_size_envelopes_come_from_the_seed():
     assert families.size_envelope("keychain") == (30.0, 60.0)
     assert families.size_envelope("raw_print") == (20.0, 240.0)
-    assert families.size_envelope("nameplate") == (120.0, 300.0)
+    assert families.size_envelope("nameplate") == (120.0, 250.0)  # the 250 mm bed (seed changed in PR 5)

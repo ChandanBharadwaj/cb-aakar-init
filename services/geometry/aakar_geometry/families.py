@@ -81,7 +81,7 @@ BUILTIN_FAMILIES: list[dict[str, Any]] = [
     _row("ornament", "carrier", "hanging_ornament", ["relief_image", "emboss_text", "motif"], ["face_front", "face_back"],
          max_text_chars=12, hardware=[{"sku": "cord_200", "qty": 1}], envelope=(50, 90)),
     _row("nameplate", "carrier", "desk_nameplate", ["emboss_text", "motif", "relief_image"], ["face", "base_front"],
-         max_text_chars=24, hardware=[{"sku": "adhesive_pads", "qty": 1}], envelope=(120, 300)),
+         max_text_chars=24, hardware=[{"sku": "adhesive_pads", "qty": 1}], envelope=(120, 250)),
     _row("lithophane", "carrier", "lithophane_plate", ["relief_image"], ["plate"],
          hardware=[{"sku": "led_base_usb", "qty": 1}], allowed=["basic_white"], shape_tolerance="strict", available=False,
          envelope=(100, 150)),
