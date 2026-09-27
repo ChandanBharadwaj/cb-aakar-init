@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 COMPOSE := docker compose -f infra/docker-compose.yml
 
-.PHONY: help infra infra-down api geometry inspect web slice test test-api test-python test-web contracts
+.PHONY: help infra infra-down api geometry inspect web admin slice test test-api test-python test-web contracts
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -25,6 +25,9 @@ inspect: ## Run the inspect service (port 8082)
 web: ## Run the storefront (port 3000)
 	pnpm --filter @aakar/web dev
 
+admin: ## Run the management portal (port 3100)
+	pnpm --filter @aakar/admin dev
+
 slice: ## Build the Jharokha phone stand from the example spec into out/slice
 	cd services/geometry && uv run aakar-geometry build ../../packages/contracts/examples/jharokha-phone-stand.spec.json --out ../../out/slice
 
@@ -40,5 +43,6 @@ test-python: ## Python services
 test-api: ## Spring Boot API (needs Postgres aakar_test)
 	cd services/api && ./gradlew test
 
-test-web: ## Storefront typecheck, lint, build
+test-web: ## Storefront and portal typecheck, lint, build
 	pnpm --filter @aakar/web typecheck && pnpm --filter @aakar/web lint && pnpm --filter @aakar/web build
+	pnpm --filter @aakar/admin typecheck && pnpm --filter @aakar/admin lint && pnpm --filter @aakar/admin build

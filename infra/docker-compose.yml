@@ -120,6 +120,8 @@ services:
       AAKAR_AMQP_URL: amqp://aakar:aakar@rabbitmq:5672/
       AAKAR_GEOMETRY_URL: http://geometry:8081
       AAKAR_API_PUBLIC_URL: http://api:8080
+      AAKAR_WEB_URL: http://localhost:3000
+      AAKAR_PROFILE: local
     ports: ["8080:8080"]
 
   web:
@@ -131,6 +133,16 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8080
     ports: ["3000:3000"]
+
+  admin:
+    build:
+      context: ..
+      dockerfile: apps/admin/Dockerfile
+    depends_on:
+      api: { condition: service_started }
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+    ports: ["3100:3100"]
 
 volumes:
   pgdata:

@@ -16,6 +16,7 @@
 
 ```
 apps/web/                  Next.js storefront + viewer (React Three Fiber)
+apps/admin/                Next.js management portal (staff): orders, pricing, materials, catalog
 services/api/              Spring Boot modulith (Java 21, Postgres, RabbitMQ)
 services/geometry/         Python: parametric templates, CAD, exports, build pipeline, worker
 services/inspect/          Python: printability report, print estimate
@@ -46,6 +47,7 @@ make infra        # Postgres, RabbitMQ, MinIO in Docker (or use a local Postgres
 make geometry     # :8081
 make api          # :8080 (direct profile: calls geometry over HTTP)
 make web          # :3000 → open /shop, click "Modify with AI" on the Jharokha Phone Stand
+make admin        # :3100 → staff portal (seeded studio@aakar.local / aakar-studio in local mode)
 ```
 
 Full instructions, without Docker too, in the [runbook](docs/runbook-local.md).

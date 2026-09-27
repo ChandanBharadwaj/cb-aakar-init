@@ -1,13 +1,17 @@
 name: web
 on:
   pull_request:
-    paths: ["apps/web/**", "packages/design-tokens/**", "packages/contracts/openapi/aakar-api.v1.yaml", ".github/workflows/web.yml"]
+    paths: ["apps/web/**", "apps/admin/**", "packages/design-tokens/**", "packages/contracts/openapi/*.yaml", ".github/workflows/web.yml"]
   push:
     branches: [main]
-    paths: ["apps/web/**", "packages/design-tokens/**"]
+    paths: ["apps/web/**", "apps/admin/**", "packages/design-tokens/**"]
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [web, admin]
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -17,8 +21,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Generated API types are current
         run: |
-          pnpm --filter @aakar/web gen:api
-          git diff --exit-code -- apps/web/src/lib/api/schema.d.ts
-      - run: pnpm --filter @aakar/web typecheck
-      - run: pnpm --filter @aakar/web lint
-      - run: pnpm --filter @aakar/web build
+          pnpm --filter @aakar/${{ matrix.app }} gen:api
+          git diff --exit-code -- apps/${{ matrix.app }}/src/lib/api/schema.d.ts
+      - run: pnpm --filter @aakar/${{ matrix.app }} typecheck
+      - run: pnpm --filter @aakar/${{ matrix.app }} lint
+      - run: pnpm --filter @aakar/${{ matrix.app }} build

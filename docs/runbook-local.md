@@ -55,12 +55,15 @@ cd services/api
 
 Quick check: `curl -s localhost:8080/api/catalog/items | head -c 400`, Swagger at http://localhost:8080/swagger-ui.html.
 
-### 4. Storefront (port 3000)
+### 4. Storefront (port 3000) and portal (port 3100)
 
 ```sh
 pnpm install
-pnpm --filter @aakar/web dev
+pnpm --filter @aakar/web dev      # customers
+pnpm --filter @aakar/admin dev    # staff; seeded account studio@aakar.local / aakar-studio (local profile only)
 ```
+
+The customer loop runs entirely on mocks in the local profile (ADR-0013): the sign-in page shows the OTP dev code, the "Pay" step lands on a placeholder gateway page where you choose success or failure, shipping is a mock carrier, and messages are logged to the portal's Messages page instead of being sent.
 
 Open http://localhost:3000/shop, click **Modify with AI** on the Jharokha Phone Stand, watch the mandala run through *Understanding → Weaving → Checking → Pricing → Ready*, then swap finishes and drag the sliders.
 
