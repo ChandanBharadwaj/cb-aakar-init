@@ -123,8 +123,11 @@ paths:
                 kind: { type: string, enum: [image, model] }
       responses:
         '201': { description: Stored, content: { application/json: { schema: { $ref: '#/components/schemas/Upload' } } } }
+        '400': { description: Missing file or kind, $ref: '#/components/responses/Problem' }
+        '401': { description: No known identity (neither a signed-in user nor a guest header), $ref: '#/components/responses/Problem' }
         '413': { description: payload_too_large, $ref: '#/components/responses/Problem' }
-        '422': { description: unsupported_format, $ref: '#/components/responses/Problem' }
+        '415': { description: Not a multipart request, $ref: '#/components/responses/Problem' }
+        '422': { description: unsupported_format, or upload_rejected when the scanner refuses the file outright, $ref: '#/components/responses/Problem' }
   /api/uploads/{id}:
     get:
       tags: [uploads]
@@ -201,7 +204,9 @@ paths:
                   items: { type: object, additionalProperties: true }
       responses:
         '202': { description: Accepted, content: { application/json: { schema: { $ref: '#/components/schemas/DesignAccepted' } } } }
+        '400': { description: More than 8 features or a malformed body, $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '409': { description: upload_not_ready (a referenced upload is still in review), $ref: '#/components/responses/Problem' }
         '422': { $ref: '#/components/responses/Problem' }
   /api/versions/{versionId}/printability:
     get:
@@ -864,7 +869,7 @@ components:
         sort_order: { type: integer }
         ready: { type: boolean, description: True when at least one live template of this family exists in the geometry service }
         templates: { type: array, items: { $ref: '../schemas/template-descriptor.v1.json' } }
-        price_from_paise: { type: [integer, 'null'], description: Lowest computed price across live templates and materials, when known }
+        price_from_paise: { type: [integer, 'null'], description: "A floor: the family's minimum from the active pricing policy, when one is set" }
     Upload:
       type: object
       required: [id, kind, format, bytes, status, created_at]

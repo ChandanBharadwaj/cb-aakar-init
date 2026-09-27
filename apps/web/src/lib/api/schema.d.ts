@@ -353,8 +353,14 @@ export interface paths {
                         "application/json": components["schemas"]["Upload"];
                     };
                 };
+                /** @description Missing file or kind */
+                400: components["responses"]["Problem"];
+                /** @description No known identity (neither a signed-in user nor a guest header) */
+                401: components["responses"]["Problem"];
                 /** @description payload_too_large */
                 413: components["responses"]["Problem"];
+                /** @description Not a multipart request */
+                415: components["responses"]["Problem"];
                 /** @description unsupported_format */
                 422: components["responses"]["Problem"];
             };
@@ -611,7 +617,11 @@ export interface paths {
                         "application/json": components["schemas"]["DesignAccepted"];
                     };
                 };
+                /** @description More than 8 features or a malformed body */
+                400: components["responses"]["Problem"];
                 404: components["responses"]["Problem"];
+                /** @description upload_not_ready (a referenced upload is still in review) */
+                409: components["responses"]["Problem"];
                 422: components["responses"]["Problem"];
             };
         };
@@ -2044,7 +2054,7 @@ export interface components {
             /** @description True when at least one live template of this family exists in the geometry service */
             ready: boolean;
             templates: components["schemas"]["template-descriptor.v1"][];
-            /** @description Lowest computed price across live templates and materials */
+            /** @description A floor: the family's minimum from the active pricing policy, when one is set */
             price_from_paise?: number | null;
         };
         Upload: {

@@ -639,6 +639,7 @@ components:
         - type: object
           properties:
             owner: { type: object, properties: { user_id: { type: [string, 'null'], format: uuid }, guest_id: { type: [string, 'null'], format: uuid }, phone: { type: [string, 'null'] } } }
+            url: { type: [string, 'null'], description: Staff get the file URL in every status so reviewers can see it }
             origin: { type: string, enum: [upload, generated] }
             review: { type: [object, 'null'], properties: { id: { type: string, format: uuid }, reason: { type: string }, status: { type: string, enum: [pending, approved, rejected] }, decision_note: { type: [string, 'null'] }, reviewer_email: { type: [string, 'null'] }, decided_at: { type: [string, 'null'], format: date-time } } }
     ContentReviewDecision:

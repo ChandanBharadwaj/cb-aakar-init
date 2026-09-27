@@ -1490,6 +1490,8 @@ export interface components {
                 guest_id?: string | null;
                 phone?: string | null;
             };
+            /** @description Staff get the file URL in every status so reviewers can see it */
+            url?: string | null;
             /** @enum {string} */
             origin?: "upload" | "generated";
             review?: {
