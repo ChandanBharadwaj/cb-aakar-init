@@ -4,6 +4,14 @@ All notable changes to Aakar. Format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added — outcome categories (Avatars) and the Swaroop raw-print path (in progress)
+- **Research**: `docs/research/outcome-categories/` — market report on how a customer's model becomes an orderable object (fixed carriers with 2–3 parameters are the pattern that survived; demand ranking; per-category engineering specs; raw-print partners; unit economics), five sourced notes, and the phased implementation plan (`implementation-plan.md`, resumable from git).
+- **Naming**: Avatar (carrier family), Chhaap (content slot: Naam text, Buti motif, Chhavi photo relief, Roop own 3D form), Duniya (experience), Swaroop (print as it is), Mahaul (backdrop). Code ids stay snake_case English; codenames are portal data.
+- **Contracts** (PR 1): `template-family.v1.json` (shelves, hardware items, families with kind carrier|object|raw, tier, codename + plain name, envelope, hardware BOM, material rules, shape tolerance, content slot) with its instance `packages/design-tokens/families.json` (6 shelves, 7 hardware items, 25 families); `relief_image` and `hero_mesh` features with a shared `content_source`; anchors with `kind` surface|volume, `size_mm`, `bleed_mm`, `bounds_mm`, `accepts`, `max_relief_mm`; descriptor `hardware` and `min_feature_mm`; price lines `hardware` and `setup`, `family_id`, `minimum_subtotal_paise`; `design.completed.hardware`; `design.failed` `content_unusable`. Storefront API: shelves, families, uploads; designs accept `family_id`, `features`, source `upload`. Admin API: families, hardware, shelves, uploads, content reviews; `PricingPolicy.hardware_markup_pct` and `family_rules`; preview `family_id`. Generated types for both apps.
+
+### Decisions
+- ADR-0014 proposed: exactly one raw print family (Swaroop) may carry customer geometry as the body; same Design Spec, same printability gate, same pricing engine with a per-family minimum and setup fee.
+
 ### Added — the customer loop, locally, on mocks (ADR-0013)
 - **Contracts**: identity (bearer + guest header), addresses, cart, shipping serviceability, checkout, orders with status/stage enums and SSE events, payments with a mock-gateway completion path and retry; a separate management API contract for the portal.
 - **API**: Spring Security stateless chain; phone OTP with a mock sender (dev code in the local profile); JWT sessions with revocation; guest designs and carts attach on sign-in; cart with price snapshots and re-pricing; versioned `pricing_policies`; orders with `AK-000001` numbers, transition table, events and SSE; `PaymentGateway`, `ShippingCarrier`, `MessageSender`, `OtpSender` adapters with mock defaults; production guard. 103 tests.

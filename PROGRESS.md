@@ -4,8 +4,8 @@ Living status of the plan in [PLAN.md](PLAN.md). Update this file with every mer
 
 | | |
 |---|---|
-| Last updated | 2026-09-27 (loop + portal live) |
-| Current phase | **Phase 1** — the loop is complete locally (ADR-0013); next: templates, embossing, real provider adapters |
+| Last updated | 2026-09-27 (outcome categories: contracts landed, phases 1–5 in flight) |
+| Current phase | **Phase 1** — the loop is complete locally (ADR-0013); now building **outcome categories (Avatars) + Swaroop** per `docs/research/outcome-categories/implementation-plan.md` |
 | Completed | Phase 0 — Foundations |
 | Roadmap position | ~2 of 28 scheduled weeks (5 phases; 1 done) |
 
@@ -114,6 +114,21 @@ Grouped by workstream (PLAN §15). Tick items as they merge.
 - [ ] OpenTelemetry traces across Java → RabbitMQ → Python
 - [ ] Rate limits and per-user generation quotas
 - [ ] GST and consumer-law review with a chartered accountant (ADR-0008 follow-up)
+
+## Outcome categories (Avatars) — in progress
+
+Plan: [`docs/research/outcome-categories/implementation-plan.md`](docs/research/outcome-categories/implementation-plan.md) (research in the same folder). Every phase ends with a commit on `claude/3d-print-categories-ypc6xw`; a new session resumes from the table below and the plan's phase table.
+
+| Phase | Scope | Status | Evidence / resume pointer |
+|---|---|---|---|
+| 0 | Research report, notes, plan committed | ✅ Done | `docs/research/outcome-categories/` |
+| 1 | PR 1 contracts · PR 2 seed + `V9` + catalog module (families, shelves, hardware, policy fields) | 🟨 PR 1 done (`5235c50`); PR 2 in progress | `packages/contracts/schemas/template-family.v1.json`, `packages/design-tokens/families.json` |
+| 2 | PR 3a geometry features framework · PR 3b text + motif | 🟨 3a in progress | `services/geometry/aakar_geometry/features/` |
+| 3 | PR 4 carriers `keychain_tag`, `fridge_magnet`, `hanging_ornament`, `desk_nameplate`, `raw_print` | ⬜ | after 3a |
+| 4 | PR 5 API uploads, features, family resolution, hardware/setup pricing, print pack, ADR-0014 | 🟨 ADR-0014 written (`0ab8f09`); code after PR 2 | `docs/adr/0014-raw-print-path.md` |
+| 5 | PR 6 storefront · PR 7 portal | 🟨 in progress against the mock APIs | `apps/web/src/app/(stage)/create/`, `apps/admin/src/app/(portal)/avatars/` |
+| 6 | PR 8 lithophane, plinth, pet tag, photo frame, keycap | ⬜ | |
+| 7 | PRs 9–12 Duniya experiences + Katha | ⬜ | |
 
 ## Decisions
 
