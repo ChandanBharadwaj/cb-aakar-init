@@ -7,6 +7,10 @@
     "web:build": "pnpm --filter @aakar/web build",
     "web:lint": "pnpm --filter @aakar/web lint",
     "web:typecheck": "pnpm --filter @aakar/web typecheck",
-    "contracts:validate": "pnpm --filter @aakar/contracts validate"
+    "contracts:validate": "pnpm --filter @aakar/contracts validate",
+    "admin:dev": "pnpm --filter @aakar/admin dev",
+    "admin:build": "pnpm --filter @aakar/admin build",
+    "admin:lint": "pnpm --filter @aakar/admin lint",
+    "admin:typecheck": "pnpm --filter @aakar/admin typecheck"
   }
 }

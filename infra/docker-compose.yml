@@ -128,20 +128,21 @@ services:
     build:
       context: ..
       dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8080
     depends_on:
       api: { condition: service_started }
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8080
     ports: ["3000:3000"]
 
   admin:
     build:
       context: ..
       dockerfile: apps/admin/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8080
+        NEXT_PUBLIC_AAKAR_PROFILE: local
     depends_on:
       api: { condition: service_started }
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8080
     ports: ["3100:3100"]
 
 volumes:
