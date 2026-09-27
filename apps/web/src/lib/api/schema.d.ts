@@ -1137,7 +1137,7 @@ export interface paths {
         put?: never;
         /**
          * Turn the cart into an order awaiting payment
-         * @description Snapshots items, prices and address into the order; creates a payment with the configured gateway (mock by default) and returns where to pay. The cart is emptied when payment succeeds.
+         * @description Snapshots items, prices and address into the order and empties the cart at once (so a second checkout answers 409 cart_empty rather than creating a duplicate order); creates a payment with the configured gateway (mock by default) and returns where to pay. An unpaid order can be paid later from the order page (POST /api/orders/{id}/payments).
          */
         post: {
             parameters: {

@@ -10,7 +10,7 @@
 | Decisions | [docs/adr](docs/adr/README.md) |
 | Run it locally | [docs/runbook-local.md](docs/runbook-local.md) |
 | Design boards | [design/](design/README.md) |
-| Status | **Phase 0 — Foundations** done; Phase 1 starting. See [PROGRESS.md](PROGRESS.md) and the [CHANGELOG](CHANGELOG.md) |
+| Status | **Phase 1 in progress**: the customer loop (sign-in → cart → checkout → mock payment → order tracking) runs locally end to end; management portal landing. See [PROGRESS.md](PROGRESS.md) and the [CHANGELOG](CHANGELOG.md) |
 
 ## Layout
 
@@ -55,6 +55,10 @@ Full instructions, without Docker too, in the [runbook](docs/runbook-local.md).
 | Home | Shop | The viewer |
 |---|---|---|
 | ![Home](docs/images/home.png) | ![Shop](docs/images/shop.png) | ![Viewer](docs/images/viewer.png) |
+
+| Cart | Checkout | Mock pay page | Order tracking |
+|---|---|---|---|
+| ![Cart](docs/images/cart.png) | ![Checkout](docs/images/checkout.png) | ![Mock pay](docs/images/mock-pay.png) | ![Tracking](docs/images/order-tracking.png) |
 
 The first template, straight out of `services/geometry`:
 

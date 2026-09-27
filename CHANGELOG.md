@@ -4,6 +4,19 @@ All notable changes to Aakar. Format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added — the customer loop, locally, on mocks (ADR-0013)
+- **Contracts**: identity (bearer + guest header), addresses, cart, shipping serviceability, checkout, orders with status/stage enums and SSE events, payments with a mock-gateway completion path and retry; a separate management API contract for the portal.
+- **API**: Spring Security stateless chain; phone OTP with a mock sender (dev code in the local profile); JWT sessions with revocation; guest designs and carts attach on sign-in; cart with price snapshots and re-pricing; versioned `pricing_policies`; orders with `AK-000001` numbers, transition table, events and SSE; `PaymentGateway`, `ShippingCarrier`, `MessageSender`, `OtpSender` adapters with mock defaults; production guard. 103 tests.
+- **Storefront**: sign-in with the mock OTP chip, cart, four-step checkout with addresses and serviceability, the clearly labelled mock pay page, orders list and the live tracking board; Add to Cart in the studio, Shop and item pages; SSE over fetch with bearer auth.
+- **Portal** (`apps/admin`): staff sign-in, dashboard, orders queue and detail with stage advancement, print pack, QC photos, packaging card, pricing policies with live preview, materials, catalog, templates, messages log, audit; built against the management contract with its own mock (API module in progress).
+- **Infra**: Dockerfiles for both web apps; portal in Compose and CI.
+
+### Verified
+- Live loop against real services: guest design → cart → OTP → attach → address → checkout `AK-000001` → payment failure, retry, success with invoice → order queued → cart empty → SSE replay; and the same loop driven through the browser with screenshots.
+
+### Known
+- A second checkout before paying creates a duplicate pending order; contract changed so checkout consumes the cart, API fix pending.
+
 ### Decisions
 - ADR-0001 accepted: cream pages with an indigo stage.
 - ADR-0002 accepted: navigation reads Shop · Create · Remix.
