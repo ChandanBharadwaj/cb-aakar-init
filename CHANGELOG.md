@@ -9,13 +9,16 @@ All notable changes to Aakar. Format follows [Keep a Changelog](https://keepacha
 - **API**: Spring Security stateless chain; phone OTP with a mock sender (dev code in the local profile); JWT sessions with revocation; guest designs and carts attach on sign-in; cart with price snapshots and re-pricing; versioned `pricing_policies`; orders with `AK-000001` numbers, transition table, events and SSE; `PaymentGateway`, `ShippingCarrier`, `MessageSender`, `OtpSender` adapters with mock defaults; production guard. 103 tests.
 - **Storefront**: sign-in with the mock OTP chip, cart, four-step checkout with addresses and serviceability, the clearly labelled mock pay page, orders list and the live tracking board; Add to Cart in the studio, Shop and item pages; SSE over fetch with bearer auth.
 - **Portal** (`apps/admin`): staff sign-in, dashboard, orders queue and detail with stage advancement, print pack, QC photos, packaging card, pricing policies with live preview, materials, catalog, templates, messages log, audit; built against the management contract with its own mock (API module in progress).
+- **Management API** (`services/api` `admin` module): staff sign-in with separate staff tokens, dashboard, orders queue and detail with next actions, stage advancement with customer messages, print pack zip (print sheet + 3MF + STL), QC photo upload to a local media store, packaging card PDF with QR that mints the share code, pricing policy history/publish/preview, materials and catalog CRUD with availability, template live flags, messages log, audit log. Flyway V8. 127 tests.
+- **Share page**: public `GET /api/share/{code}` and the storefront `/k/[code]` page ("Designed by you. Crafted by Aakar.") with Reprint into the cart and Remix.
 - **Infra**: Dockerfiles for both web apps; portal in Compose and CI.
 
 ### Verified
 - Live loop against real services: guest design → cart → OTP → attach → address → checkout `AK-000001` → payment failure, retry, success with invoice → order queued → cart empty → SSE replay; and the same loop driven through the browser with screenshots.
+- Live studio loop: staff login → queue → advance through slicing, printing, finishing, QC and packed → print pack zip → packaging card PDF → share code resolves on the public endpoint and the storefront page; customer tracking board shows the studio card and AWB.
 
-### Known
-- A second checkout before paying creates a duplicate pending order; contract changed so checkout consumes the cart, API fix pending.
+### Fixed
+- A second checkout before paying created a duplicate pending order; checkout now consumes the cart (contract and API).
 
 ### Decisions
 - ADR-0001 accepted: cream pages with an indigo stage.

@@ -4,8 +4,8 @@ Living status of the plan in [PLAN.md](PLAN.md). Update this file with every mer
 
 | | |
 |---|---|
-| Last updated | 2026-09-27 (loop live) |
-| Current phase | **Phase 1 — complete the loop locally** (external providers mocked, printing outsourced; ADR-0013, ADR-0004) |
+| Last updated | 2026-09-27 (loop + portal live) |
+| Current phase | **Phase 1** — the loop is complete locally (ADR-0013); next: templates, embossing, real provider adapters |
 | Completed | Phase 0 — Foundations |
 | Roadmap position | ~2 of 28 scheduled weeks (5 phases; 1 done) |
 
@@ -14,7 +14,7 @@ Living status of the plan in [PLAN.md](PLAN.md). Update this file with every mer
 | Phase | Weeks | Status | Exit criterion | Evidence |
 |---|---|---|---|---|
 | 0 — Foundations | 1–2 | ✅ Done | One template renders, prices and exports print-ready files from a fresh clone | `make slice` builds the Jharokha stand in ~3.5 s; API + geometry + storefront verified live; 110 automated tests |
-| 1 — Shop + Remix-lite MVP | 3–10 | ⬜ Not started | 50 paid orders shipped; ≥ 95% fidelity; p95 preview ≤ 15 s | |
+| 1 — Shop + Remix-lite MVP | 3–10 | 🟨 In progress | Loop on the local stack with sandbox providers; 50 end-to-end orders; ≥ 95% fidelity; p95 preview ≤ 15 s | Customer loop and staff portal run end to end on mocks (Groups A–D done); templates, embossing and real adapters remain |
 | 2 — Create + Co-Designer | 11–18 | ⬜ Not started | ≥ 70% of Create sessions reach a priced design; intent accuracy ≥ 90% | |
 | 3 — Freeform and immersive | 19–28 | ⬜ Not started | Freeform designs ship at the same fidelity bar; AR used in ≥ 20% of mobile sessions | |
 | 4 — Scale | 29+ | ⬜ Not started | | |
@@ -24,12 +24,12 @@ Living status of the plan in [PLAN.md](PLAN.md). Update this file with every mer
 | Touchpoint | State |
 |---|---|
 | 01 Grand entrance (Home, prompt bar) | ✅ Built; prompt submits to Create, which explains Phase 2 |
-| 02 Shop (catalog, "Modify with AI") | 🟨 Built; 1 of 6 SKUs buildable, cart disabled |
+| 02 Shop (catalog, "Modify with AI") | 🟨 Built with Add to Cart; 1 of 6 SKUs buildable |
 | 03 Create (natural-language generation) | 🟨 Template picker only; agent arrives in Phase 2 |
 | 04 Remix (AI modifications) | 🟨 Parameter sliders only; language edits arrive in Phase 2 |
-| 05 Checkout + physics check | 🟨 Stability report and price exist; no cart, payment or address |
-| 06 Order tracking + WhatsApp time-lapse | ⬜ |
-| 07 Unboxing | ⬜ |
+| 05 Checkout + physics check | ✅ Cart, four-step checkout with stability, address and serviceability, mock payment |
+| 06 Order tracking + WhatsApp time-lapse | 🟨 Live tracking board with studio card; time-lapse is a placeholder card and a logged message |
+| 07 Unboxing | ✅ Packaging card PDF with QR from the portal; /k/{code} page reprints or remixes |
 
 ## Phase 0 — Foundations (done)
 
@@ -63,17 +63,17 @@ Order of work agreed on 27 Sep 2026: finish the customer loop with mocks, featur
 - [x] API `payment`: `PaymentGateway` interface + mock; webhook-style confirmation; invoice numbers
 - [x] API `shipping`: `ShippingCarrier` interface + mock serviceability, ETA, AWB, events
 - [x] Web: checkout (Review → Stability → Pay → Track), mock pay page, orders list, tracking page with stages
-- [ ] API: checkout consumes the cart (found in the live run: a second checkout before paying created a duplicate order)
+- [x] API: checkout consumes the cart (found in the live run: a second checkout before paying created a duplicate order)
 
 **Group C — Fulfilment and management portal**
-- [ ] API `admin`: staff auth, orders queue, stage advancement, QC photo, print pack (3MF/STL + print sheet), pricing policy editor, materials and catalog availability, audit log
-- [x] `apps/admin`: sign-in, dashboard, orders queue and detail with advance panel, print pack, QC photos, packaging card, pricing policies with preview, materials, catalog, templates, messages log, audit (frontend against a mock; API module in progress)
-- [x] API `notification`: `MessageSender` interface + logging mock (`order_confirmed`); printing/shipped/delivered templates arrive with the admin module
+- [x] API `admin`: staff auth, orders queue, stage advancement, QC photo, print pack (3MF/STL + print sheet), packaging card PDF with QR, pricing policy editor, materials and catalog availability, template live flags, messages, audit log
+- [x] `apps/admin`: sign-in, dashboard, orders queue and detail with advance panel, print pack, QC photos, packaging card, pricing policies with preview, materials, catalog, templates, messages log, audit (verified against the real API)
+- [x] API `notification`: `MessageSender` interface + logging mock; templates order_confirmed, printing_timelapse, shipped, delivered
 
 **Group D — Unboxing and polish**
-- [ ] Share links `/k/{code}` → reprint or remix
-- [ ] Packaging card PDF at PACKED
-- [ ] Time-lapse placeholder at PRINTING stage
+- [x] Share links `/k/{code}` → reprint or remix (public API + storefront page)
+- [x] Packaging card PDF at PACKED (PDFBox + QR, share code minted once)
+- [x] Time-lapse placeholder at PRINTING stage (tracking card + logged `printing_timelapse` message)
 - [x] Startup guard: mock adapters refused in a production profile (`ProductionGuard`)
 
 ## Phase 1 — later backlog
@@ -139,12 +139,13 @@ Grouped by workstream (PLAN §15). Tick items as they merge.
 |---|---|---|
 | `services/inspect` pytest | 21 passed | 2026-09-26 |
 | `services/geometry` pytest | 57 passed | 2026-09-26 |
-| `services/api` Gradle test | 103 passed | 2026-09-27 |
+| `services/api` Gradle test | 127 passed | 2026-09-27 |
 | `apps/web` typecheck · lint · build | clean | 2026-09-27 |
 | `apps/admin` typecheck · lint · build | clean | 2026-09-27 |
 | End-to-end slice (live services) | passed | 2026-09-26 |
 | Customer loop, live (guest design → cart → OTP → checkout → mock pay fail/retry/succeed → order queued → SSE) | passed, 1 finding (duplicate checkout) | 2026-09-27 |
 | Customer loop in the browser (sign-in → cart → checkout → mock pay → tracking) | passed, no page errors | 2026-09-27 |
+| Studio loop, live (staff login → queue → slicing → printing → finishing → qc → packed → print pack zip → packaging card PDF → share code → /k/{code}) | passed, no page errors | 2026-09-27 |
 
 ## Known gaps carried into Phase 1
 

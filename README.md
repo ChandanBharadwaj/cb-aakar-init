@@ -10,7 +10,7 @@
 | Decisions | [docs/adr](docs/adr/README.md) |
 | Run it locally | [docs/runbook-local.md](docs/runbook-local.md) |
 | Design boards | [design/](design/README.md) |
-| Status | **Phase 1 in progress**: the customer loop (sign-in → cart → checkout → mock payment → order tracking) runs locally end to end; management portal landing. See [PROGRESS.md](PROGRESS.md) and the [CHANGELOG](CHANGELOG.md) |
+| Status | **Phase 1, loop complete**: sign-in → cart → checkout → mock payment → tracking, staff portal advancing orders with print pack and packaging card, and the card's share page, all running locally on mocks. See [PROGRESS.md](PROGRESS.md) and the [CHANGELOG](CHANGELOG.md) |
 
 ## Layout
 
@@ -59,6 +59,10 @@ Full instructions, without Docker too, in the [runbook](docs/runbook-local.md).
 | Cart | Checkout | Mock pay page | Order tracking |
 |---|---|---|---|
 | ![Cart](docs/images/cart.png) | ![Checkout](docs/images/checkout.png) | ![Mock pay](docs/images/mock-pay.png) | ![Tracking](docs/images/order-tracking.png) |
+
+| Studio portal · orders | Studio portal · order | Studio portal · pricing | The card's share page |
+|---|---|---|---|
+| ![Portal orders](docs/images/admin-orders.png) | ![Portal order](docs/images/admin-order.png) | ![Portal pricing](docs/images/admin-pricing.png) | ![Share page](docs/images/share-page.png) |
 
 The first template, straight out of `services/geometry`:
 
