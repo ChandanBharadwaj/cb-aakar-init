@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import type { Design, DesignSpec, DesignVersion, JobStageEvent, Material, ParamValues, PriceBreakdown, Stage, Upload } from "@/lib/api/types";
-import { featuresFromSpec, uploadIdOf, withFeature, type Feature } from "@/lib/features";
+import { featuresFromSpec, uploadIdOf, type Feature, type FeatureEdit } from "@/lib/features";
 import { rejectionMessage } from "@/lib/uploads";
 import { FALLBACK_MATERIALS } from "@/lib/viewer/materials";
 
@@ -40,7 +40,10 @@ interface DesignState {
   price: PriceState;
   job?: JobProgress;
   paramsDraft: ParamValues;
-  /** The Chhaap being edited: at most one feature per anchor; sent whole with the next Sculpt. */
+  /**
+   * The Chhaap being edited, sent whole with the next Sculpt: per spot a photo or a form alone, or a name and a motif
+   * side by side (`placeFeature` / `clearFeature` in `@/lib/features` keep that rule).
+   */
   featuresDraft: Feature[];
   /**
    * Uploads seen in this tab, by id. Kept across `reset()`, so the Chhaap panel still shows a file's own name
@@ -59,8 +62,8 @@ interface DesignState {
   clearJob(): void;
   setParam(key: string, value: ParamValues[string]): void;
   resetParams(values: ParamValues): void;
-  /** Put `feature` on an anchor, or clear the anchor with null. */
-  setFeature(anchorId: string, feature: Feature | null): void;
+  /** Apply an edit to the Chhaap draft (functional, so an upload that finishes late never undoes another edit). */
+  updateFeatures(edit: FeatureEdit): void;
   /** Rebuild the draft from a version's spec (undo, or a new version arriving). */
   resetFeatures(fromSpec: Pick<DesignSpec, "features"> | undefined): void;
   /** Note a fresh upload (with the file's name, when the browser has it) or a newer record from polling. */
@@ -135,7 +138,7 @@ export const useDesignStore = create<DesignState>()((set, get) => ({
 
   resetParams: (values) => set({ paramsDraft: { ...values } }),
 
-  setFeature: (anchorId, feature) => set((s) => ({ featuresDraft: withFeature(s.featuresDraft, anchorId, feature) })),
+  updateFeatures: (edit) => set((s) => ({ featuresDraft: edit(s.featuresDraft) })),
 
   resetFeatures: (fromSpec) => set({ featuresDraft: featuresFromSpec(fromSpec) }),
 

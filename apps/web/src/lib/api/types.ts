@@ -40,6 +40,17 @@ export type Upload = Schemas["Upload"];
 export type UploadKind = Upload["kind"];
 export type EditParamsRequest = paths["/api/versions/{versionId}/params"]["post"]["requestBody"]["content"]["application/json"];
 
+// Duniya (experiences), Mahaul (viewer backdrops) and the Buti motif library.
+/** An experience (Duniya); `avatars` are its orderable families in the experience's order, shaped like `Family`. */
+export type Experience = Omit<Schemas["Experience"], "avatars"> & { avatars: Family[] };
+export type ExperienceStyle = Experience["style"];
+export type ExperienceSurface = Schemas["ExperienceSurface"];
+export type SeasonWindow = Schemas["SeasonWindow"];
+/** A viewer backdrop (Mahaul): `preset_key` names the storefront viewer preset that renders it. */
+export type Environment = Schemas["Environment"];
+/** An entry of the Buti library (`GET /api/motifs`). The `motif` feature placed on a piece is `MotifFeature` in `@/lib/features`. */
+export type Motif = Schemas["Motif"];
+
 // Phase 1 (ADR-0013): identity, cart, checkout, orders, payments.
 export type User = Schemas["User"];
 export type Session = Schemas["Session"];

@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatPaise } from "@aakar/design-tokens";
 import { api, toProblem } from "@/lib/api/client";
-import { boundsMm, glbUrl, type DesignVersion, type Family, type PrintabilityReport, type Problem, type TemplateDescriptor } from "@/lib/api/types";
+import { boundsMm, glbUrl, type DesignVersion, type Environment, type Experience, type Family, type PrintabilityReport, type Problem, type TemplateDescriptor } from "@/lib/api/types";
+import { duniyaPreset, presetStyle, STYLE_LABELS, type DuniyaPreset } from "@/lib/experiences";
 import { allowedMaterialIds, hardwareNames, isRawFamily, namedHardware, RAW_FAMILY_ID } from "@/lib/families";
 import { familyLabel, featuresForSubmit, featuresFromSpec, hasContentSlot, sameFeatures } from "@/lib/features";
 import { formatGrams, formatMm, formatPrintTime } from "@/lib/format";
@@ -19,6 +20,7 @@ import { BloomLoader } from "@/components/brand/BloomLoader";
 import { MandalaSpinner } from "@/components/brand/MandalaSpinner";
 import { StageNav } from "@/components/nav/StageNav";
 import { ContentSlotPanel } from "@/components/design/ContentSlotPanel";
+import { DuniyaChip } from "@/components/duniya/DuniyaChip";
 import { FinishChips } from "@/components/ui/FinishChips";
 import { ParamSliders } from "@/components/ui/ParamSliders";
 import { PriceBreakdown } from "@/components/ui/PriceBreakdown";
@@ -42,9 +44,36 @@ export interface DesignStudioProps {
   designId: string;
   /** `?job=` from the URL: the generation job to follow. */
   jobId?: string;
+  /**
+   * `?duniya=` from the URL: the slug of the Duniya experience the piece is made for. Without it the studio falls back
+   * to the design's own `experience_id`.
+   */
+  duniya?: string;
 }
 
 type LoadStatus = "loading" | "ready" | "error";
+
+/** `/design/{id}` with the job to follow and the Duniya slug kept, so a reload lands on the same themed studio. */
+function studioHref(designId: string, query: { job?: string; duniya?: string }): string {
+  const params = new URLSearchParams();
+  if (query.job) params.set("job", query.job);
+  if (query.duniya) params.set("duniya", query.duniya);
+  const qs = params.toString();
+  return `/design/${designId}${qs ? `?${qs}` : ""}`;
+}
+
+/**
+ * The Duniya a studio shows: the slug from the URL, else the experience the design was started from (looked up among
+ * the open experiences by id). Anything unknown, closed or unreachable presets nothing.
+ */
+async function resolveDuniya(slug: string | undefined, experienceId: string | null | undefined): Promise<DuniyaPreset | undefined> {
+  let experience: Experience | undefined;
+  if (slug) experience = await api.experiences.get(slug).catch(() => undefined);
+  if (!experience && experienceId) experience = (await api.experiences.list().catch(() => [] as Experience[])).find((x) => x.id === experienceId);
+  if (!experience) return undefined;
+  const environments = await api.environments.list().catch(() => undefined as Environment[] | undefined);
+  return duniyaPreset(experience, environments);
+}
 
 function sameParams(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
@@ -62,7 +91,7 @@ function rawNudge(report: PrintabilityReport | undefined, minWallMm: number): st
   return `Walls under ${formatMm(minWallMm, 1)} won't print; make it larger with the size slider on Your form.`;
 }
 
-export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
+export function DesignStudio({ designId, jobId: urlJobId, duniya: duniyaSlug }: DesignStudioProps) {
   const router = useRouter();
   const store = useDesignStore();
   const [status, setStatus] = useState<LoadStatus>("loading");
@@ -74,6 +103,7 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
   const [sculpting, setSculpting] = useState(false);
   const [adding, setAdding] = useState(false);
   const [addProblem, setAddProblem] = useState<Problem>();
+  const [duniya, setDuniya] = useState<DuniyaPreset>();
   const cartCount = useCartStore((s) => s.count);
 
   const reload = useCallback(async () => {
@@ -141,6 +171,20 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
     };
   }, [familyId]);
 
+  // The Duniya this piece is made for: its backdrop on the stage, its motif pack first in Buti, its chip in the panel.
+  const experienceId = design?.experience_id;
+  useEffect(() => {
+    if (!duniyaSlug && !experienceId) {
+      setDuniya(undefined);
+      return;
+    }
+    let cancelled = false;
+    resolveDuniya(duniyaSlug, experienceId).then((d) => !cancelled && setDuniya(d));
+    return () => {
+      cancelled = true;
+    };
+  }, [duniyaSlug, experienceId]);
+
   // Follow the job from the URL, or the one the design says is still generating.
   const effectiveJobId = urlJobId ?? (design?.status === "generating" ? design.latest_version?.job_id : undefined);
 
@@ -161,7 +205,7 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
       } catch (err) {
         setProblem(toProblem(err));
       }
-      router.replace(`/design/${designId}`);
+      router.replace(studioHref(designId, { duniya: duniyaSlug }));
     },
   });
 
@@ -228,7 +272,7 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
     try {
       const accepted = await api.versions.editParams(activeVersion.id, { params: raw ? {} : store.paramsDraft, material: material.id, features: sending });
       useDesignStore.getState().startJob(accepted.job_id);
-      router.replace(`/design/${designId}?job=${encodeURIComponent(accepted.job_id)}`);
+      router.replace(studioHref(designId, { job: accepted.job_id, duniya: duniyaSlug }));
     } catch (err) {
       setSculptProblem(toProblem(err));
     } finally {
@@ -272,7 +316,9 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
 
   const bounds = boundsMm(activeVersion);
   const model = glbUrl(activeVersion);
-  const environment = template?.environment ?? family?.environment;
+  // A Duniya's backdrop wins when the viewer has its preset; otherwise the piece keeps its own.
+  const environment = duniya?.environment ?? template?.environment ?? family?.environment;
+  const look = presetStyle(duniya?.style, template);
   const hardware = hardwareNames(namedHardware(activeVersion?.hardware, family));
   const minWall = template?.constraints.min_wall_mm ?? activeVersion?.spec.constraints?.min_wall_mm ?? 1.2;
   const nudge = raw && !busy ? rawNudge(activeVersion?.printability, minWall) : undefined;
@@ -288,14 +334,15 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
           : "Create";
 
   const fromCreate = design?.source === "create" || design?.source === "upload";
-  const backHref = design?.catalog_item_slug ? `/shop/${design.catalog_item_slug}` : fromCreate && familyId ? `/create/${encodeURIComponent(familyId)}` : "/shop";
+  const composerHref = familyId ? `/create/${encodeURIComponent(familyId)}${duniya ? `?duniya=${encodeURIComponent(duniya.slug)}` : ""}` : undefined;
+  const backHref = design?.catalog_item_slug ? `/shop/${design.catalog_item_slug}` : fromCreate && composerHref ? composerHref : "/shop";
   const backLabel = design?.catalog_item_slug ? "Back to the Shop" : fromCreate && familyId ? "Back to Create" : "Back to the Shop";
 
   const tryAgainHref =
     design?.source === "shop" && design.catalog_item_slug
       ? `/design/new?item=${encodeURIComponent(design.catalog_item_slug)}`
-      : fromCreate && familyId
-        ? `/create/${encodeURIComponent(familyId)}`
+      : fromCreate && composerHref
+        ? composerHref
         : template
           ? `/design/new?template=${encodeURIComponent(template.id)}`
           : "/shop";
@@ -354,11 +401,13 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
         {/* Left: title, karigar's note, params, the Chhaap */}
         <aside className="ak-panel order-3 grid content-start gap-5 border-t border-surface-border p-5 lg:order-1 lg:min-h-0 lg:overflow-y-auto lg:border-r lg:border-t-0">
           <div className="grid gap-1.5">
+            {duniya && <DuniyaChip duniya={duniya} />}
             <div className="ak-eyebrow">{eyebrow}</div>
             <h1 className="font-display text-3xl font-semibold leading-tight">{design.title}</h1>
             {template && (
               <p className="text-xs text-surface-muted">
-                {template.name} · {environmentLabel(environment)}
+                {template.name} · {duniya?.environment ? duniya.environmentLabel : environmentLabel(environment)}
+                {look ? ` · ${STYLE_LABELS[look]}` : ""}
               </p>
             )}
           </div>
@@ -386,7 +435,9 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
                   template={template}
                   family={family}
                   features={store.featuresDraft}
-                  onChange={(anchorId, feature) => useDesignStore.getState().setFeature(anchorId, feature)}
+                  onChange={(edit) => useDesignStore.getState().updateFeatures(edit)}
+                  motifPack={duniya?.motifPack}
+                  motifPackLabel={duniya?.codename}
                   raw={raw}
                   disabled={busy || sculpting}
                 />
@@ -487,7 +538,7 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
                       className="ak-btn ak-btn-secondary ak-btn-pill"
                       onClick={() => {
                         useDesignStore.getState().clearJob();
-                        router.replace(`/design/${designId}`);
+                        router.replace(studioHref(designId, { duniya: duniyaSlug }));
                       }}
                     >
                       Keep looking

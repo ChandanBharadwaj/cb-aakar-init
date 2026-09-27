@@ -73,6 +73,18 @@ export type HardwareRef = NonNullable<AdminFamilyInput["hardware"]>[number];
 export type AdminHardware = Schemas["AdminHardware"];
 export type AdminHardwareInput = Schemas["AdminHardwareInput"];
 
+// Duniya (experiences), Mahaul (viewer backdrops) and the Buti motif library
+/** An experience row as stored: `avatars` are family ids and `items` Shop item slugs, in display order. */
+export type AdminExperience = Schemas["AdminExperience"];
+export type AdminExperienceInput = Schemas["AdminExperienceInput"];
+export type ExperienceStyle = AdminExperienceInput["style"];
+export type ExperienceSurface = Schemas["ExperienceSurface"];
+export type ExperienceCollection = Schemas["ExperienceCollection"];
+export type SeasonWindow = Schemas["SeasonWindow"];
+/** A viewer backdrop: `preset_key` names the storefront viewer preset that renders it. */
+export type Environment = Schemas["Environment"];
+export type Motif = Schemas["Motif"];
+
 // Uploads and content reviews
 export type AdminUpload = Schemas["AdminUpload"];
 export type UploadStatus = AdminUpload["status"];

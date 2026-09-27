@@ -5,7 +5,7 @@
 // schema.d.ts types request features as open objects and marks every defaulted field
 // required on the response side, so the UI keeps this discriminated union with optional
 // defaults instead. Keep it in step with the schema whenever a feature changes.
-import type { DesignSpec, Family, TemplateAnchor, TemplateDescriptor } from "@/lib/api/types";
+import type { DesignSpec, Family, Motif, TemplateAnchor, TemplateDescriptor } from "@/lib/api/types";
 import { capitalise, formatMm } from "@/lib/format";
 
 export type FeatureType = "emboss_text" | "motif" | "relief_image" | "hero_mesh";
@@ -38,15 +38,17 @@ export type EmbossText = {
   mode?: "emboss" | "deboss";
 };
 
-/** `$defs/motif` — Buti. */
-export type Motif = {
+/** `$defs/motif` — Buti. (The library entry it names is `Motif` in `@/lib/api/types`.) */
+export type MotifFeature = {
   type: "motif";
+  /** An id from the Buti library (`GET /api/motifs`). */
   motif_id: string;
   anchor: string;
-  /** 0.2–3, default 1. */
+  /** 0.2–1, default 1: 1 fills the spot; never below the motif's own `min_scale`. */
   scale?: number;
-  /** 0.4–3 mm, default 1.0. */
+  /** 0.4–3 mm, default 1.0, never deeper than the anchor's `max_relief_mm`. */
   depth_mm?: number;
+  /** Default `deboss` (cut in); thin pieces default to `emboss` (raised). */
   mode?: "emboss" | "deboss";
 };
 
@@ -81,29 +83,25 @@ export type HeroMesh = {
   orientation?: "as_uploaded" | "lay_flat";
 };
 
-export type Feature = EmbossText | Motif | ReliefImage | HeroMesh;
+export type Feature = EmbossText | MotifFeature | ReliefImage | HeroMesh;
 
 export type Orientation = NonNullable<HeroMesh["orientation"]>;
+export type ReliefMode = "emboss" | "deboss";
 
 // Schema limits, so sliders and counters never offer a value the API would refuse.
 export const TEXT_MAX_CHARS = 40;
 export const RELIEF_MM = { min: 0.2, max: 3, default: 0.6 } as const;
 export const TEXT_DEPTH_MM = { min: 0.4, max: 3, default: 1.2 } as const;
+export const MOTIF_DEPTH_MM = { min: 0.4, max: 3, default: 1 } as const;
+/** `motif.scale`: 1 fills the spot; each motif's own `min_scale` raises the floor. */
+export const MOTIF_SCALE = { min: 0.2, max: 1, default: 1 } as const;
 export const LONGEST_MM = { min: 5, max: 250 } as const;
 
-/** Display order of the Chhaap tabs: text, photo, your form, then motifs (which arrive later). */
-export const FEATURE_TYPES: readonly FeatureType[] = ["emboss_text", "relief_image", "hero_mesh", "motif"];
-
 /**
- * Buti (motifs) needs the motif library, which isn't live yet. Until it is, a motif is never offered as something
- * to add: the Avatar picker and the Shop's "Make it yours" line leave it out, and the Chhaap tabs mark it "soon".
+ * Display order of the Chhaap tabs, as the naming convention lists them: Naam and Buti (which may share a spot),
+ * then Chhavi and Roop (which fill a spot on their own).
  */
-export const MOTIFS_LIVE = false;
-
-/** True for the feature types a customer can add today. */
-export function isLiveFeature(type: FeatureType): boolean {
-  return type !== "motif" || MOTIFS_LIVE;
-}
+export const FEATURE_TYPES: readonly FeatureType[] = ["emboss_text", "motif", "relief_image", "hero_mesh"];
 
 export type FeatureCodename = "Naam" | "Buti" | "Chhavi" | "Roop";
 
@@ -182,9 +180,9 @@ export function anchorAccepts(anchor: TemplateAnchor, template: Pick<TemplateDes
   return FEATURE_TYPES.filter((t) => list.includes(t) && supported.includes(t) && (volume ? t === "hero_mesh" : t !== "hero_mesh"));
 }
 
-/** Anchors a customer can fill today (at least one live feature type), in descriptor order. */
+/** Anchors a customer can fill (at least one feature type the anchor and the template both take), in descriptor order. */
 export function contentAnchors(template: ContentTemplate): TemplateAnchor[] {
-  return (template.anchors ?? []).filter((a) => anchorAccepts(a, template).some(isLiveFeature));
+  return (template.anchors ?? []).filter((a) => anchorAccepts(a, template).length > 0);
 }
 
 /** True when the template has somewhere to put a Chhaap. */
@@ -192,10 +190,10 @@ export function hasContentSlot(template: ContentTemplate): boolean {
   return contentAnchors(template).length > 0;
 }
 
-/** What the composer can put on this template today, across its anchors, in tab order (Buti waits for the motif library). */
+/** What the composer can put on this template, across its anchors, in tab order. */
 export function templateTakes(template: ContentTemplate): FeatureType[] {
   const found = new Set(contentAnchors(template).flatMap((a) => anchorAccepts(a, template)));
-  return FEATURE_TYPES.filter((t) => found.has(t) && isLiveFeature(t));
+  return FEATURE_TYPES.filter((t) => found.has(t));
 }
 
 /** What a family's live templates take today: the picker's "Takes …" line (never the family's aspirational `content_slot.accepts`). */
@@ -208,11 +206,72 @@ const ADD_WORDS: readonly (readonly [FeatureType, string])[] = [
   ["relief_image", "a photo"],
   ["hero_mesh", "your own 3D form"],
   ["emboss_text", "your name"],
+  ["motif", "a motif"],
 ];
 
-/** ["a photo", "your name"]: what a customer can add, in plain words, for "Make it yours · add a photo or your name". */
+/** ["a photo", "your name", "a motif"]: what a customer can add, in plain words, for "Make it yours · add a photo, your name or a motif". */
 export function addWords(types: readonly FeatureType[]): string[] {
   return ADD_WORDS.filter(([t]) => types.includes(t)).map(([, words]) => words);
+}
+
+// ---- What one spot may hold -------------------------------------------------------------------------------------
+//
+// The geometry service's rule (services/geometry features/validate.py): per anchor at most one photo or form, at most
+// one name and at most one motif. A name and a motif may share a spot (the motif first, the name beside it); a photo
+// fills its spot on its own, so a photo with a name or a motif on the same anchor is refused as crowded. The panel
+// never lets a customer build a crowded spot: the tabs that would crowd it are disabled with a hint.
+
+/** Feature types that hold a spot on their own: a photo relief (surface) or a customer's form (volume). */
+export const SOLO_TYPES: readonly FeatureType[] = ["relief_image", "hero_mesh"];
+
+export function isSolo(type: FeatureType): boolean {
+  return SOLO_TYPES.includes(type);
+}
+
+/** Two different types may sit on one spot only when neither holds it alone: a name and a motif. */
+export function canShareSpot(a: FeatureType, b: FeatureType): boolean {
+  return a !== b && !isSolo(a) && !isSolo(b);
+}
+
+/** Everything on one spot, in list order. */
+export function featuresOn(features: readonly Feature[], anchorId: string): Feature[] {
+  return features.filter((f) => f.anchor === anchorId);
+}
+
+/** The feature of one type on a spot, if any. */
+export function featureOfType<T extends FeatureType>(features: readonly Feature[], anchorId: string, type: T): Extract<Feature, { type: T }> | undefined {
+  return features.find((f): f is Extract<Feature, { type: T }> => f.anchor === anchorId && f.type === type);
+}
+
+/** What on this spot would crowd a new feature of `type`: a photo blocks a name and a motif; a name or a motif blocks a photo. */
+export function crowdedBy(onSpot: readonly Feature[], type: FeatureType): Feature[] {
+  return onSpot.filter((f) => f.type !== type && !canShareSpot(f.type, type));
+}
+
+/** Put `feature` on its spot: it replaces the same type there and anything it may not share the spot with. */
+export function placeFeature(features: readonly Feature[], feature: Feature): Feature[] {
+  const rest = features.filter((f) => f.anchor !== feature.anchor || (f.type !== feature.type && canShareSpot(f.type, feature.type)));
+  return [...rest, feature];
+}
+
+/** Clear one type from a spot, or the whole spot ("Leave plain") when `type` is omitted. */
+export function clearFeature(features: readonly Feature[], anchorId: string, type?: FeatureType): Feature[] {
+  return features.filter((f) => f.anchor !== anchorId || (type !== undefined && f.type !== type));
+}
+
+/**
+ * Pieces whose skin is too thin for a cut-in motif by default: a 1 mm cut on a 5 mm fridge magnet eats into the
+ * 1.2 mm skin over its magnet pocket. Buti defaults to raised on these (the customer can still choose cut in).
+ */
+export const THIN_FAMILIES: ReadonlySet<string> = new Set(["fridge_magnet"]);
+
+export function isThinPiece(template: Pick<TemplateDescriptor, "id" | "family"> | undefined, family?: Pick<Family, "id">): boolean {
+  return Boolean((template && (THIN_FAMILIES.has(template.family) || THIN_FAMILIES.has(template.id))) || (family && THIN_FAMILIES.has(family.id)));
+}
+
+/** Buti's default relief: cut in, except raised on thin pieces. */
+export function defaultMotifMode(template: Pick<TemplateDescriptor, "id" | "family"> | undefined, family?: Pick<Family, "id">): ReliefMode {
+  return isThinPiece(template, family) ? "emboss" : "deboss";
 }
 
 export interface DepthRange {
@@ -237,6 +296,22 @@ export function reliefRange(anchor: Pick<TemplateAnchor, "max_relief_mm">): Dept
 /** Letter depth on this anchor: 0.4–3 mm, default 1.2, under the same `max_relief_mm` cap. */
 export function textDepthRange(anchor: Pick<TemplateAnchor, "max_relief_mm">): DepthRange {
   return depthRange(TEXT_DEPTH_MM, anchor);
+}
+
+/** Motif depth on this anchor: 0.4–3 mm, default 1.0, under the same `max_relief_mm` cap. */
+export function motifDepthRange(anchor: Pick<TemplateAnchor, "max_relief_mm">): DepthRange {
+  return depthRange(MOTIF_DEPTH_MM, anchor);
+}
+
+/** Scale slider bounds for a motif: its `min_scale` (never under the schema's 0.2) up to 1, default 1. */
+export function motifScaleRange(motif: Pick<Motif, "min_scale"> | undefined): DepthRange {
+  const min = Math.min(MOTIF_SCALE.max, Math.max(MOTIF_SCALE.min, motif?.min_scale ?? MOTIF_SCALE.min));
+  return { min, max: MOTIF_SCALE.max, default: MOTIF_SCALE.default };
+}
+
+/** A scale kept inside the motif's range (hundredths). */
+export function clampScale(value: number, range: DepthRange): number {
+  return Math.min(range.max, Math.max(range.min, Math.round(value * 100) / 100));
 }
 
 /** A slider value kept inside the range (hundredths, so a cap such as 1.25 mm is never rounded past). */
@@ -277,14 +352,15 @@ export function featuresFromSpec(spec: Pick<DesignSpec, "features"> | undefined)
   return ((spec?.features ?? []) as unknown[]).filter(isFeature);
 }
 
-/** Replace whatever sits on `anchorId` with `feature` (or clear it); other anchors keep their content. */
-export function withFeature(features: readonly Feature[], anchorId: string, feature: Feature | null): Feature[] {
-  const rest = features.filter((f) => f.anchor !== anchorId);
-  return feature ? [...rest, feature] : rest;
-}
+/** An edit to the Chhaap as a whole list, applied functionally so an upload finishing late never undoes other edits. */
+export type FeatureEdit = (features: Feature[]) => Feature[];
 
-export function featureOn(features: readonly Feature[], anchorId: string): Feature | undefined {
-  return features.find((f) => f.anchor === anchorId);
+/** Features that still fit a template after a switch: the spot exists and still takes that type. */
+export function featuresFitting(features: readonly Feature[], template: ContentTemplate): Feature[] {
+  return features.filter((f) => {
+    const anchor = (template.anchors ?? []).find((a) => a.id === f.anchor);
+    return anchor !== undefined && anchorAccepts(anchor, template).includes(f.type);
+  });
 }
 
 /** The upload behind a photo relief or a hero form. */
@@ -325,8 +401,16 @@ export function sameFeatures(a: readonly Feature[], b: readonly Feature[]): bool
   return JSON.stringify(stable(sort(a))) === JSON.stringify(stable(sort(b)));
 }
 
-/** One line describing a feature for summaries: "Text (Naam) · “Asha”", "Photo relief (Chhavi) · raised 0.6 mm". */
-export function featureSummary(feature: Feature): string {
+/** A motif's plain name from the library ("Rangoli star"), else its humanised id. */
+export function motifName(motifId: string, motifs?: readonly Pick<Motif, "id" | "label">[]): string {
+  return motifs?.find((m) => m.id === motifId)?.label ?? capitalise(motifId.replace(/_/g, " "));
+}
+
+/**
+ * One line describing a feature for summaries: "Text (Naam) · “Asha”", "Photo relief (Chhavi) · raised 0.6 mm",
+ * "Motif (Buti) · Lotus, cut in". Pass the Buti library to name motifs as it does.
+ */
+export function featureSummary(feature: Feature, motifs?: readonly Pick<Motif, "id" | "label">[]): string {
   const head = capitalise(featurePhrase(feature.type));
   switch (feature.type) {
     case "emboss_text":
@@ -337,7 +421,9 @@ export function featureSummary(feature: Feature): string {
     }
     case "hero_mesh":
       return `${head}${feature.longest_mm ? ` · ${Math.round(feature.longest_mm)} mm` : ""}`;
-    case "motif":
-      return `${head} · ${feature.motif_id.replace(/_/g, " ")}`;
+    case "motif": {
+      const size = feature.scale !== undefined && feature.scale < 1 ? ` at ${Math.round(feature.scale * 100)}%` : "";
+      return `${head} · ${motifName(feature.motif_id, motifs)}, ${(feature.mode ?? "deboss") === "emboss" ? "raised" : "cut in"}${size}`;
+    }
   }
 }

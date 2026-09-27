@@ -16,8 +16,8 @@ export interface FamilyPickerProps {
 /**
  * "Give your idea an Avatar": one card per outcome family from `GET /api/families` — codename large with its
  * plain name, tagline, what comes in the box, how big it gets, what its live templates take today ("Takes
- * text (Naam) · photo relief (Chhavi)"; Buti only once motifs are live) — and a quiet "Swaroop · Print as it is"
- * card last. Cards open `/create/[family]`.
+ * text (Naam) · motif (Buti) · photo relief (Chhavi)") — and a quiet "Swaroop · Print as it is" card last. Cards
+ * open `/create/[family]`.
  */
 export function FamilyPicker({ families, prompt, className }: FamilyPickerProps) {
   const sorted = sortFamilies(families.filter((f) => f.available !== false));
@@ -45,7 +45,12 @@ export function FamilyPicker({ families, prompt, className }: FamilyPickerProps)
   );
 }
 
-function AvatarCard({ family, href }: { family: Family; href: string }) {
+/**
+ * One Avatar card (the picker's, and the Duniya pages', which link it with `?duniya=<slug>`). A family without a live
+ * template shows "Coming soon" and no link.
+ */
+export function AvatarCard({ family, href, headingLevel = "h2" }: { family: Family; href: string; headingLevel?: "h2" | "h3" }) {
+  const Heading = headingLevel;
   const ready = family.ready !== false && family.templates.length > 0;
   const lines = [hardwareSentence(family.hardware), envelopeLine(family)].filter((x): x is string => Boolean(x));
   // Only what the live templates take today, never the family's aspirational content_slot.accepts.
@@ -59,11 +64,11 @@ function AvatarCard({ family, href }: { family: Family; href: string }) {
       </div>
       <div className="grid gap-1">
         {/* The codename never travels alone: the plain name is part of the heading (and the card's accessible name). */}
-        <h2 id={`avatar-${family.id}`} className="grid gap-1">
+        <Heading id={`avatar-${family.id}`} className="grid gap-1">
           <span className="font-display text-3xl font-semibold leading-none group-hover:text-surface-accent">{family.codename}</span>
           <span className="sr-only"> · </span>
           <span className="text-sm font-semibold">{family.name}</span>
-        </h2>
+        </Heading>
         {family.tagline && <p className="text-sm text-surface-muted">{family.tagline}</p>}
       </div>
       <ul className="grid gap-1 text-[12px] text-surface-muted">

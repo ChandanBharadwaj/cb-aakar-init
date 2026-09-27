@@ -6,15 +6,18 @@ import { useEffect, useId, useMemo, useState } from "react";
 import { formatPaise } from "@aakar/design-tokens";
 import { api, toProblem } from "@/lib/api/client";
 import type { CatalogItem, Family, Material, ParamValues, Problem } from "@/lib/api/types";
+import { presetStyle, STYLE_LABELS, type DuniyaPreset } from "@/lib/experiences";
 import { allowedMaterialIds, defaultTemplate, envelopeLine, hardwareNames, hardwareSentence, packedHardware, priceFromLabel } from "@/lib/families";
-import { CHHAAP, contentAnchors, familyLabel, featureSummary, featuresForSubmit, type Feature } from "@/lib/features";
+import { CHHAAP, contentAnchors, familyLabel, featureSummary, featuresFitting, featuresForSubmit, templateTakes, type Feature } from "@/lib/features";
 import { capitalise } from "@/lib/format";
 import { REJECTED_COPY } from "@/lib/uploads";
 import { FALLBACK_MATERIALS } from "@/lib/viewer/materials";
 import { environmentLabel } from "@/lib/viewer/environments";
 import { uploadHold, useDesignStore } from "@/store/design";
 import { ContentSlotPanel } from "@/components/design/ContentSlotPanel";
+import { DuniyaChip } from "@/components/duniya/DuniyaChip";
 import { FinishChips } from "@/components/ui/FinishChips";
+import { useMotifs } from "./useMotifs";
 
 export interface ContentComposerProps {
   family: Family;
@@ -24,6 +27,11 @@ export interface ContentComposerProps {
   item?: CatalogItem;
   /** The customer's words from the prompt bar, used as the working title. */
   prompt?: string;
+  /**
+   * The Duniya experience from `?duniya=<slug>`: its chip in the header, its backdrop and (when the template offers it)
+   * its style carried into the studio, its motif pack first in Buti, and `experience_id` on the design.
+   */
+  duniya?: DuniyaPreset;
 }
 
 /** Only primitive defaults travel as `params`; the contract allows number, boolean and string. */
@@ -36,11 +44,11 @@ function primitiveParams(values: Record<string, unknown> | undefined): ParamValu
 
 /**
  * The Avatar composer: pick a template when the family has several, fill the Chhaap, choose a finish,
- * then "Sculpt" → `POST /api/designs {source: "create", family_id, template_id, features, material, title}`
- * → the studio with the job, exactly like the Shop and Remix paths. Sculpt waits while the studio is still
- * checking a file in the Chhaap, and after a file is turned down until it is replaced.
+ * then "Sculpt" → `POST /api/designs {source: "create", family_id, template_id, features, material, title,
+ * experience_id?}` → the studio with the job, exactly like the Shop and Remix paths. Sculpt waits while the studio
+ * is still checking a file in the Chhaap, and after a file is turned down until it is replaced.
  */
-export function ContentComposer({ family, materials: materialsProp, item, prompt }: ContentComposerProps) {
+export function ContentComposer({ family, materials: materialsProp, item, prompt, duniya }: ContentComposerProps) {
   const router = useRouter();
   const titleId = useId();
   const materials = materialsProp.length > 0 ? materialsProp : FALLBACK_MATERIALS;
@@ -64,15 +72,14 @@ export function ContentComposer({ family, materials: materialsProp, item, prompt
 
   const ready = family.available !== false && family.ready !== false && Boolean(template);
   const anchors = template ? contentAnchors(template) : [];
+  const motifs = useMotifs(template ? templateTakes(template).includes("motif") : false).motifs;
+  const look = presetStyle(duniya?.style, template);
 
   function pickTemplate(id: string) {
     setTemplateId(id);
     const next = templates.find((t) => t.id === id);
-    setFeatures((list) => list.filter((f) => next?.anchors.some((a) => a.id === f.anchor)));
-  }
-
-  function setFeature(anchorId: string, feature: Feature | null) {
-    setFeatures((list) => [...list.filter((f) => f.anchor !== anchorId), ...(feature ? [feature] : [])]);
+    // Keep what still fits: the spot exists on the new template and still takes that kind of content.
+    setFeatures((list) => (next ? featuresFitting(list, next) : []));
   }
 
   async function sculpt() {
@@ -89,8 +96,11 @@ export function ContentComposer({ family, materials: materialsProp, item, prompt
         material: materialId,
         title: title.trim() || familyLabel(family),
         ...(params ? { params } : {}),
+        ...(duniya ? { experience_id: duniya.id } : {}),
       });
-      router.push(`/design/${accepted.design_id}?job=${encodeURIComponent(accepted.job_id)}`);
+      const query = new URLSearchParams({ job: accepted.job_id });
+      if (duniya) query.set("duniya", duniya.slug);
+      router.push(`/design/${accepted.design_id}?${query.toString()}`);
     } catch (err) {
       setProblem(toProblem(err));
       setBusy(false);
@@ -106,6 +116,7 @@ export function ContentComposer({ family, materials: materialsProp, item, prompt
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
       <section className="ak-card grid content-start gap-6 p-6 sm:p-8" aria-labelledby="composer-heading">
         <header className="grid gap-2">
+          {duniya && <DuniyaChip duniya={duniya} />}
           <span className="ak-eyebrow">{family.kind === "object" ? "Object" : "Avatar · the form your idea takes"}</span>
           <h1 id="composer-heading" className="font-display text-4xl font-semibold leading-none">
             {family.codename} <span className="text-surface-muted">· {family.name}</span>
@@ -152,7 +163,15 @@ export function ContentComposer({ family, materials: materialsProp, item, prompt
             )}
 
             {template && anchors.length > 0 ? (
-              <ContentSlotPanel template={template} family={family} features={features} onChange={setFeature} disabled={busy} />
+              <ContentSlotPanel
+                template={template}
+                family={family}
+                features={features}
+                onChange={setFeatures}
+                motifPack={duniya?.motifPack}
+                motifPackLabel={duniya?.codename}
+                disabled={busy}
+              />
             ) : (
               <p className="text-sm text-surface-muted">This piece takes no personal content yet; its size and shape are yours to change in the studio.</p>
             )}
@@ -223,13 +242,25 @@ export function ContentComposer({ family, materials: materialsProp, item, prompt
                 <ul className="grid gap-1">
                   {sending.map((f) => (
                     <li key={`${f.anchor}-${f.type}`} className="font-semibold">
-                      {featureSummary(f)}
+                      {featureSummary(f, motifs)}
                     </li>
                   ))}
                 </ul>
               )}
             </dd>
           </div>
+          {duniya?.environment && (
+            <div className="grid gap-0.5">
+              <dt className="text-[11px] text-surface-muted">Shown on</dt>
+              <dd className="font-semibold">{duniya.environmentLabel}</dd>
+            </div>
+          )}
+          {look && (
+            <div className="grid gap-0.5">
+              <dt className="text-[11px] text-surface-muted">Look</dt>
+              <dd className="font-semibold">{STYLE_LABELS[look]}</dd>
+            </div>
+          )}
           {from && (
             <div className="grid gap-0.5">
               <dt className="text-[11px] text-surface-muted">Price</dt>

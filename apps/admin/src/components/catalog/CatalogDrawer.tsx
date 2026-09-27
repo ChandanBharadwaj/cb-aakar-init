@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { formatPaise } from "@aakar/design-tokens";
 import { api, toProblem } from "@/lib/api/client";
-import type { AdminFamily, AdminMaterial, AdminTemplate, CatalogItem, CatalogItemInput, Problem, Shelf } from "@/lib/api/types";
-import { ENVIRONMENTS, environmentLabel, shelfLabel, sortShelves } from "@/lib/catalog";
+import type { AdminFamily, AdminMaterial, AdminTemplate, CatalogItem, CatalogItemInput, Environment, Problem, Shelf } from "@/lib/api/types";
+import { shelfLabel, sortShelves } from "@/lib/catalog";
 import { familyTitle, sortFamilies } from "@/lib/families";
 import { paiseToRupees, rupeesToPaise } from "@/lib/format";
 import { useCanWrite } from "@/store/session";
+import { EnvironmentSelect } from "@/components/environments/Backdrops";
 import { Drawer } from "@/components/ui/Drawer";
 import { Field } from "@/components/ui/Field";
 import { OwnerOnlyHint } from "@/components/ui/OwnerOnly";
@@ -48,20 +49,22 @@ export interface CatalogDrawerProps {
   templates: AdminTemplate[];
   shelves: Shelf[];
   families: AdminFamily[];
+  /** Backdrops from GET /admin/api/environments: the valid `environment` values. */
+  environments: Environment[];
   onClose(): void;
   onSaved(item: CatalogItem): void;
 }
 
-export function CatalogDrawer({ item, materials, templates, shelves, families, onClose, onSaved }: CatalogDrawerProps) {
+export function CatalogDrawer({ item, materials, templates, shelves, families, environments, onClose, onSaved }: CatalogDrawerProps) {
   const open = item !== undefined;
   return (
     <Drawer open={open} onClose={onClose} title={item ? item.name : "Add item"} eyebrow={item ? `Catalog · ${item.slug}` : "New catalog item"}>
-      {open && <CatalogForm key={item?.slug ?? "new"} item={item} materials={materials} templates={templates} shelves={shelves} families={families} onClose={onClose} onSaved={onSaved} />}
+      {open && <CatalogForm key={item?.slug ?? "new"} item={item} materials={materials} templates={templates} shelves={shelves} families={families} environments={environments} onClose={onClose} onSaved={onSaved} />}
     </Drawer>
   );
 }
 
-function CatalogForm({ item, materials, templates, shelves, families, onClose, onSaved }: { item: CatalogItem | null } & Omit<CatalogDrawerProps, "item">) {
+function CatalogForm({ item, materials, templates, shelves, families, environments, onClose, onSaved }: { item: CatalogItem | null } & Omit<CatalogDrawerProps, "item">) {
   const canWrite = useCanWrite();
   const editing = item !== null;
   const orderedShelves = sortShelves(shelves);
@@ -188,16 +191,8 @@ function CatalogForm({ item, materials, templates, shelves, families, onClose, o
         <Field label="Base price (₹)" hint={`Shown on the Shop card · ${formatPaise(rupeesToPaise(price))}`}>
           {(id) => <input id={id} type="number" min="0" step="1" className="ak-input ak-input-sm" value={price} onChange={(e) => setPrice(e.target.value)} disabled={dis} required />}
         </Field>
-        <Field label="Environment" hint="Viewer backdrop">
-          {(id) => (
-            <select id={id} className="ak-input ak-input-sm" value={draft.environment ?? "studio"} onChange={(e) => set("environment", e.target.value)} disabled={dis}>
-              {ENVIRONMENTS.map((env) => (
-                <option key={env} value={env}>
-                  {environmentLabel(env)}
-                </option>
-              ))}
-            </select>
-          )}
+        <Field label="Environment" hint="Viewer backdrop (Backgrounds page)">
+          {(id) => <EnvironmentSelect id={id} value={draft.environment ?? "studio"} onChange={(v) => set("environment", v)} environments={environments} disabled={dis} />}
         </Field>
         <Field label="Available" hint="Off shows 'Coming soon' in the Shop" inline>
           {(id) => <Switch id={id} label="Available" checked={draft.available} onChange={(v) => set("available", v)} disabled={dis} />}

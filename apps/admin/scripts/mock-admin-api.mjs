@@ -3,7 +3,9 @@
 // before Spring Boot lands. Implements every path in packages/contracts/openapi/aakar-admin.v1.yaml with
 // in-memory data: staff accounts, ~14 orders across every status with events, pricing policy versions,
 // the six materials, catalog items, three templates, the shelves / hardware / outcome families (Avatars) from
-// packages/design-tokens/families.json, a few customer uploads with content reviews, a messages log and an audit log.
+// packages/design-tokens/families.json, the Duniya experiences and viewer backdrops from
+// packages/design-tokens/experiences.json, the Buti motif library from packages/design-tokens/motifs/, a few customer
+// uploads with content reviews, a messages log and an audit log.
 //
 // Usage: node scripts/mock-admin-api.mjs [port=8080]
 //
@@ -19,6 +21,9 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "../../..");
 const tokensFile = JSON.parse(readFileSync(path.join(root, "packages/design-tokens/materials.json"), "utf8"));
 const familiesFile = JSON.parse(readFileSync(path.join(root, "packages/design-tokens/families.json"), "utf8"));
+const experiencesFile = JSON.parse(readFileSync(path.join(root, "packages/design-tokens/experiences.json"), "utf8"));
+const motifsDir = path.join(root, "packages/design-tokens/motifs");
+const motifsFile = JSON.parse(readFileSync(path.join(motifsDir, "index.json"), "utf8"));
 
 const PORT = Number(process.argv[2] && !process.argv[2].startsWith("--") ? process.argv[2] : 8080);
 const BASE = `http://localhost:${PORT}`;
@@ -153,7 +158,11 @@ const FAMILY_KINDS = ["carrier", "object", "raw"];
 const FAMILY_TIERS = ["launch", "next", "later"];
 const SHAPE_TOLERANCES = ["any", "constrained", "strict"];
 const FEATURE_TYPES = ["emboss_text", "motif", "relief_image", "hero_mesh"];
-const ENVIRONMENTS = ["studio", "teak_table_candlelight", "desk_oak", "dashboard", "kitchen_marble", "balcony_daylight"];
+/** Viewer backdrops (Mahaul), read-only reference data: the valid `environment` values everywhere. */
+const environments = experiencesFile.environments
+  .map((e) => ({ id: e.id, label: e.label, surface: e.surface, preset_key: e.preset_key, palette: e.palette ?? [], sort_order: e.sort_order ?? 100 }))
+  .sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id));
+const ENVIRONMENTS = environments.map((e) => e.id);
 const FINISH_CLASSES = ["matte", "silk"];
 const ID_RE = /^[a-z][a-z0-9_]*$/;
 
@@ -176,10 +185,38 @@ const catalog = [
   { slug: "fluted-planter", name: "Fluted Planter · drainage tray", category: "home_decor", family_id: "planter", template_id: "fluted_planter", default_params: { diameter_mm: 140, height_mm: 130, flutes: 24, tray: true }, default_material: "terracotta_matte", base_price_paise: 89900, specs_line: "140 mm pot · fits 4″ nursery plants · 210 g", environment: "balcony_daylight", description: "Vertical flutes, a drainage tray, sized for nursery pots.", available: false, media: [] },
   { slug: "kantha-nameplate", name: "Nameplate · Kantha border", category: "nameplates", family_id: "nameplate", template_id: "kantha_nameplate", default_params: { width_mm: 300, height_mm: 110 }, default_material: "polished_brass", base_price_paise: 119900, specs_line: "300 × 110 mm · raised letters · screws included", environment: "studio", description: "Raised letters in any of seven scripts inside a running Kantha stitch border.", available: false, media: [] },
   { slug: "elephant-bookends", name: "Elephant Bookends", category: "gifting", family_id: "bookend", template_id: "elephant_bookends", default_params: { height_mm: 180 }, default_material: "sandalwood_silk", base_price_paise: 134900, specs_line: "180 mm tall · weighted · holds 6 kg of books", environment: "teak_table_candlelight", description: "A pair of elephants, trunks raised, weighted at the base.", available: false, media: [] },
-  { slug: "headphone-stand-pillar", name: "Headphone Stand · Pillar", category: "desk_tech", family_id: "headphone_stand", template_id: "headphone_stand_pillar", default_params: { height_mm: 270 }, default_material: "basic_white", base_price_paise: 57900, specs_line: "270 mm tall · weighted base · 180 g", environment: "desk_oak", description: "A fluted pillar with a soft saddle for over-ear headphones.", available: false, media: [] },
+  { slug: "pillar-headphone-stand", name: "Headphone Stand · Pillar", category: "desk_tech", family_id: "headphone_stand", template_id: "headphone_stand_pillar", default_params: { height_mm: 270 }, default_material: "basic_white", base_price_paise: 57900, specs_line: "270 mm tall · weighted base · 180 g", environment: "desk_oak", description: "A fluted pillar with a soft saddle for over-ear headphones.", available: false, media: [] },
 ];
 
 const templateView = (t) => ({ ...t, catalog_items: catalog.filter((c) => c.template_id === t.id).map((c) => c.slug) });
+
+// ---------------------------------------------------------------------------------------------------------
+// Duniya experiences (seeded from experiences.json; POST/PUT mutate in memory) and the Buti motif library
+// ---------------------------------------------------------------------------------------------------------
+const STYLES = ["none", "jaipur_heritage", "modern_zen", "cyber_desi", "warli_line", "comic_pop"];
+const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+const HEX_RE = /^#[0-9A-Fa-f]{6}$/;
+const DATE_RE = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
+const MONTH_DAY_RE = /^--([0-9]{2})-([0-9]{2})$/;
+const experiences = experiencesFile.experiences.map((e) => ({ ...normaliseExperienceSeed(e), updated_at: iso(ago(8 * DAY)) }));
+const experienceById = (id) => experiences.find((e) => e.id === id);
+const sortedExperiences = () => [...experiences].sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id));
+function normaliseExperienceSeed(e) {
+  return {
+    id: e.id, codename: e.codename, slug: e.slug, title: e.title,
+    ...(e.tagline !== undefined ? { tagline: e.tagline } : {}),
+    ...(e.description !== undefined ? { description: e.description } : {}),
+    environment: e.environment,
+    surface: { accent: e.surface.accent, paper_tint: e.surface.paper_tint ?? null, hero_media: e.surface.hero_media ?? null },
+    style: e.style ?? "none", motif_pack: [...(e.motif_pack ?? [])], avatars: [...e.avatars], items: [...(e.items ?? [])],
+    collections: (e.collections ?? []).map((c) => ({ id: c.id, title: c.title, licence_ref: c.licence_ref ?? null })),
+    season: (e.season ?? []).map((w) => ({ starts_on: w.starts_on, ends_on: w.ends_on, label: w.label })),
+    available: e.available, sort_order: e.sort_order ?? 100,
+  };
+}
+/** Motif rows as GET /admin/api/motifs answers; the artwork is served at /api/motifs/{id}.svg (no staff token needed). */
+const motifs = motifsFile.motifs.map((m) => ({ id: m.id, label: m.label, tags: m.tags ?? [], min_scale: m.min_scale, svg_url: `${BASE}/api/motifs/${m.id}.svg` }));
+const motifArt = new Map(motifsFile.motifs.map((m) => [m.id, readFileSync(path.join(motifsDir, m.file))]));
 
 // ---------------------------------------------------------------------------------------------------------
 // Orders
@@ -476,6 +513,7 @@ logNotification({ template: "otp", channel: "sms", to: c1.phone, text: "Your Aak
 logNotification({ template: "otp", channel: "sms", to: c2.phone, text: "Your Aakar sign-in code is 105577. Valid for 5 minutes.", at: ago(30 * 60_000), user_id: c2.id });
 recordAudit("studio@aakar.local", "family.update", "keychain", { available: false }, { available: true }, ago(6 * DAY));
 recordAudit("studio@aakar.local", "hardware.update", "magnet_d10x3", { unit_cost_paise: 1200 }, { unit_cost_paise: 1500 }, ago(5 * DAY));
+recordAudit("studio@aakar.local", "experience.update", "festive", { tagline: "Gifts for every festival" }, { tagline: "Gifts that glow for every festival" }, ago(4 * DAY));
 
 // ---------------------------------------------------------------------------------------------------------
 // Customer uploads and content reviews (the Reviews queue). Flagged uploads wait as pending_review until staff decide.
@@ -723,6 +761,12 @@ const server = http.createServer(async (req, res) => {
       const up = customerUploads.find((u) => u.id === m[1]);
       if (!up) return problem(res, 404, "not_found", "No such upload.");
       return binary(res, "application/octet-stream", Buffer.from(`Aakar mock ${up.format.toUpperCase()} placeholder for customer upload ${up.id}.\nThe real API serves the stored file from its object store.\n`), `upload.${up.format}`);
+    }
+    if ((m = p.match(/^\/api\/motifs\/([^/]+)\.svg$/)) && method === "GET") {
+      const art = motifArt.get(decodeURIComponent(m[1]));
+      if (!art) return problem(res, 404, "unknown_motif", "That motif isn't in the library.");
+      res.writeHead(200, { "Content-Type": "image/svg+xml", "Content-Length": art.length, "Cache-Control": "public, max-age=3600", ...CORS });
+      return res.end(art);
     }
     if ((m = p.match(/^\/mock-tracking\/(.+)$/))) {
       res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", ...CORS });
@@ -972,6 +1016,34 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, existing);
     }
 
+    if (p === "/admin/api/experiences" && method === "GET") return json(res, 200, sortedExperiences());
+    if (p === "/admin/api/experiences" && method === "POST") {
+      requireOwner(who);
+      const body = await readJson(req);
+      const draft = normaliseExperience(body);
+      if (experienceById(draft.id)) return problem(res, 409, "experience_exists", `Experience '${draft.id}' already exists; update it with PUT /admin/api/experiences/${draft.id}.`);
+      if (experiences.some((x) => x.slug === draft.slug)) return problem(res, 409, "slug_exists", `Another experience already lives at /duniya/${draft.slug}.`);
+      validateExperienceRefs(draft);
+      const created = { ...draft, updated_at: iso(now()) };
+      experiences.push(created);
+      recordAudit(who.email, "experience.create", created.id, null, draft);
+      return json(res, 201, created);
+    }
+    if ((m = p.match(/^\/admin\/api\/experiences\/([^/]+)$/)) && method === "PUT") {
+      requireOwner(who);
+      const existing = experienceById(decodeURIComponent(m[1]));
+      if (!existing) return problem(res, 404, "unknown_experience", `Experience ${decodeURIComponent(m[1])} was not found.`);
+      const draft = normaliseExperience({ ...(await readJson(req)), id: existing.id }); // the id in the path wins
+      if (experiences.some((x) => x.id !== existing.id && x.slug === draft.slug)) return problem(res, 409, "slug_exists", `Another experience already lives at /duniya/${draft.slug}.`);
+      validateExperienceRefs(draft);
+      const before = omit(existing, "updated_at");
+      Object.assign(existing, draft, { updated_at: iso(now()) });
+      recordAudit(who.email, "experience.update", existing.id, before, draft);
+      return json(res, 200, existing);
+    }
+    if (p === "/admin/api/environments" && method === "GET") return json(res, 200, environments);
+    if (p === "/admin/api/motifs" && method === "GET") return json(res, 200, motifs);
+
     if (p === "/admin/api/uploads" && method === "GET") {
       const status = url.searchParams.get("status");
       validate(!status || UPLOAD_STATUSES.includes(status), `status must be one of ${UPLOAD_STATUSES.join(", ")}.`);
@@ -1110,6 +1182,7 @@ function normaliseCatalogItem(b) {
   validate(Number.isInteger(b.base_price_paise) && b.base_price_paise >= 0, "base_price_paise must be a non-negative integer.");
   validate(typeof b.specs_line === "string" && b.specs_line.length <= 120, "specs_line is required (max 120 characters).");
   validate(typeof b.available === "boolean", "available must be a boolean.");
+  if (b.environment !== undefined && b.environment !== null) validate(ENVIRONMENTS.includes(b.environment), `environment '${b.environment}' is not a backdrop; the backdrops are: ${ENVIRONMENTS.join(", ")}.`);
   return {
     slug: b.slug,
     name: b.name.trim(),
@@ -1155,7 +1228,7 @@ function normaliseFamily(b) {
   validate(typeof b.shelf === "string" && shelfById(b.shelf), `shelf must be a shelf id: ${shelves.map((sh) => sh.id).join(", ")}.`);
   if (b.demand_rank !== undefined) validate(Number.isInteger(b.demand_rank) && b.demand_rank >= 1, "demand_rank must be an integer of at least 1.");
   validate(typeof b.default_template_id === "string" && ID_RE.test(b.default_template_id), "default_template_id must be snake_case starting with a letter.");
-  if (b.environment !== undefined) validate(ENVIRONMENTS.includes(b.environment), `environment must be one of ${ENVIRONMENTS.join(", ")}.`);
+  if (b.environment !== undefined) validate(ENVIRONMENTS.includes(b.environment), `environment '${b.environment}' is not a backdrop; the backdrops are: ${ENVIRONMENTS.join(", ")}.`);
   if (b.size_envelope_mm !== undefined) {
     const e = b.size_envelope_mm;
     validate(e && typeof e.min_longest_mm === "number" && e.min_longest_mm > 0 && typeof e.max_longest_mm === "number" && e.max_longest_mm > 0, "size_envelope_mm needs positive min_longest_mm and max_longest_mm.");
@@ -1207,10 +1280,88 @@ function normaliseFamily(b) {
   };
 }
 
+/** Shape of an experience (experience.v1.json#/$defs/experience): 422 validation_failed with the field in the detail. */
+function normaliseExperience(b) {
+  validate(b && typeof b === "object", "Send an experience object.");
+  validate(typeof b.id === "string" && ID_RE.test(b.id) && b.id.length <= 40, "id must be snake_case starting with a letter (max 40).");
+  validate(typeof b.codename === "string" && b.codename.trim() && b.codename.length <= 40, "codename is required (max 40 characters).");
+  validate(typeof b.slug === "string" && SLUG_RE.test(b.slug) && b.slug.length >= 2 && b.slug.length <= 60, "slug must be 2–60 lowercase letters and digits in words joined by single dashes.");
+  validate(typeof b.title === "string" && b.title.trim() && b.title.length <= 80, "title is required (max 80 characters).");
+  if (b.tagline !== undefined && b.tagline !== null) validate(typeof b.tagline === "string" && b.tagline.length <= 120, "tagline must be at most 120 characters.");
+  if (b.description !== undefined && b.description !== null) validate(typeof b.description === "string" && b.description.length <= 500, "description must be at most 500 characters.");
+  validate(typeof b.environment === "string" && b.environment.trim(), "environment is required.");
+  const sfc = b.surface;
+  validate(sfc && typeof sfc === "object" && typeof sfc.accent === "string" && HEX_RE.test(sfc.accent), "surface.accent must be an sRGB hex such as #D8AE5B.");
+  if (sfc.paper_tint !== undefined && sfc.paper_tint !== null) validate(typeof sfc.paper_tint === "string" && HEX_RE.test(sfc.paper_tint), "surface.paper_tint must be an sRGB hex or null.");
+  if (sfc.hero_media !== undefined && sfc.hero_media !== null) validate(typeof sfc.hero_media === "string" && sfc.hero_media.length <= 500, "surface.hero_media must be a URL or path of at most 500 characters, or null.");
+  const style = b.style ?? "none";
+  validate(STYLES.includes(style), `style must be one of ${STYLES.join(", ")}.`);
+  const list = (name, value, max, check, what) => {
+    if (value === undefined || value === null) return [];
+    validate(Array.isArray(value) && value.length <= max, `${name} must be a list of at most ${max}.`);
+    for (const v of value) validate(check(v), `${name} lists '${typeof v === "string" ? v : JSON.stringify(v)}', which is not ${what}.`);
+    return value;
+  };
+  const motifPack = list("motif_pack", b.motif_pack, 24, (v) => typeof v === "string" && ID_RE.test(v), "a motif or pack id");
+  validate(Array.isArray(b.avatars), "avatars must be a list of family ids.");
+  const avatars = list("avatars", b.avatars, 24, (v) => typeof v === "string" && v.trim(), "a family id");
+  const items = list("items", b.items, 24, (v) => typeof v === "string" && /^[a-z0-9-]{3,60}$/.test(v), "a Shop item slug");
+  const collections = list("collections", b.collections, 24, (c) => c && typeof c === "object" && typeof c.id === "string" && ID_RE.test(c.id) && c.id.length <= 40 && typeof c.title === "string" && c.title.trim() && c.title.length <= 80 && (c.licence_ref === undefined || c.licence_ref === null || (typeof c.licence_ref === "string" && c.licence_ref.length <= 120)), "a collection {id, title, licence_ref}");
+  const season = list("season", b.season, 12, (w) => w && typeof w === "object" && typeof w.label === "string" && w.label.trim() && w.label.length <= 40 && typeof w.starts_on === "string" && typeof w.ends_on === "string", "a season window {starts_on, ends_on, label}");
+  for (const [name, values] of [["avatars", avatars], ["items", items], ["motif_pack", motifPack], ["collections", collections.map((c) => c.id)]]) {
+    const seen = new Set();
+    for (const v of values) {
+      validate(!seen.has(v), `${name} lists '${v}' more than once.`);
+      seen.add(v);
+    }
+  }
+  season.forEach((w, i) => checkSeasonWindow(i, w));
+  validate(typeof b.available === "boolean", "available must be a boolean.");
+  if (b.sort_order !== undefined) validate(Number.isInteger(b.sort_order), "sort_order must be an integer.");
+  return {
+    id: b.id, codename: b.codename.trim(), slug: b.slug, title: b.title.trim(),
+    ...(typeof b.tagline === "string" ? { tagline: b.tagline } : {}),
+    ...(typeof b.description === "string" ? { description: b.description } : {}),
+    environment: b.environment.trim(),
+    surface: { accent: sfc.accent, paper_tint: sfc.paper_tint ?? null, hero_media: sfc.hero_media ?? null },
+    style, motif_pack: [...motifPack], avatars: avatars.map((a) => a.trim()), items: [...items],
+    collections: collections.map((c) => ({ id: c.id, title: c.title.trim(), licence_ref: c.licence_ref ?? null })),
+    season: season.map((w) => ({ starts_on: w.starts_on, ends_on: w.ends_on, label: w.label.trim() })),
+    available: b.available, sort_order: Number.isInteger(b.sort_order) ? b.sort_order : 100,
+  };
+}
+/** Both ends dates (in order) or both month-days (a recurring window, which may wrap the new year), every day real. */
+function checkSeasonWindow(i, w) {
+  const where = `season[${i}] (${w.label})`;
+  const a = MONTH_DAY_RE.exec(w.starts_on);
+  const b = MONTH_DAY_RE.exec(w.ends_on);
+  if (a || b) {
+    validate(a && b, `${where} mixes a date and a month-day; use two dates (2026-10-20) or two month-days (--10-01).`);
+    for (const md of [a, b]) {
+      const month = Number(md[1]), day = Number(md[2]);
+      validate(month >= 1 && month <= 12 && day >= 1 && day <= [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1], `${where} names a day that does not exist (${w.starts_on} to ${w.ends_on}).`);
+    }
+    return;
+  }
+  validate(DATE_RE.test(w.starts_on) && DATE_RE.test(w.ends_on), `${where} needs two dates (2026-10-20) or two month-days (--10-01).`);
+  const real = (d) => !Number.isNaN(Date.parse(`${d}T00:00:00Z`)) && new Date(`${d}T00:00:00Z`).toISOString().slice(0, 10) === d;
+  validate(real(w.starts_on) && real(w.ends_on), `${where} names a day that does not exist (${w.starts_on} to ${w.ends_on}).`);
+  validate(w.starts_on <= w.ends_on, `${where} ends (${w.ends_on}) before it starts (${w.starts_on}).`);
+}
+/** What the schema cannot say: the backdrop exists, every avatar is a family (422 unknown_family), every item a Shop item. */
+function validateExperienceRefs(x) {
+  validate(ENVIRONMENTS.includes(x.environment), `environment '${x.environment}' is not a backdrop; the backdrops are: ${ENVIRONMENTS.join(", ")}.`);
+  for (const id of x.avatars) {
+    if (!familyById(id)) throw Object.assign(new Error(`avatars names '${id}', which is not a family (see GET /admin/api/families).`), { status: 422, code: "unknown_family" });
+  }
+  for (const slug of x.items) validate(catalog.some((c) => c.slug === slug), `items names '${slug}', which is not a Shop item (see GET /admin/api/catalog/items).`);
+}
+
 server.listen(PORT, () => {
   console.log(`Aakar mock management API on ${BASE}`);
   console.log(`  owner  : studio@aakar.local / aakar-studio`);
   console.log(`  studio : karigar@aakar.local / aakar-karigar   (read-only configuration)`);
   console.log(`  ${orders.size} orders, ${materials.length} materials, ${catalog.length} catalog items, ${templates.length} templates, ${policies.length} pricing policy versions`);
   console.log(`  ${shelves.length} shelves, ${families.length} families (Avatars), ${hardwareItems.length} hardware items, ${customerUploads.filter((u) => u.status === "pending_review").length} uploads pending review`);
+  console.log(`  ${experiences.length} Duniya experiences (${experiences.filter((e) => e.available).length} available), ${environments.length} backgrounds, ${motifs.length} motifs`);
 });

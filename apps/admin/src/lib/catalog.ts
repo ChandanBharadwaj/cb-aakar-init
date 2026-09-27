@@ -16,10 +16,4 @@ export function sortShelves(shelves: readonly Shelf[]): Shelf[] {
   return [...shelves].sort((a, b) => a.sort_order - b.sort_order || a.label.localeCompare(b.label));
 }
 
-/** Environments known to the storefront viewer (design-tokens `environments`). */
-export const ENVIRONMENTS = ["studio", "teak_table_candlelight", "desk_oak", "dashboard", "kitchen_marble", "balcony_daylight"] as const;
-
-/** "teak_table_candlelight" → "Teak table candlelight". */
-export function environmentLabel(id: string): string {
-  return humanize(id);
-}
+// Viewer backdrops (environments) come from GET /admin/api/environments: see src/lib/environments.ts.

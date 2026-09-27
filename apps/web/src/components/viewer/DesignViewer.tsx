@@ -39,6 +39,11 @@ export interface DesignViewerProps {
   dimmed?: boolean;
   /** Called when the GLB fails to load; the viewer falls back to the stand-in form. */
   onModelError?(error: Error): void;
+  /**
+   * A still stage (a Duniya page's strip): no orbit controls or double-click reset, frames drawn on demand rather than
+   * every tick, and hidden from assistive tech (the caller labels the strip).
+   */
+  still?: boolean;
   className?: string;
 }
 
@@ -77,7 +82,19 @@ function CameraRig({ resetKey, frame }: { resetKey: number; frame: ModelFrame | 
   );
 }
 
-export function DesignViewer({ glbUrl, pbr, environment, dimmed, onModelError, className }: DesignViewerProps) {
+/** The still stage's fixed view: the default camera aimed at the stand-in form. */
+function StillCamera() {
+  const camera = useThree((s) => s.camera);
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => {
+    camera.position.set(...CAMERA_POS);
+    camera.lookAt(...TARGET);
+    invalidate();
+  }, [camera, invalidate]);
+  return null;
+}
+
+export function DesignViewer({ glbUrl, pbr, environment, dimmed, onModelError, still, className }: DesignViewerProps) {
   const [resetKey, setResetKey] = useState(0);
   const [frame, setFrame] = useState<ModelFrame | null>(null);
   const onFramed = useCallback((next: ModelFrame) => {
@@ -105,11 +122,13 @@ export function DesignViewer({ glbUrl, pbr, environment, dimmed, onModelError, c
     >
       <Canvas
         dpr={[1, 1.75]}
+        frameloop={still ? "demand" : "always"}
         camera={{ position: CAMERA_POS, fov: 34, near: 0.05, far: 50 }}
         gl={{ antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
-        onDoubleClick={() => setResetKey((k) => k + 1)}
-        aria-label="3D preview of your piece. Drag to turn, scroll to zoom, double-click to reset."
-        role="img"
+        onDoubleClick={still ? undefined : () => setResetKey((k) => k + 1)}
+        aria-label={still ? undefined : "3D preview of your piece. Drag to turn, scroll to zoom, double-click to reset."}
+        aria-hidden={still || undefined}
+        role={still ? undefined : "img"}
       >
         <StageEnvironment preset={preset} />
         <group position={[0, 0, 0]}>
@@ -124,7 +143,7 @@ export function DesignViewer({ glbUrl, pbr, environment, dimmed, onModelError, c
           )}
         </group>
         <ContactShadows position={[0, -0.001, 0]} opacity={0.55} scale={3.2} blur={2.6} far={1.4} resolution={512} color="#0E1220" frames={60} />
-        <CameraRig resetKey={resetKey} frame={glbUrl ? frame : null} />
+        {still ? <StillCamera /> : <CameraRig resetKey={resetKey} frame={glbUrl ? frame : null} />}
       </Canvas>
     </div>
   );

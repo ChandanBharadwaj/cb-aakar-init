@@ -6,7 +6,9 @@
 // seconds, and an order SSE stream. Outcome categories (Avatars) come from packages/design-tokens/families.json:
 // shelves, families with their live templates, customer uploads (multipart, kept in memory and served back under
 // /media/uploads/), features (the Chhaap) on designs and param edits, hardware and setup price lines and family
-// minimums. Everything is in memory.
+// minimums. Duniya experiences and viewer backdrops come from packages/design-tokens/experiences.json and the Buti
+// motif library from packages/design-tokens/motifs/ (index.json + the SVGs, served back under /api/motifs/{id}.svg).
+// Everything is in memory.
 //
 // Usage: node scripts/mock-api.mjs [port=8080] [--fail]
 //   --fail                    every third generation job fails
@@ -19,6 +21,8 @@
 //   identity that uploaded the file (a guest's uploads move to the user on sign-in). A model file named "*broken*"
 //   fails its job with content_unusable; a raw print under 30 mm completes with printability.passed=false (thin walls).
 //   Swaroop (raw_print@1) has no template params: its size and orientation come from its one hero_mesh feature.
+//   A spot takes a photo or a form on its own, or a name and a motif side by side; a photo with a name or a motif on the
+//   same anchor is refused as crowded (422 validation_failed), like the geometry service does.
 import http from "node:http";
 import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -31,6 +35,11 @@ const materials = JSON.parse(readFileSync(path.join(root, "packages/design-token
 const completed = JSON.parse(readFileSync(path.join(root, "packages/contracts/examples/design.completed.example.json"), "utf8"));
 const familiesSeed = JSON.parse(readFileSync(path.join(root, "packages/design-tokens/families.json"), "utf8"));
 const hardwareItems = new Map(familiesSeed.hardware_items.map((h) => [h.sku, h]));
+const experiencesSeed = JSON.parse(readFileSync(path.join(root, "packages/design-tokens/experiences.json"), "utf8"));
+const motifsDir = path.join(root, "packages/design-tokens/motifs");
+const motifLibrary = JSON.parse(readFileSync(path.join(motifsDir, "index.json"), "utf8"));
+/** The artwork of every motif, read once: served at /api/motifs/{id}.svg. */
+const motifArt = new Map(motifLibrary.motifs.map((m) => [m.id, readFileSync(path.join(motifsDir, m.file))]));
 
 const PORT = Number(process.argv[2] && !process.argv[2].startsWith("--") ? process.argv[2] : 8080);
 const FAIL_EVERY_THIRD = process.argv.includes("--fail");
@@ -92,8 +101,40 @@ const items = [
   { slug: "fluted-planter", name: "Fluted Planter · drainage tray", category: "home_decor", family_id: "planter", template_id: "fluted_planter", default_params: { diameter_mm: 140, height_mm: 130, flutes: 24, tray: true }, default_material: "terracotta_matte", base_price_paise: 89900, specs_line: "140 mm pot · fits 4″ nursery plants · 210 g", environment: "balcony_daylight", available: true },
   { slug: "kantha-nameplate", name: "Nameplate · Kantha border", category: "nameplates", family_id: "nameplate", template_id: "jharokha_phone_stand", default_params: {}, default_material: "polished_brass", base_price_paise: 119900, specs_line: "300 × 110 mm · raised letters · screws included", environment: "studio", available: false },
   { slug: "elephant-bookends", name: "Elephant Bookends", category: "gifting", family_id: "bookend", template_id: "jharokha_phone_stand", default_params: {}, default_material: "sandalwood_silk", base_price_paise: 134900, specs_line: "180 mm tall · weighted · holds 6 kg of books", environment: "teak_table_candlelight", available: false },
-  { slug: "headphone-stand-pillar", name: "Headphone Stand · Pillar", category: "desk_tech", family_id: "headphone_stand", template_id: "jharokha_phone_stand", default_params: {}, default_material: "basic_white", base_price_paise: 57900, specs_line: "270 mm tall · weighted base · 180 g", environment: "desk_oak", available: false },
+  { slug: "pillar-headphone-stand", name: "Headphone Stand · Pillar", category: "desk_tech", family_id: "headphone_stand", template_id: "jharokha_phone_stand", default_params: {}, default_material: "basic_white", base_price_paise: 57900, specs_line: "270 mm tall · weighted base · 180 g", environment: "desk_oak", available: false },
 ];
+
+// ---- Duniya (experiences), Mahaul (viewer backdrops) and the Buti library -------------------------------------------
+const environments = [...experiencesSeed.environments].sort((a, b) => (a.sort_order ?? 100) - (b.sort_order ?? 100) || a.id.localeCompare(b.id));
+const experiences = [...experiencesSeed.experiences].sort((a, b) => (a.sort_order ?? 100) - (b.sort_order ?? 100) || a.id.localeCompare(b.id));
+const experienceById = (id) => experiences.find((e) => e.id === id);
+/** "Utsav · Festive & gifting". */
+const experienceLabel = (e) => `${e.codename} · ${e.title}`;
+/**
+ * As GET /api/experiences answers: avatars expanded to the families orderable today (available and backed by a live
+ * template), in the experience's order; items expanded to the curated Shop items in order (Coming soon ones kept); the
+ * lowest family floor as price_from_paise.
+ */
+function experienceView(e) {
+  const avatars = (e.avatars ?? []).map(familyById).filter((f) => f && f.available && familyReady(f)).map(familyView);
+  const curated = (e.items ?? []).map((slug) => items.find((i) => i.slug === slug)).filter(Boolean);
+  const floors = avatars.map((a) => a.price_from_paise).filter((n) => typeof n === "number");
+  return {
+    ...e,
+    style: e.style ?? "none",
+    motif_pack: e.motif_pack ?? [],
+    avatars,
+    items: curated,
+    collections: e.collections ?? [],
+    season: e.season ?? [],
+    sort_order: e.sort_order ?? 100,
+    price_from_paise: floors.length > 0 ? Math.min(...floors) : null,
+  };
+}
+const motifById = (id) => motifLibrary.motifs.find((m) => m.id === id);
+/** A library row as GET /api/motifs answers: `svg_url` is a browser URL on this server. */
+const motifView = (m, host) => ({ id: m.id, label: m.label, tags: m.tags ?? [], min_scale: m.min_scale, svg_url: `http://${host}/api/motifs/${m.id}.svg` });
+const percent = (scale) => `${Math.round(scale * 100)}%`;
 
 // ---- Phase 0 state: designs, versions, jobs -------------------------------------------------
 const designs = new Map();
@@ -406,8 +447,12 @@ function startJob(design, spec, parentVersionId) {
     const content = (spec.features ?? []).map((f) =>
       f.type === "emboss_text" ? `your text “${f.text}” on the ${anchorLabel(f.anchor)}`
         : f.type === "relief_image" ? `your photo ${f.mode === "deboss" ? "cut into" : "raised on"} the ${anchorLabel(f.anchor)}`
-          : f.type === "hero_mesh" ? `your own 3D form at ${longest} mm` : `a ${f.motif_id.replace(/_/g, " ")} motif on the ${anchorLabel(f.anchor)}`);
+          : f.type === "hero_mesh" ? `your own 3D form at ${longest} mm`
+            : `a ${(motifById(f.motif_id)?.label ?? f.motif_id.replace(/_/g, " ")).toLowerCase()} motif ${f.mode === "emboss" ? "raised on" : "cut into"} the ${anchorLabel(f.anchor)}`);
     const contentNote = content.length ? ` I set ${content.length > 1 ? `${content.slice(0, -1).join(", ")} and ${content[content.length - 1]}` : content[0]}.` : "";
+    // The design remembers the Duniya it started from, so the note (and the packaging card) can name the theme.
+    const theme = design.experience_id ? experienceById(design.experience_id) : undefined;
+    const themeNote = theme && versionNo === 1 ? ` Made for ${experienceLabel(theme)}.` : "";
     Object.assign(version, {
       status: "ready",
       assets: completed.assets,
@@ -418,7 +463,7 @@ function startJob(design, spec, parentVersionId) {
       karigar_note: hero && template.family === "raw_print"
         ? `Your file, repaired and set at ${longest} mm on its longest side, ${orientation === "lay_flat" ? "laid flat on its widest face" : "printed as you sent it"}.${thin ? " The thinnest wall came out under 1.2 mm; a larger size fixes that." : ""}`
         : versionNo === 1
-          ? (template.id === "keychain_tag" ? `A ${spec.params.shape ?? "rounded"} Saathi tag, ${spec.params.width_mm ?? 45} mm wide with a ${spec.params.hole_d_mm ?? 4.2} mm ring hole.` : completed.karigar_note) + contentNote
+          ? (template.id === "keychain_tag" ? `A ${spec.params.shape ?? "rounded"} Saathi tag, ${spec.params.width_mm ?? 45} mm wide with a ${spec.params.hole_d_mm ?? 4.2} mm ring hole.` : completed.karigar_note) + contentNote + themeNote
           : `Version ${versionNo}: I re-sculpted the ${template.name.toLowerCase()} at ${spec.params.height_mm ?? spec.params.width_mm ?? 120} mm and kept the walls at ${spec.params.wall_mm ?? spec.params.thickness_mm ?? 3.2} mm.${contentNote}`,
     });
     job.status = "succeeded"; job.finished_at = now();
@@ -459,6 +504,22 @@ const server = http.createServer(async (req, res) => {
     if ((m = p.match(/^\/api\/families\/([^/]+)$/))) {
       const f = familyById(decodeURIComponent(m[1]));
       return f ? json(res, 200, familyView(f)) : problem(res, 404, "unknown_family", "We don't make that kind of piece.");
+    }
+    // ---- Duniya: open experiences (avatars and items expanded), any experience by slug, the backdrops ----
+    if (p === "/api/experiences" && method === "GET") return json(res, 200, experiences.filter((e) => e.available).map(experienceView));
+    if ((m = p.match(/^\/api\/experiences\/([^/]+)$/)) && method === "GET") {
+      const slug = decodeURIComponent(m[1]);
+      const e = experiences.find((x) => x.slug === slug);
+      return e ? json(res, 200, experienceView(e)) : problem(res, 404, "unknown_experience", `There's no Duniya at /duniya/${slug}.`);
+    }
+    if (p === "/api/environments" && method === "GET") return json(res, 200, environments.map((e) => ({ ...e, palette: e.palette ?? [], sort_order: e.sort_order ?? 100 })));
+    // ---- the Buti library and its artwork ----
+    if (p === "/api/motifs" && method === "GET") return json(res, 200, motifLibrary.motifs.map((mm) => motifView(mm, req.headers.host ?? `localhost:${PORT}`)));
+    if ((m = p.match(/^\/api\/motifs\/([^/]+)\.svg$/)) && method === "GET") {
+      const art = motifArt.get(decodeURIComponent(m[1]));
+      if (!art) return problem(res, 404, "unknown_motif", "That motif isn't in the library.");
+      res.writeHead(200, { "Content-Type": "image/svg+xml", "Content-Length": art.length, "Cache-Control": "public, max-age=3600", ...CORS });
+      return res.end(art);
     }
     // ---- uploads: multipart file + kind, kept in memory and served back under /media/uploads/ ----
     if (p === "/api/uploads" && method === "POST") {
@@ -547,8 +608,12 @@ const server = http.createServer(async (req, res) => {
         family = familyById(template.family) ?? null;
       }
       if (family && !materialAllowed(family, material)) return problem(res, 422, "validation_failed", `${materialOf(material)?.name ?? material} isn't offered for ${familyLabel(family)}.`);
+      // Any path may name the Duniya the customer came from; the design keeps it (422 unknown_experience otherwise).
+      const experienceId = typeof body.experience_id === "string" && body.experience_id.trim() ? body.experience_id.trim() : null;
+      if (body.experience_id !== undefined && body.experience_id !== null && typeof body.experience_id !== "string") return problem(res, 400, "bad_request", "experience_id must be a string.");
+      if (experienceId && (experienceId.length > 40 || !experienceById(experienceId))) return problem(res, 422, "unknown_experience", `experience_id '${experienceId}' is not an experience (see GET /api/experiences).`);
       const features = resolveFeatures(body.features ?? [], template, who);
-      const design = { id: randomUUID(), source: body.source, catalog_item_slug: slug, family_id: family?.id ?? null, title, status: "generating", created_at: now(), versions_count: 0 };
+      const design = { id: randomUUID(), source: body.source, catalog_item_slug: slug, family_id: family?.id ?? null, experience_id: experienceId, title, status: "generating", created_at: now(), versions_count: 0 };
       Object.defineProperty(design, "owner", { value: who?.key ?? null, writable: true, enumerable: false });
       designs.set(design.id, design);
       const spec = { spec_version: "1.0", family: template.family, template: `${template.id}@${template.version}`, params, features, style: "none", material, constraints: template.constraints };
@@ -883,15 +948,30 @@ const detectScript = (text) => SCRIPTS.find(([, re]) => re.test(text))?.[0] ?? "
 /** Customer copy for a feature type: plain words first, the codename after, never the code id. */
 const FEATURE_WORDS = { emboss_text: "text (Naam)", motif: "a motif (Buti)", relief_image: "a photo relief (Chhavi)", hero_mesh: "your own 3D form (Roop)" };
 const capitalise = (text) => text.charAt(0).toUpperCase() + text.slice(1);
+/** Types that hold a spot alone (a photo relief, a customer's form); a name and a motif may share one. */
+const SOLO_TYPES = ["relief_image", "hero_mesh"];
+const SPOT_NOUN = { emboss_text: "name", motif: "motif" };
+/**
+ * What one spot may hold, as the geometry service rules it: at most one photo or form, at most one name and at most one
+ * motif; a name and a motif sit side by side, but a photo never shares its spot with either (refused as crowded).
+ */
+function checkSpot(held, type, anchor) {
+  const spot = anchor.label.toLowerCase();
+  if (SOLO_TYPES.includes(type) && held.some((t) => SOLO_TYPES.includes(t))) throw fail(422, "validation_failed", `Only one photo or 3D form can go on the ${spot}.`);
+  if (!SOLO_TYPES.includes(type) && held.includes(type)) throw fail(422, "validation_failed", `Only one ${SPOT_NOUN[type]} can go on the ${spot}; put the other ${SPOT_NOUN[type]} on another spot.`);
+  const crowding = type === "relief_image" ? held.find((t) => t in SPOT_NOUN) : type in SPOT_NOUN && held.includes("relief_image") ? type : undefined;
+  if (crowding) throw fail(422, "validation_failed", `The ${spot} is too crowded for a photo and a ${SPOT_NOUN[crowding]} together; put the ${SPOT_NOUN[crowding]} on another spot.`);
+}
 /**
  * Type ∈ features_supported, anchor exists and accepts it (a hero form only on a volume anchor, everything else on a
- * surface), one feature per anchor, upload owned by the caller and ready → the url filled in. Messages are customer copy.
+ * surface), what one spot may hold (`checkSpot`), a motif from the library at a printable scale and depth, upload owned
+ * by the caller and ready → the url filled in. Messages are customer copy.
  */
 function resolveFeatures(list, template, who) {
   if (!Array.isArray(list)) throw fail(400, "bad_request", "Send features as a list.");
   if (list.length > 8) throw fail(422, "validation_failed", "A piece can carry at most 8 things.");
   if (template.family === "raw_print") checkRawForm(list);
-  const seen = new Set();
+  const held = new Map(); // anchor id -> feature types on it so far
   return list.map((f) => {
     if (!f || typeof f !== "object" || !FEATURE_TYPES.includes(f.type)) throw fail(422, "validation_failed", "That isn't something a piece can carry.");
     const words = FEATURE_WORDS[f.type];
@@ -903,16 +983,25 @@ function resolveFeatures(list, template, who) {
     if (!(anchor.accepts ?? template.features_supported ?? []).includes(f.type) || volume !== (f.type === "hero_mesh")) {
       throw fail(422, "unsupported_feature", `${spot} can't carry ${words} yet.`);
     }
-    if (seen.has(anchor.id)) throw fail(422, "validation_failed", `${spot} already carries something; one thing per spot.`);
-    seen.add(anchor.id);
+    const onSpot = held.get(anchor.id) ?? [];
+    checkSpot(onSpot, f.type, anchor);
+    held.set(anchor.id, [...onSpot, f.type]);
     const out = { ...f };
     if (f.type === "emboss_text") {
       if (typeof f.text !== "string" || !f.text.trim() || f.text.length > 40) throw fail(422, "validation_failed", "Your text (Naam) can be 1 to 40 characters.");
       out.script ??= detectScript(f.text); out.depth_mm ??= Math.min(1.2, anchor.max_relief_mm ?? 1.2); out.projection ??= "planar"; out.mode ??= "emboss";
       if (anchor.max_relief_mm && out.depth_mm > anchor.max_relief_mm) throw fail(422, "param_out_of_range", `Letters on the ${anchor.label.toLowerCase()} can be at most ${anchor.max_relief_mm} mm deep.`);
     } else if (f.type === "motif") {
-      if (typeof f.motif_id !== "string") throw fail(422, "validation_failed", "Pick a motif (Buti) first.");
-      out.scale ??= 1; out.depth_mm ??= 1; out.mode ??= "deboss";
+      if (typeof f.motif_id !== "string" || !f.motif_id) throw fail(422, "validation_failed", "Choose a motif (Buti) first.");
+      const motif = motifById(f.motif_id);
+      if (!motif) throw fail(422, "validation_failed", `That motif (Buti) isn't in the library; choose one of ${motifLibrary.motifs.map((x) => x.label).join(", ")}.`);
+      out.scale ??= 1; out.depth_mm ??= Math.min(1, anchor.max_relief_mm ?? 1); out.mode ??= "deboss";
+      if (typeof out.scale !== "number" || out.scale < motif.min_scale - 1e-9 || out.scale > 1 + 1e-9) {
+        throw fail(422, "param_out_of_range", `The ${motif.label} motif (Buti) can be ${percent(motif.min_scale)}–100% of the spot; ${typeof out.scale === "number" ? percent(out.scale) : "that"} was asked.`);
+      }
+      if (typeof out.depth_mm !== "number" || out.depth_mm < 0.4 || out.depth_mm > 3) throw fail(422, "param_out_of_range", "A motif (Buti) can be 0.4 to 3 mm deep.");
+      if (anchor.max_relief_mm && out.depth_mm > anchor.max_relief_mm + 1e-9) throw fail(422, "param_out_of_range", `A motif (Buti) on the ${anchor.label.toLowerCase()} can be at most ${anchor.max_relief_mm} mm deep.`);
+      if (!["emboss", "deboss"].includes(out.mode)) throw fail(422, "validation_failed", "A motif (Buti) is raised (emboss) or cut in (deboss).");
     } else {
       const up = uploads.get(f.source?.upload_id);
       // The real API resolves uploads with Uploads.findOwned: someone else's file reads as unknown.
@@ -984,4 +1073,4 @@ function readBody(req) {
   });
 }
 
-server.listen(PORT, () => console.log(`Aakar mock API on http://localhost:${PORT}${FAIL_EVERY_THIRD ? " (every third job fails)" : ""} · ${familiesSeed.families.filter((f) => f.available && familyReady(f)).length} Avatars live · pay pages on ${WEB_URL} · dev OTP ${DEV_CODE} · order stage every ${ORDER_STAGE_MS} ms`));
+server.listen(PORT, () => console.log(`Aakar mock API on http://localhost:${PORT}${FAIL_EVERY_THIRD ? " (every third job fails)" : ""} · ${familiesSeed.families.filter((f) => f.available && familyReady(f)).length} Avatars live · ${experiences.filter((e) => e.available).length} Duniya open · ${motifLibrary.motifs.length} motifs · pay pages on ${WEB_URL} · dev OTP ${DEV_CODE} · order stage every ${ORDER_STAGE_MS} ms`));

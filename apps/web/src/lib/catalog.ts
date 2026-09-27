@@ -40,19 +40,22 @@ export interface MakeItYours {
 }
 
 /**
- * "Make it yours · add a photo or your name" → /create/{family}?item={slug}. Shown only when the composer can put
- * something on the item's template today — a photo relief or a name on a surface anchor, or your own 3D form on a
- * figurine-style volume anchor (motifs wait for the motif library) — and the label says exactly that: "add a photo",
- * "add your name", "add a photo or your name". A descriptor without `features_supported` takes nothing.
- * `openFamilies`, when known (GET /api/families lists the families that are available with a live template), also
- * hides the link for a family that isn't open, so it never lands on "still being finished".
+ * "Make it yours · add a photo, your name or a motif" → /create/{family}?item={slug}. Shown only when the composer can
+ * put something on the item's template — a photo relief, a name or a motif (Buti) on a surface anchor, or your own
+ * 3D form on a figurine-style volume anchor — and the label says exactly that: "add a photo", "add your name",
+ * "add a photo, your name or a motif". A descriptor without `features_supported` takes nothing. `openFamilies`, when
+ * known (GET /api/families lists the families that are available with a live template), also hides the link for a
+ * family that isn't open, so it never lands on "still being finished". `duniya` (an experience slug) travels along,
+ * so an item opened from a Duniya page keeps that world's presets.
  */
-export function makeItYours(item: CatalogItem, template: TemplateDescriptor | undefined, openFamilies?: ReadonlySet<string>): MakeItYours | undefined {
+export function makeItYours(item: CatalogItem, template: TemplateDescriptor | undefined, openFamilies?: ReadonlySet<string>, duniya?: string): MakeItYours | undefined {
   if (!item.family_id || item.family_id === RAW_FAMILY_ID || !template) return undefined;
   if (openFamilies && !openFamilies.has(item.family_id)) return undefined;
   const words = addWords(templateTakes(template));
   if (words.length === 0) return undefined;
-  return { href: `/create/${encodeURIComponent(item.family_id)}?item=${encodeURIComponent(item.slug)}`, label: `Make it yours · add ${joinList(words, "or")}` };
+  const query = new URLSearchParams({ item: item.slug });
+  if (duniya) query.set("duniya", duniya);
+  return { href: `/create/${encodeURIComponent(item.family_id)}?${query.toString()}`, label: `Make it yours · add ${joinList(words, "or")}` };
 }
 
 /** Example prompts shown under the Home prompt bar. */

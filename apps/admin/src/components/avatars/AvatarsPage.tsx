@@ -24,6 +24,7 @@ export function AvatarsPage() {
   const hardware = useQuery(() => api.hardware.list(), "hardware");
   const materials = useQuery(() => api.materials.list(), "materials");
   const templates = useQuery(() => api.templates.list(), "templates");
+  const environments = useQuery(() => api.environments.list(), "environments");
   const [editing, setEditing] = useState<AdminFamily | null | undefined>(undefined);
   const [toggling, setToggling] = useState<string>();
   const [problem, setProblem] = useState<Problem>();
@@ -148,7 +149,16 @@ export function AvatarsPage() {
           </div>
         </div>
       )}
-      <AvatarDrawer family={editing} shelves={shelves.data ?? []} hardware={hardware.data ?? []} materials={materials.data ?? []} templates={templates.data ?? []} onClose={() => setEditing(undefined)} onSaved={saved} />
+      <AvatarDrawer
+        family={editing}
+        shelves={shelves.data ?? []}
+        hardware={hardware.data ?? []}
+        materials={materials.data ?? []}
+        templates={templates.data ?? []}
+        environments={environments.data ?? []}
+        onClose={() => setEditing(undefined)}
+        onSaved={saved}
+      />
     </>
   );
 }

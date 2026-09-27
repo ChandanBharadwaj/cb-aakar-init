@@ -23,6 +23,7 @@ export function CatalogPage() {
   const templates = useQuery(() => api.templates.list(), "templates");
   const shelves = useQuery(() => api.catalog.shelves(), "shelves");
   const families = useQuery(() => api.families.list(), "families");
+  const environments = useQuery(() => api.environments.list(), "environments");
   const [editing, setEditing] = useState<CatalogItem | null | undefined>(undefined);
   const [toggling, setToggling] = useState<string>();
   const [problem, setProblem] = useState<Problem>();
@@ -139,7 +140,16 @@ export function CatalogPage() {
           </div>
         </div>
       )}
-      <CatalogDrawer item={editing} materials={materials.data ?? []} templates={templates.data ?? []} shelves={shelves.data ?? []} families={families.data ?? []} onClose={() => setEditing(undefined)} onSaved={saved} />
+      <CatalogDrawer
+        item={editing}
+        materials={materials.data ?? []}
+        templates={templates.data ?? []}
+        shelves={shelves.data ?? []}
+        families={families.data ?? []}
+        environments={environments.data ?? []}
+        onClose={() => setEditing(undefined)}
+        onSaved={saved}
+      />
     </>
   );
 }

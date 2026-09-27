@@ -2,6 +2,8 @@
 // Staff token lives in localStorage (`aakar_staff_token`) and travels as `Authorization: Bearer`.
 // A 401 on any call clears the token and sends the browser back to /signin.
 import type {
+  AdminExperience,
+  AdminExperienceInput,
   AdminFamily,
   AdminFamilyInput,
   AdminHardware,
@@ -16,8 +18,10 @@ import type {
   CatalogItem,
   CatalogItemInput,
   Dashboard,
+  Environment,
   LoginRequest,
   MediaAsset,
+  Motif,
   NotificationsPage,
   NotificationsQuery,
   OrdersPage,
@@ -248,6 +252,21 @@ export const api = {
     list: () => request<AdminHardware[]>("/admin/api/hardware"),
     create: (body: AdminHardwareInput) => request<AdminHardware>("/admin/api/hardware", { method: "POST", body }),
     update: (sku: string, body: AdminHardwareInput) => request<AdminHardware>(`/admin/api/hardware/${enc(sku)}`, { method: "PUT", body }),
+  },
+  /** Duniya experiences: every row, available or not; owner-only writes, audited as experience.create / experience.update. */
+  experiences: {
+    list: () => request<AdminExperience[]>("/admin/api/experiences"),
+    create: (body: AdminExperienceInput) => request<AdminExperience>("/admin/api/experiences", { method: "POST", body }),
+    /** The id in the path wins over the body's. */
+    update: (id: string, body: AdminExperienceInput) => request<AdminExperience>(`/admin/api/experiences/${enc(id)}`, { method: "PUT", body }),
+  },
+  /** Viewer backdrops (Mahaul): read-only reference data, the valid `environment` values everywhere. */
+  environments: {
+    list: () => request<Environment[]>("/admin/api/environments"),
+  },
+  /** The Buti motif library, for experience motif packs. */
+  motifs: {
+    list: () => request<Motif[]>("/admin/api/motifs"),
   },
   /** Customer uploads (images for reliefs, model files for Swaroop); `pending_review` is the review queue. */
   uploads: {

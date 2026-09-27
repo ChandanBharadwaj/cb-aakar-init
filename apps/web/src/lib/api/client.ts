@@ -16,11 +16,14 @@ import type {
   DesignAccepted,
   DesignVersion,
   EditParamsRequest,
+  Environment,
+  Experience,
   Family,
   FamilyKind,
   Job,
   Material,
   MockCompleteRequest,
+  Motif,
   Order,
   OrderSummary,
   OtpRequestResult,
@@ -54,6 +57,15 @@ export function apiBase(): string {
 
 export function apiUrl(path: string): string {
   return `${apiBase().replace(/\/$/, "")}${path}`;
+}
+
+/**
+ * A URL on the API that a browser will load (an `<img src>`), even when a server component renders it: always the
+ * public base, never the server-only `API_URL`. Absolute URLs pass through; site paths are joined to the public base.
+ */
+export function browserApiUrl(pathOrUrl: string): string {
+  if (/^[a-z][a-z0-9+.-]*:/i.test(pathOrUrl)) return pathOrUrl;
+  return `${PUBLIC_API_URL.replace(/\/$/, "")}${pathOrUrl.startsWith("/") ? "" : "/"}${pathOrUrl}`;
 }
 
 export class ApiError extends Error {
@@ -166,6 +178,20 @@ export const api = {
     list: (kind?: FamilyKind) => request<Family[]>("/api/families", { query: { kind } }),
     get: (id: string) => request<Family>(`/api/families/${encodeURIComponent(id)}`),
   },
+  experiences: {
+    /** Duniya on the Shop: the available experiences by `sort_order`, avatars expanded to the families orderable today. */
+    list: () => request<Experience[]>("/api/experiences"),
+    /** Any experience by URL slug, available or not (so `/duniya/katha` can say "coming soon"); 404 `unknown_experience`. */
+    get: (slug: string) => request<Experience>(`/api/experiences/${encodeURIComponent(slug)}`),
+  },
+  environments: {
+    /** The viewer backdrops (Mahaul) behind every `environment` field, with the preset key that renders each. */
+    list: () => request<Environment[]>("/api/environments"),
+  },
+  motifs: {
+    /** The Buti library: `min_scale` per motif and the artwork's `svg_url`. */
+    list: () => request<Motif[]>("/api/motifs"),
+  },
   uploads: {
     /**
      * Customer content for the Chhaap: an image for a photo relief or a model file for a hero form / Swaroop.
@@ -184,7 +210,10 @@ export const api = {
     get: (id: string) => request<TemplateDescriptor>(`/api/templates/${encodeURIComponent(id)}`),
   },
   designs: {
-    /** Shop (`catalog_item_slug`), Remix (`template_id`), Avatar (`family_id` + `features`) or Swaroop (`source: upload`) path. */
+    /**
+     * Shop (`catalog_item_slug`), Remix (`template_id`), Avatar (`family_id` + `features`) or Swaroop (`source: upload`)
+     * path; any of them may name the Duniya experience the customer came from (`experience_id`, 422 `unknown_experience`).
+     */
     create: (body: CreateDesignBody) => request<DesignAccepted>("/api/designs", { method: "POST", body }),
     get: (id: string) => request<Design>(`/api/designs/${encodeURIComponent(id)}`),
     versions: (id: string) => request<DesignVersion[]>(`/api/designs/${encodeURIComponent(id)}/versions`),

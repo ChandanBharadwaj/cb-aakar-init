@@ -2,10 +2,24 @@
 
 import { useState } from "react";
 import { api, toProblem } from "@/lib/api/client";
-import type { AdminFamily, AdminFamilyInput, AdminHardware, AdminMaterial, AdminTemplate, FamilyKind, FamilyTier, FeatureType, FinishClass, Problem, ShapeTolerance, Shelf } from "@/lib/api/types";
-import { ENVIRONMENTS, environmentLabel } from "@/lib/catalog";
+import type {
+  AdminFamily,
+  AdminFamilyInput,
+  AdminHardware,
+  AdminMaterial,
+  AdminTemplate,
+  Environment,
+  FamilyKind,
+  FamilyTier,
+  FeatureType,
+  FinishClass,
+  Problem,
+  ShapeTolerance,
+  Shelf,
+} from "@/lib/api/types";
 import { FAMILY_KINDS, FAMILY_TIERS, FEATURE_TYPES, SHAPE_TOLERANCES, familyTitle } from "@/lib/families";
 import { useCanWrite } from "@/store/session";
+import { EnvironmentSelect } from "@/components/environments/Backdrops";
 import { Drawer } from "@/components/ui/Drawer";
 import { Field } from "@/components/ui/Field";
 import { OwnerOnlyHint } from "@/components/ui/OwnerOnly";
@@ -162,20 +176,24 @@ export interface AvatarDrawerProps {
   hardware: AdminHardware[];
   materials: AdminMaterial[];
   templates: AdminTemplate[];
+  /** Backdrops from GET /admin/api/environments: the valid `environment` values. */
+  environments: Environment[];
   onClose(): void;
   onSaved(family: AdminFamily): void;
 }
 
-export function AvatarDrawer({ family, shelves, hardware, materials, templates, onClose, onSaved }: AvatarDrawerProps) {
+export function AvatarDrawer({ family, shelves, hardware, materials, templates, environments, onClose, onSaved }: AvatarDrawerProps) {
   const open = family !== undefined;
   return (
     <Drawer open={open} onClose={onClose} title={family ? familyTitle(family) : "New Avatar"} eyebrow={family ? `Avatar · ${family.id}` : "New outcome family"}>
-      {open && <AvatarForm key={family?.id ?? "new"} family={family} shelves={shelves} hardware={hardware} materials={materials} templates={templates} onClose={onClose} onSaved={onSaved} />}
+      {open && (
+        <AvatarForm key={family?.id ?? "new"} family={family} shelves={shelves} hardware={hardware} materials={materials} templates={templates} environments={environments} onClose={onClose} onSaved={onSaved} />
+      )}
     </Drawer>
   );
 }
 
-function AvatarForm({ family, shelves, hardware, materials, templates, onClose, onSaved }: { family: AdminFamily | null } & Omit<AvatarDrawerProps, "family">) {
+function AvatarForm({ family, shelves, hardware, materials, templates, environments, onClose, onSaved }: { family: AdminFamily | null } & Omit<AvatarDrawerProps, "family">) {
   const canWrite = useCanWrite();
   const editing = family !== null;
   const [draft, setDraft] = useState<Draft>(() => fromFamily(family, shelves));
@@ -308,16 +326,8 @@ function AvatarForm({ family, shelves, hardware, materials, templates, onClose, 
               </>
             )}
           </Field>
-          <Field label="Environment" hint="Default viewer backdrop before a template is chosen">
-            {(id) => (
-              <select id={id} className="ak-input ak-input-sm" value={draft.environment} onChange={(e) => set("environment", e.target.value)} disabled={dis}>
-                {ENVIRONMENTS.map((env) => (
-                  <option key={env} value={env}>
-                    {environmentLabel(env)}
-                  </option>
-                ))}
-              </select>
-            )}
+          <Field label="Environment" hint="Default viewer backdrop before a template is chosen (Backgrounds page)">
+            {(id) => <EnvironmentSelect id={id} value={draft.environment} onChange={(v) => set("environment", v)} environments={environments} disabled={dis} />}
           </Field>
           <Field label="Shape tolerance" hint={SHAPE_TOLERANCES.find((s) => s.id === draft.shape_tolerance)?.hint}>
             {(id) => (
