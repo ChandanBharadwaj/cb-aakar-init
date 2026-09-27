@@ -10,7 +10,8 @@ Contract-first definitions shared by every Aakar service. Change a contract here
 | `schemas/print-estimate.v1.json` | Material-independent slicing estimate; mass per material is derived by the API |
 | `schemas/price-breakdown.v1.json` | Price lines in integer paise, snapshotted into cart and order |
 | `schemas/events/*.json` | RabbitMQ envelope and payloads: `design.generate`, `design.progress`, `design.completed`, `design.failed` |
-| `openapi/aakar-api.v1.yaml` | Storefront API (Spring Boot) |
+| `openapi/aakar-api.v1.yaml` | Storefront API (Spring Boot): catalog, designs, jobs, identity, cart, checkout, orders, payments |
+| `openapi/aakar-admin.v1.yaml` | Management API for `apps/admin` (staff auth, orders queue, stage advancement, print pack, pricing policies, materials, catalog, templates, messages, audit) |
 | `openapi/geometry.v1.yaml` | Geometry service (Python) |
 | `openapi/inspect.v1.yaml` | Inspect service (Python) |
 | `examples/` | Worked examples used by the validator and by service tests |

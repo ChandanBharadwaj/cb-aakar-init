@@ -1,0 +1,472 @@
+openapi: 3.1.0
+info:
+  title: Aakar Management API
+  version: 1.0.0-phase1
+  description: |
+    Staff-only API behind the management portal (`apps/admin`, ADR-0012). Served by `services/api`
+    under `/admin/api/*` with its own staff authentication (email + password, seeded account in the
+    local profile; never customer tokens). Owns operational configuration (pricing policies, materials,
+    catalog, live templates) and fulfilment operations (orders queue, stage advancement, QC, print pack,
+    messages log). Every write is recorded in the audit log.
+
+    Roles: `owner` (everything), `studio` (fulfilment and read-only configuration).
+    Errors are RFC 9457 Problem Details with a stable `code` (`unauthenticated`, `forbidden`,
+    `invalid_transition`, `policy_version_exists`, `not_found`, `validation_failed`).
+servers:
+  - url: http://localhost:8080
+security: [{ staffBearer: [] }]
+paths:
+  /admin/api/auth/login:
+    post:
+      summary: Staff sign-in
+      security: []
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+      responses:
+        '200': { description: Signed in, content: { application/json: { schema: { $ref: '#/components/schemas/StaffSession' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+  /admin/api/auth/me:
+    get:
+      tags: [auth]
+      responses:
+        '200': { description: Staff member, content: { application/json: { schema: { $ref: '#/components/schemas/Staff' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+  /admin/api/dashboard:
+    get:
+      summary: Counts and money for the studio board
+      tags: [dashboard]
+      responses:
+        '200':
+          description: Dashboard
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [orders_by_status, orders_today, revenue_today_paise, revenue_month_paise, awaiting_action]
+                properties:
+                  orders_by_status: { type: object, additionalProperties: { type: integer } }
+                  orders_today: { type: integer }
+                  revenue_today_paise: { type: integer }
+                  revenue_month_paise: { type: integer }
+                  awaiting_action: { type: integer, description: Orders in queued, finishing or qc that need a staff step }
+  /admin/api/orders:
+    get:
+      summary: Orders queue
+      tags: [orders]
+      parameters:
+        - { name: status, in: query, schema: { type: string }, description: "Comma-separated OrderStatus values" }
+        - { name: q, in: query, schema: { type: string }, description: Order number or customer phone }
+        - { name: page, in: query, schema: { type: integer, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, default: 25, maximum: 100 } }
+      responses:
+        '200':
+          description: Page of orders
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, page, size, total]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/AdminOrderSummary' } }
+                  page: { type: integer }
+                  size: { type: integer }
+                  total: { type: integer }
+  /admin/api/orders/{orderId}:
+    get:
+      tags: [orders]
+      parameters: [{ $ref: '#/components/parameters/OrderId' }]
+      responses:
+        '200': { description: Order, content: { application/json: { schema: { $ref: '#/components/schemas/AdminOrder' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+  /admin/api/orders/{orderId}/advance:
+    post:
+      summary: Move the order to its next status
+      description: "Allowed transitions: confirmed→queued→slicing→printing→finishing→qc→packed→shipped→delivered; any active status→on_hold and back to the previous status; qc→reprint→printing; any status before shipped→cancelled. Packed creates the shipment; shipped adds the carrier event. Invalid moves answer 409 invalid_transition."
+      tags: [orders]
+      parameters: [{ $ref: '#/components/parameters/OrderId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [status]
+              properties:
+                status: { $ref: 'aakar-api.v1.yaml#/components/schemas/OrderStatus' }
+                message: { type: string, maxLength: 200, description: Shown to the customer on the tracking page }
+                detail:
+                  type: object
+                  additionalProperties: true
+                  description: "Free-form; the tracking board reads studio, printer_bay, layer_height_mm, layers_total, layer"
+      responses:
+        '200': { description: Order after the move, content: { application/json: { schema: { $ref: '#/components/schemas/AdminOrder' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { description: "invalid_transition", $ref: '#/components/responses/Problem' }
+  /admin/api/orders/{orderId}/print-pack:
+    get:
+      summary: Everything the outsourced printer needs, as one zip
+      description: "Per item: model.3mf and model.stl (from the version's assets), plus print-sheet.txt (order number, item, material and filament, quantity, finish class, dimensions, mass, estimated time, notes). Printing is outsourced for now (ADR-0004)."
+      tags: [orders]
+      parameters: [{ $ref: '#/components/parameters/OrderId' }]
+      responses:
+        '200': { description: Zip archive, content: { application/zip: { schema: { type: string, format: binary } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+  /admin/api/orders/{orderId}/qc-photos:
+    post:
+      summary: Attach a QC photo
+      tags: [orders]
+      parameters: [{ $ref: '#/components/parameters/OrderId' }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+                note: { type: string, maxLength: 200 }
+      responses:
+        '201': { description: Stored, content: { application/json: { schema: { $ref: '#/components/schemas/MediaAsset' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+        '413': { description: Larger than 10 MB, $ref: '#/components/responses/Problem' }
+  /admin/api/orders/{orderId}/packaging-card.pdf:
+    get:
+      summary: The card that goes in the box
+      description: '"Designed by You. Crafted by Aakar." with piece, finish, studio, date and the /k/{code} link (QR + text). Available from packed onwards.'
+      tags: [orders]
+      parameters: [{ $ref: '#/components/parameters/OrderId' }]
+      responses:
+        '200': { description: PDF, content: { application/pdf: { schema: { type: string, format: binary } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { description: "Not packed yet (order_not_packed)", $ref: '#/components/responses/Problem' }
+  /admin/api/pricing/policies:
+    get:
+      summary: All pricing policy versions, newest first
+      tags: [pricing]
+      responses:
+        '200': { description: Policies, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/PricingPolicyVersion' } } } } }
+    post:
+      summary: Publish a new policy version (becomes active)
+      tags: [pricing]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [version, policy]
+              properties:
+                version: { type: string, pattern: '^[A-Za-z0-9._-]{3,40}$' }
+                policy: { $ref: '#/components/schemas/PricingPolicy' }
+                note: { type: string, maxLength: 200 }
+      responses:
+        '201': { description: Published, content: { application/json: { schema: { $ref: '#/components/schemas/PricingPolicyVersion' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { description: "policy_version_exists", $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /admin/api/pricing/policies/active:
+    get:
+      tags: [pricing]
+      responses:
+        '200': { description: Active policy, content: { application/json: { schema: { $ref: '#/components/schemas/PricingPolicyVersion' } } } }
+  /admin/api/pricing/preview:
+    post:
+      summary: What would a piece cost under a draft policy
+      tags: [pricing]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [policy, material, extruded_volume_cm3, print_seconds]
+              properties:
+                policy: { $ref: '#/components/schemas/PricingPolicy' }
+                material: { type: string }
+                extruded_volume_cm3: { type: number }
+                print_seconds: { type: integer }
+      responses:
+        '200': { description: Breakdown, content: { application/json: { schema: { $ref: '../schemas/price-breakdown.v1.json' } } } }
+        '422': { $ref: '#/components/responses/Problem' }
+  /admin/api/materials:
+    get:
+      tags: [materials]
+      responses:
+        '200': { description: Materials incl. unavailable, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AdminMaterial' } } } } }
+    post:
+      tags: [materials]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AdminMaterialInput' } } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/AdminMaterial' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { description: "material_exists", $ref: '#/components/responses/Problem' }
+  /admin/api/materials/{materialId}:
+    put:
+      tags: [materials]
+      parameters: [{ name: materialId, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AdminMaterialInput' } } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/AdminMaterial' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /admin/api/catalog/items:
+    get:
+      tags: [catalog]
+      responses:
+        '200': { description: All items incl. unavailable, content: { application/json: { schema: { type: array, items: { $ref: 'aakar-api.v1.yaml#/components/schemas/CatalogItem' } } } } }
+    post:
+      tags: [catalog]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CatalogItemInput' } } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: 'aakar-api.v1.yaml#/components/schemas/CatalogItem' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { description: "slug_exists", $ref: '#/components/responses/Problem' }
+  /admin/api/catalog/items/{slug}:
+    put:
+      tags: [catalog]
+      parameters: [{ name: slug, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CatalogItemInput' } } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: 'aakar-api.v1.yaml#/components/schemas/CatalogItem' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /admin/api/templates:
+    get:
+      summary: Templates known to the geometry service with their live flag
+      tags: [templates]
+      responses:
+        '200':
+          description: Templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [id, version, family, name, live]
+                  properties:
+                    id: { type: string }
+                    version: { type: integer }
+                    family: { type: string }
+                    name: { type: string }
+                    live: { type: boolean, description: False hides the template from Create and blocks new designs }
+                    catalog_items: { type: array, items: { type: string }, description: Slugs using this template }
+  /admin/api/templates/{templateId}:
+    put:
+      tags: [templates]
+      parameters: [{ name: templateId, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: false, required: [live], properties: { live: { type: boolean } } }
+      responses:
+        '200': { description: Updated }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /admin/api/notifications:
+    get:
+      summary: Messages log (what the mock sender would have sent)
+      tags: [messages]
+      parameters:
+        - { name: order_id, in: query, schema: { type: string, format: uuid } }
+        - { name: page, in: query, schema: { type: integer, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, default: 50, maximum: 200 } }
+      responses:
+        '200':
+          description: Page of messages
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, page, size, total]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/NotificationRecord' } }
+                  page: { type: integer }
+                  size: { type: integer }
+                  total: { type: integer }
+  /admin/api/audit:
+    get:
+      tags: [audit]
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, default: 50, maximum: 200 } }
+      responses:
+        '200':
+          description: Page of audit entries
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, page, size, total]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/AuditEntry' } }
+                  page: { type: integer }
+                  size: { type: integer }
+                  total: { type: integer }
+components:
+  securitySchemes:
+    staffBearer: { type: http, scheme: bearer, bearerFormat: JWT, description: Staff token from /admin/api/auth/login; distinct from customer tokens }
+  parameters:
+    OrderId: { name: orderId, in: path, required: true, schema: { type: string, format: uuid } }
+  responses:
+    Problem:
+      description: Problem Details
+      content:
+        application/problem+json:
+          schema:
+            type: object
+            properties:
+              type: { type: string }
+              title: { type: string }
+              status: { type: integer }
+              detail: { type: string }
+              code: { type: string }
+  schemas:
+    Staff:
+      type: object
+      required: [id, email, name, role]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string }
+        name: { type: string }
+        role: { type: string, enum: [owner, studio] }
+    StaffSession:
+      type: object
+      required: [access_token, token_type, expires_in_s, staff]
+      properties:
+        access_token: { type: string }
+        token_type: { const: Bearer }
+        expires_in_s: { type: integer }
+        staff: { $ref: '#/components/schemas/Staff' }
+    AdminOrderSummary:
+      allOf:
+        - $ref: 'aakar-api.v1.yaml#/components/schemas/OrderSummary'
+        - type: object
+          required: [customer]
+          properties:
+            customer: { type: object, properties: { id: { type: string, format: uuid }, phone: { type: string }, name: { type: [string, 'null'] } } }
+            materials: { type: array, items: { type: string } }
+            next_actions: { type: array, items: { $ref: 'aakar-api.v1.yaml#/components/schemas/OrderStatus' }, description: Statuses this order may be advanced to }
+    AdminOrder:
+      allOf:
+        - $ref: 'aakar-api.v1.yaml#/components/schemas/Order'
+        - type: object
+          required: [customer, next_actions]
+          properties:
+            customer: { type: object, properties: { id: { type: string, format: uuid }, phone: { type: string }, name: { type: [string, 'null'] }, email: { type: [string, 'null'] } } }
+            next_actions: { type: array, items: { $ref: 'aakar-api.v1.yaml#/components/schemas/OrderStatus' } }
+            qc_photos: { type: array, items: { $ref: '#/components/schemas/MediaAsset' } }
+            notifications: { type: array, items: { $ref: '#/components/schemas/NotificationRecord' } }
+    MediaAsset:
+      type: object
+      required: [id, kind, url, content_type, bytes, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: [qc_photo, packaging_card, other] }
+        url: { type: string }
+        content_type: { type: string }
+        bytes: { type: integer }
+        note: { type: [string, 'null'] }
+        created_at: { type: string, format: date-time }
+    PricingPolicy:
+      type: object
+      description: Same shape as design-tokens materials.json pricing_policy, minus the version.
+      additionalProperties: false
+      required: [machine_rate_paise_per_hour, finishing_fee_paise, packaging_fee_paise, margin_pct, round_to_rupees_ending_in, shipping_flat_paise, free_shipping_above_paise, shipping_label]
+      properties:
+        machine_rate_paise_per_hour: { type: integer, minimum: 0 }
+        finishing_fee_paise: { type: object, additionalProperties: { type: integer, minimum: 0 }, description: Keyed by finish class (matte, silk) }
+        packaging_fee_paise: { type: integer, minimum: 0 }
+        margin_pct: { type: number, minimum: 0, maximum: 500 }
+        round_to_rupees_ending_in: { type: integer, minimum: 0, maximum: 9 }
+        shipping_flat_paise: { type: integer, minimum: 0 }
+        free_shipping_above_paise: { type: integer, minimum: 0 }
+        shipping_label: { type: string, maxLength: 60 }
+    PricingPolicyVersion:
+      type: object
+      required: [version, active, policy, created_at, created_by]
+      properties:
+        version: { type: string }
+        active: { type: boolean }
+        policy: { $ref: '#/components/schemas/PricingPolicy' }
+        note: { type: [string, 'null'] }
+        created_at: { type: string, format: date-time }
+        created_by: { type: string, description: Staff email or system }
+    AdminMaterialInput:
+      type: object
+      additionalProperties: false
+      required: [id, name, filament, density_g_cm3, finish_class, rate_per_g_paise, pbr]
+      properties:
+        id: { type: string, pattern: '^[a-z][a-z0-9_]*$' }
+        name: { type: string, maxLength: 40 }
+        filament: { type: string, maxLength: 80 }
+        density_g_cm3: { type: number, minimum: 0.5, maximum: 3 }
+        finish_class: { type: string, enum: [matte, silk] }
+        rate_per_g_paise: { type: integer, minimum: 0 }
+        heat_safe: { type: boolean, default: false }
+        available: { type: boolean, default: true }
+        sort_order: { type: integer, default: 100 }
+        pbr: { $ref: 'aakar-api.v1.yaml#/components/schemas/Material/properties/pbr' }
+    AdminMaterial:
+      allOf:
+        - $ref: '#/components/schemas/AdminMaterialInput'
+        - type: object
+          properties:
+            updated_at: { type: string, format: date-time }
+    CatalogItemInput:
+      type: object
+      additionalProperties: false
+      required: [slug, name, category, template_id, default_params, default_material, base_price_paise, specs_line, available]
+      properties:
+        slug: { type: string, pattern: '^[a-z0-9-]{3,60}$' }
+        name: { type: string, maxLength: 80 }
+        category: { type: string, enum: [home_decor, nameplates, kitchen, desk_tech, gifting] }
+        description: { type: string, maxLength: 500 }
+        template_id: { type: string }
+        default_params: { type: object, additionalProperties: true }
+        default_material: { type: string }
+        base_price_paise: { type: integer, minimum: 0 }
+        specs_line: { type: string, maxLength: 120 }
+        environment: { type: string }
+        available: { type: boolean }
+        media: { type: array, items: { type: object, properties: { kind: { type: string }, url: { type: string } } } }
+    NotificationRecord:
+      type: object
+      required: [id, channel, template, to, status, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        order_id: { type: [string, 'null'], format: uuid }
+        user_id: { type: [string, 'null'], format: uuid }
+        channel: { type: string, enum: [whatsapp, email, sms] }
+        template: { type: string, description: order_confirmed, printing_timelapse, shipped, delivered, otp }
+        to: { type: string }
+        payload: { type: object, additionalProperties: true }
+        rendered_text: { type: [string, 'null'], description: What the mock would have sent }
+        status: { type: string, enum: [logged, sent, failed] }
+        created_at: { type: string, format: date-time }
+    AuditEntry:
+      type: object
+      required: [id, at, staff_email, action, target]
+      properties:
+        id: { type: integer }
+        at: { type: string, format: date-time }
+        staff_email: { type: string }
+        action: { type: string, description: order.advance, pricing.publish, material.update, catalog.update, template.live }
+        target: { type: string, description: Order number, policy version, material id, slug or template id }
+        before: { type: [object, 'null'], additionalProperties: true }
+        after: { type: [object, 'null'], additionalProperties: true }
