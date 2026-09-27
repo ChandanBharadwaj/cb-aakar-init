@@ -606,12 +606,15 @@ Kraft box, marigold tape, sustainable fill, and the printed card: *Designed by Y
 
 ### Phase 1 — Shop + Remix-lite MVP (weeks 3–10)
 
+**Re-scoped on 27 Sep 2026 (ADR-0004, ADR-0013):** first **complete the customer loop locally** with every external provider mocked behind an adapter and a placeholder page (payments, shipping, messaging, OTP), printing outsourced (no farm agent; staff download a print pack), and the management portal covering fulfilment stages and pricing configuration. Templates, embossing and real integrations follow once the loop runs.
+
+
 - Twelve templates across the launch families; six SKUs from the Shop board photographed in real finishes for calibration.
 - Viewer: environments (`studio`, `teak_table_candlelight`, `desk_oak`), finish swap, size presets, exposed parameter sliders.
 - Text emboss in all seven launch scripts (Latin, Devanagari, Telugu, Tamil, Kannada, Bengali, Gujarati) with HarfBuzz shaping and a golden-image test set per script; planar and cylindrical projection.
 - Printability report v1 (manifold, bed fit, wall thickness, centre of gravity).
-- Identity, cart, checkout with Razorpay, orders, SSE tracking, WhatsApp status texts.
-- Fulfilment: farm agent with Moonraker and Bambu bridges, packaging card PDF.
+- Identity (phone OTP with a mock sender), cart, checkout with a mock payment gateway and placeholder pay page, orders with `AK-` numbers, SSE tracking, message log standing in for WhatsApp (ADR-0013).
+- Fulfilment (outsourced printing): print pack download per order, manual stage advancement in the portal, packaging card PDF. Farm agent deferred (ADR-0004).
 - Management portal (`apps/admin`): staff sign-in, pricing policies, materials, catalog availability, fulfilment ops (ADR-0012).
 
 **Exit**: the full loop runs on the local Docker stack with payment and shipping providers in sandbox mode; 50 end-to-end orders (real prints, sandbox payments) with ≥ 95% fidelity; p95 preview ≤ 15 s; zero reconciliation gaps. Production hosting is deferred (ADR-0006).

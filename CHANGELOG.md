@@ -13,6 +13,8 @@ All notable changes to Aakar. Format follows [Keep a Changelog](https://keepacha
 - ADR-0007 accepted: Aakar everywhere, `AK-000001` order numbers.
 - ADR-0008 accepted in a new form: pricing, shipping and margin are versioned configuration edited in the management portal; board figures are the seed.
 - ADR-0012 added and accepted: a separate management portal (`apps/admin`) owns operational configuration and fulfilment ops; the storefront's planned `/studio` console is dropped.
+- ADR-0004 moved to deferred: printing is outsourced for now, so no farm agent; staff get a print pack per order.
+- ADR-0013 added and accepted: Phase 1 completes the customer loop locally with payments, shipping, messaging and OTP mocked behind adapters and placeholder pages.
 
 ### Changed
 - PLAN.md: `admin` API module, `apps/admin` in the layout, farm agent with two bridges, Phase 1 exit criterion reinterpreted for the local stack, infra row reflects local-only hosting.

@@ -5,7 +5,7 @@ Living status of the plan in [PLAN.md](PLAN.md). Update this file with every mer
 | | |
 |---|---|
 | Last updated | 2026-09-27 |
-| Current phase | **Phase 1 — Shop + Remix-lite MVP** (starting; local Docker only, production deferred per ADR-0006) |
+| Current phase | **Phase 1 — complete the loop locally** (external providers mocked, printing outsourced; ADR-0013, ADR-0004) |
 | Completed | Phase 0 — Foundations |
 | Roadmap position | ~2 of 28 scheduled weeks (5 phases; 1 done) |
 
@@ -46,7 +46,36 @@ Living status of the plan in [PLAN.md](PLAN.md). Update this file with every mer
 - [x] ADRs 0001–0011; runbook; README with screenshots
 - [x] End-to-end run: design → six SSE stages → priced version → parameter edit → version 2, verified in the browser
 
-## Phase 1 — Shop + Remix-lite MVP (backlog)
+## Phase 1 — complete the loop (in progress)
+
+Order of work agreed on 27 Sep 2026: finish the customer loop with mocks, feature by feature, end-to-end tests batched per group.
+
+**Group A — Identity and cart**
+- [ ] Contracts: auth, cart endpoints
+- [ ] API `identity`: phone OTP (mock sender returns the code in local profile), JWT sessions, guest → user attach
+- [ ] API `cart`: items (version × material × qty) with price snapshots, guest cookie cart, merge on sign-in
+- [ ] Web: sign-in page with dev code, cart drawer/page, "Add to Cart" enabled
+
+**Group B — Checkout and orders**
+- [ ] Contracts: checkout, orders, payments, shipments
+- [ ] API `pricing`: versioned `pricing_policies` table (ADR-0008), active policy used by price and cart
+- [ ] API `order`: `AK-000001` numbers, state machine, order events, SSE tracking
+- [ ] API `payment`: `PaymentGateway` interface + mock; webhook-style confirmation; invoice numbers
+- [ ] API `shipping`: `ShippingCarrier` interface + mock serviceability, ETA, AWB, events
+- [ ] Web: checkout (Review → Stability → Pay → Track), mock pay page, orders list, tracking page with stages
+
+**Group C — Fulfilment and management portal**
+- [ ] API `admin`: staff auth, orders queue, stage advancement, QC photo, print pack (3MF/STL + print sheet), pricing policy editor, materials and catalog availability, audit log
+- [ ] `apps/admin`: sign-in, orders board, order detail with stage buttons and print pack, pricing policies, materials, catalog, messages log
+- [ ] API `notification`: `MessageSender` interface + mock log; templates for confirmed, printing, shipped, delivered
+
+**Group D — Unboxing and polish**
+- [ ] Share links `/k/{code}` → reprint or remix
+- [ ] Packaging card PDF at PACKED
+- [ ] Time-lapse placeholder at PRINTING stage
+- [ ] Startup guard: mock adapters refused in a production profile
+
+## Phase 1 — later backlog
 
 Grouped by workstream (PLAN §15). Tick items as they merge.
 
@@ -76,7 +105,7 @@ Grouped by workstream (PLAN §15). Tick items as they merge.
 - [ ] Remaining environments; material chips with calibration swatches
 
 **Studio ops**
-- [ ] `services/farm-agent`: `PrinterBridge` interface with Moonraker and Bambu Lab bridges, fake-printer test doubles, snapshots, stage posts (ADR-0004)
+- [ ] `services/farm-agent` (deferred while printing is outsourced, ADR-0004): `PrinterBridge` with Moonraker and Bambu Lab bridges
 - [ ] `apps/admin` management portal: staff sign-in, pricing policies, materials and rates, catalog items and availability, live templates, printers, fulfilment ops, audit log (ADR-0012)
 - [ ] Packaging card PDF at PACKED
 
@@ -92,7 +121,7 @@ Grouped by workstream (PLAN §15). Tick items as they merge.
 | 0001 | Cream pages + indigo stage | Accepted 2026-09-27 |
 | 0002 | Shop · Create · Remix labels | Accepted 2026-09-27 |
 | 0003 | All seven embossing scripts at launch | Accepted 2026-09-27 |
-| 0004 | Klipper/Moonraker and Bambu Lab, two farm-agent bridges | Accepted 2026-09-27 |
+| 0004 | Klipper/Moonraker and Bambu Lab bridges; deferred while printing is outsourced | Deferred 2026-09-27 |
 | 0005 | Generative provider behind an adapter | Proposed |
 | 0006 | Local Docker only for now; production deferred | Deferred 2026-09-27 |
 | 0007 | Retire KalaForge; `AK-000001` order numbers | Accepted 2026-09-27 |
@@ -101,6 +130,7 @@ Grouped by workstream (PLAN §15). Tick items as they merge.
 | 0010 | RabbitMQ dispatch with direct profile | Accepted |
 | 0011 | Contract-first schemas | Accepted |
 | 0012 | Separate management portal `apps/admin` | Accepted 2026-09-27 |
+| 0013 | Complete the loop with mocked external providers | Accepted 2026-09-27 |
 
 ## Verification snapshot
 

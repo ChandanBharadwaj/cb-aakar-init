@@ -1,6 +1,6 @@
 # ADR-0004: Studio printers: Klipper/Moonraker and Bambu Lab, two farm-agent bridges
 
-- Status: Accepted (decided by the product owner on 2026-09-27; wider than the single-ecosystem recommendation)
+- Status: Deferred (2026-09-27, later the same day: printing is outsourced for now, so no farm agent is built; the two-bridge design below stands for when a studio farm exists)
 - Date: 2026-09-27
 - Deciders: Chandan Bharadwaj (product owner)
 
@@ -15,6 +15,7 @@ The studio runs **both** families and the farm agent ships **two bridges** from 
 Both implement one `PrinterBridge` interface (connect, list jobs, start job, subscribe progress, snapshot) so the fulfilment module never sees the difference.
 
 ## Consequences
+- **Deferred:** until Aakar prints in-house, orders are fulfilled by an outsourced printer. The management portal gives staff a per-order **print pack** (3MF, STL, print sheet with material, quantity and finish) to hand over, and stages are advanced manually. `services/farm-agent` stays a placeholder.
 - Roughly double the Phase 1 farm-agent integration and test work; each bridge gets a fake-printer test double.
 - Slicing profiles are maintained per printer family (PrusaSlicer/OrcaSlicer for Klipper, Bambu Studio or OrcaSlicer for Bambu).
 - Bambu firmware updates can break the MQTT contract; pin firmware in the studio and keep the bridge behind a feature flag per printer.
