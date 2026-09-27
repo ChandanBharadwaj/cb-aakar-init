@@ -11,6 +11,13 @@ info:
     with 422 `not_yet_available` until the co-designer agent lands in Phase 2.
 
     Errors use RFC 9457 Problem Details (`application/problem+json`) with a stable `code`.
+
+    **Identity (Phase 1, ADR-0013).** Signed-in customers send `Authorization: Bearer <access_token>`.
+    Guests send `X-Aakar-Guest: <uuid>` (generated and stored by the browser). Designs and carts belong
+    to whichever identity created them; `POST /api/auth/otp/verify` attaches the guest's designs and cart
+    to the user. In the `local` profile the OTP mock returns the code in the response (`dev_code`).
+    External providers (payments, shipping, messaging, OTP) are adapters with mock defaults; a mock
+    payment is completed from the placeholder pay page through `POST /api/payments/{id}/mock/complete`.
 servers:
   - url: http://localhost:8080
 paths:
@@ -166,6 +173,289 @@ paths:
           content:
             text/event-stream:
               schema: { type: string }
+  /api/auth/otp/request:
+    post:
+      summary: Request a sign-in code for a phone number
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [phone]
+              properties:
+                phone: { type: string, pattern: '^\+91[6-9][0-9]{9}$', description: E.164 Indian mobile }
+      responses:
+        '202':
+          description: Code sent (or mocked)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [request_id, expires_in_s]
+                properties:
+                  request_id: { type: string, format: uuid }
+                  expires_in_s: { type: integer }
+                  dev_code: { type: string, description: Only in the local profile with the mock OTP sender }
+        '400': { $ref: '#/components/responses/Problem' }
+        '429': { description: "Too many requests for this phone (otp_rate_limited)", $ref: '#/components/responses/Problem' }
+  /api/auth/otp/verify:
+    post:
+      summary: Verify the code, sign in, attach guest designs and cart
+      tags: [auth]
+      parameters: [{ $ref: '#/components/parameters/GuestHeader' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [request_id, code]
+              properties:
+                request_id: { type: string, format: uuid }
+                code: { type: string, minLength: 4, maxLength: 8 }
+      responses:
+        '200': { description: Signed in, content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { description: "Wrong or expired code (otp_invalid / otp_expired)", $ref: '#/components/responses/Problem' }
+  /api/auth/me:
+    get:
+      summary: Current user
+      tags: [auth]
+      security: [{ bearer: [] }]
+      responses:
+        '200': { description: User, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+    patch:
+      summary: Update profile
+      tags: [auth]
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                name: { type: string, maxLength: 80 }
+                email: { type: string, format: email }
+      responses:
+        '200': { description: User, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+  /api/auth/logout:
+    post:
+      summary: Revoke the current session token
+      tags: [auth]
+      security: [{ bearer: [] }]
+      responses:
+        '204': { description: Revoked }
+  /api/me/addresses:
+    get:
+      tags: [addresses]
+      security: [{ bearer: [] }]
+      responses:
+        '200': { description: Addresses, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Address' } } } } }
+    post:
+      tags: [addresses]
+      security: [{ bearer: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AddressInput' } } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Address' } } } }
+        '422': { $ref: '#/components/responses/Problem' }
+  /api/me/addresses/{addressId}:
+    put:
+      tags: [addresses]
+      security: [{ bearer: [] }]
+      parameters: [{ name: addressId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AddressInput' } } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Address' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [addresses]
+      security: [{ bearer: [] }]
+      parameters: [{ name: addressId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '204': { description: Deleted }
+        '404': { $ref: '#/components/responses/Problem' }
+  /api/cart:
+    get:
+      summary: The current identity's cart (user or guest)
+      tags: [cart]
+      parameters: [{ $ref: '#/components/parameters/GuestHeader' }]
+      security: [{ bearer: [] }, {}]
+      responses:
+        '200': { description: Cart, content: { application/json: { schema: { $ref: '#/components/schemas/Cart' } } } }
+    delete:
+      summary: Empty the cart
+      tags: [cart]
+      parameters: [{ $ref: '#/components/parameters/GuestHeader' }]
+      security: [{ bearer: [] }, {}]
+      responses:
+        '200': { description: Cart, content: { application/json: { schema: { $ref: '#/components/schemas/Cart' } } } }
+  /api/cart/items:
+    post:
+      summary: Add a design version in a finish
+      description: "The version must be ready and pass printability. The unit price is snapshotted from the active pricing policy at add time and refreshed on GET /api/cart when the policy changes (the item then carries repriced = true)."
+      tags: [cart]
+      parameters: [{ $ref: '#/components/parameters/GuestHeader' }]
+      security: [{ bearer: [] }, {}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [version_id, material]
+              properties:
+                version_id: { type: string, format: uuid }
+                material: { type: string }
+                qty: { type: integer, minimum: 1, maximum: 20, default: 1 }
+      responses:
+        '201': { description: Cart, content: { application/json: { schema: { $ref: '#/components/schemas/Cart' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { description: "Version not ready (version_not_ready) or failed printability (not_printable)", $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /api/cart/items/{itemId}:
+    patch:
+      tags: [cart]
+      parameters:
+        - { $ref: '#/components/parameters/GuestHeader' }
+        - { name: itemId, in: path, required: true, schema: { type: string, format: uuid } }
+      security: [{ bearer: [] }, {}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                qty: { type: integer, minimum: 1, maximum: 20 }
+                material: { type: string }
+      responses:
+        '200': { description: Cart, content: { application/json: { schema: { $ref: '#/components/schemas/Cart' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [cart]
+      parameters:
+        - { $ref: '#/components/parameters/GuestHeader' }
+        - { name: itemId, in: path, required: true, schema: { type: string, format: uuid } }
+      security: [{ bearer: [] }, {}]
+      responses:
+        '200': { description: Cart, content: { application/json: { schema: { $ref: '#/components/schemas/Cart' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+  /api/shipping/serviceability:
+    get:
+      summary: Can we deliver to this pincode, and how fast
+      tags: [shipping]
+      parameters: [{ name: pincode, in: query, required: true, schema: { type: string, pattern: '^[1-9][0-9]{5}$' } }]
+      responses:
+        '200':
+          description: Serviceability
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [pincode, serviceable, carrier]
+                properties:
+                  pincode: { type: string }
+                  serviceable: { type: boolean }
+                  carrier: { type: string, description: "delhivery, or mock-delhivery" }
+                  eta_days: { type: integer }
+                  cod_available: { type: boolean }
+  /api/checkout:
+    post:
+      summary: Turn the cart into an order awaiting payment
+      description: Snapshots items, prices and address into the order; creates a payment with the configured gateway (mock by default) and returns where to pay. The cart is emptied when payment succeeds.
+      tags: [orders]
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [address_id]
+              properties:
+                address_id: { type: string, format: uuid }
+                notify_whatsapp: { type: boolean, default: true }
+                note: { type: string, maxLength: 200 }
+      responses:
+        '201': { description: Order created, content: { application/json: { schema: { $ref: '#/components/schemas/CheckoutResult' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '409': { description: "Cart empty (cart_empty) or an item no longer purchasable (not_printable)", $ref: '#/components/responses/Problem' }
+        '422': { description: "Address not serviceable (not_serviceable)", $ref: '#/components/responses/Problem' }
+  /api/orders:
+    get:
+      tags: [orders]
+      security: [{ bearer: [] }]
+      responses:
+        '200': { description: Orders newest first, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/OrderSummary' } } } } }
+  /api/orders/{orderId}:
+    get:
+      tags: [orders]
+      security: [{ bearer: [] }]
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Order, content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+  /api/orders/{orderId}/events:
+    get:
+      summary: Server-Sent Events of order stage changes
+      description: "event = stage, data = OrderEvent; replays after Last-Event-ID; closes after delivered or cancelled."
+      tags: [orders]
+      security: [{ bearer: [] }]
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Event stream, content: { text/event-stream: { schema: { type: string } } } }
+  /api/orders/{orderId}/payments:
+    post:
+      summary: Start a new payment attempt for an order still awaiting payment
+      description: Used after a failed or abandoned payment. Only while the order is pending_payment; the previous attempt is left as failed.
+      tags: [payments]
+      security: [{ bearer: [] }]
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '201': { description: New payment, content: { application/json: { schema: { $ref: '#/components/schemas/Payment' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { description: "Order is not awaiting payment (order_not_payable)", $ref: '#/components/responses/Problem' }
+  /api/payments/{paymentId}:
+    get:
+      tags: [payments]
+      security: [{ bearer: [] }]
+      parameters: [{ name: paymentId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Payment, content: { application/json: { schema: { $ref: '#/components/schemas/Payment' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+  /api/payments/{paymentId}/mock/complete:
+    post:
+      summary: Placeholder gateway page reports the outcome (mock gateway only)
+      description: Enabled only when the payment's gateway is mock. Real gateways confirm through their webhook endpoints instead. Runs the same confirmation path a webhook would.
+      tags: [payments]
+      security: [{ bearer: [] }]
+      parameters: [{ name: paymentId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [outcome]
+              properties:
+                outcome: { type: string, enum: [success, failure] }
+                method: { type: string, enum: [upi, card, netbanking], default: upi }
+      responses:
+        '200': { description: Payment after confirmation, content: { application/json: { schema: { $ref: '#/components/schemas/Payment' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { description: "Not a mock payment or already final (payment_final)", $ref: '#/components/responses/Problem' }
   /internal/jobs/{jobId}/callback:
     post:
       summary: Direct-profile callback from the geometry service
@@ -180,6 +470,15 @@ paths:
       responses:
         '204': { description: Recorded }
 components:
+  securitySchemes:
+    bearer: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    GuestHeader:
+      name: X-Aakar-Guest
+      in: header
+      required: false
+      schema: { type: string, format: uuid }
+      description: Guest identity generated by the browser; ignored when a bearer token is present.
   responses:
     Problem:
       description: Problem Details
@@ -195,8 +494,181 @@ components:
               instance: { type: string }
               code:
                 type: string
-                description: Stable machine code, e.g. not_found, not_yet_available, param_out_of_range, version_not_ready
+                description: "Stable machine code, e.g. not_found, not_yet_available, param_out_of_range, version_not_ready, unauthenticated, otp_invalid, otp_expired, otp_rate_limited, not_printable, cart_empty, not_serviceable, payment_final"
   schemas:
+    User:
+      type: object
+      required: [id, phone, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        phone: { type: string }
+        name: { type: [string, 'null'] }
+        email: { type: [string, 'null'] }
+        created_at: { type: string, format: date-time }
+    Session:
+      type: object
+      required: [access_token, token_type, expires_in_s, user, attached]
+      properties:
+        access_token: { type: string }
+        token_type: { const: Bearer }
+        expires_in_s: { type: integer }
+        user: { $ref: '#/components/schemas/User' }
+        attached:
+          type: object
+          description: What was moved from the guest identity to the user on this sign-in.
+          properties:
+            designs: { type: integer }
+            cart_items: { type: integer }
+    AddressInput:
+      type: object
+      additionalProperties: false
+      required: [name, phone, line1, city, state, pincode]
+      properties:
+        label: { type: string, maxLength: 30, description: "Home or Office" }
+        name: { type: string, maxLength: 80 }
+        phone: { type: string }
+        line1: { type: string, maxLength: 120 }
+        line2: { type: string, maxLength: 120 }
+        city: { type: string, maxLength: 60 }
+        state: { type: string, maxLength: 60 }
+        pincode: { type: string, pattern: '^[1-9][0-9]{5}$' }
+        is_default: { type: boolean, default: false }
+    Address:
+      allOf:
+        - $ref: '#/components/schemas/AddressInput'
+        - type: object
+          required: [id]
+          properties:
+            id: { type: string, format: uuid }
+    CartItem:
+      type: object
+      required: [id, design_id, version_id, title, material_id, qty, unit_price, line_total_paise, purchasable]
+      properties:
+        id: { type: string, format: uuid }
+        design_id: { type: string, format: uuid }
+        version_id: { type: string, format: uuid }
+        version_no: { type: integer }
+        title: { type: string }
+        specs_line: { type: string, description: "e.g. Terracotta Silk · 92 × 78 × 120 mm · 55 g" }
+        material_id: { type: string }
+        material_name: { type: string }
+        qty: { type: integer }
+        unit_price: { $ref: '../schemas/price-breakdown.v1.json' }
+        line_total_paise: { type: integer }
+        thumbnail_url: { type: [string, 'null'] }
+        purchasable: { type: boolean, description: False when the version failed printability or the template is no longer live }
+        repriced: { type: boolean, description: True when the active pricing policy changed since the item was added }
+    Cart:
+      type: object
+      required: [id, owner, items, subtotal_paise, shipping_paise, total_paise, policy_version, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        owner: { type: string, enum: [user, guest] }
+        items: { type: array, items: { $ref: '#/components/schemas/CartItem' } }
+        subtotal_paise: { type: integer }
+        shipping_paise: { type: integer }
+        shipping_label: { type: string }
+        total_paise: { type: integer }
+        policy_version: { type: string }
+        updated_at: { type: string, format: date-time }
+    OrderStatus:
+      type: string
+      description: Internal status. The customer stage is derived.
+      enum: [pending_payment, confirmed, queued, slicing, printing, finishing, qc, packed, shipped, delivered, cancelled, on_hold, reprint]
+    OrderStage:
+      type: string
+      description: Customer-facing collapsed stage (board 06).
+      enum: [payment, queued, slicing, printing, sanding, shipped, delivered, cancelled]
+    OrderItem:
+      type: object
+      required: [id, design_id, version_id, title, material_id, qty, unit_price, line_total_paise]
+      properties:
+        id: { type: string, format: uuid }
+        design_id: { type: string, format: uuid }
+        version_id: { type: string, format: uuid }
+        version_no: { type: integer }
+        title: { type: string }
+        specs_line: { type: string }
+        material_id: { type: string }
+        material_name: { type: string }
+        qty: { type: integer }
+        unit_price: { $ref: '../schemas/price-breakdown.v1.json' }
+        line_total_paise: { type: integer }
+        assets: { type: object, additionalProperties: true, description: Snapshot of the version assets at order time }
+    OrderSummary:
+      type: object
+      required: [id, number, status, stage, total_paise, items_count, placed_at]
+      properties:
+        id: { type: string, format: uuid }
+        number: { type: string, description: "AK-000001" }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        stage: { $ref: '#/components/schemas/OrderStage' }
+        title: { type: string, description: First item title plus a count of the others }
+        total_paise: { type: integer }
+        items_count: { type: integer }
+        eta: { type: [string, 'null'], format: date }
+        placed_at: { type: string, format: date-time }
+    Order:
+      allOf:
+        - $ref: '#/components/schemas/OrderSummary'
+        - type: object
+          required: [items, address, subtotal_paise, shipping_paise, payment, events]
+          properties:
+            items: { type: array, items: { $ref: '#/components/schemas/OrderItem' } }
+            address: { $ref: '#/components/schemas/Address' }
+            subtotal_paise: { type: integer }
+            shipping_paise: { type: integer }
+            shipping_label: { type: string }
+            policy_version: { type: string }
+            payment: { $ref: '#/components/schemas/Payment' }
+            shipment: { $ref: '#/components/schemas/Shipment' }
+            events: { type: array, items: { $ref: '#/components/schemas/OrderEvent' } }
+            notify_whatsapp: { type: boolean }
+            note: { type: [string, 'null'] }
+    OrderEvent:
+      type: object
+      required: [sequence, status, stage, message, at]
+      properties:
+        sequence: { type: integer }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        stage: { $ref: '#/components/schemas/OrderStage' }
+        message: { type: string }
+        detail: { type: object, additionalProperties: true, description: "Studio, printer bay and layer height for the tracking board" }
+        at: { type: string, format: date-time }
+    Payment:
+      type: object
+      required: [id, order_id, gateway, status, amount_paise, currency, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        order_id: { type: string, format: uuid }
+        gateway: { type: string, description: "mock or razorpay" }
+        gateway_ref: { type: [string, 'null'], description: Provider order or payment id }
+        status: { type: string, enum: [created, pending, succeeded, failed, refunded] }
+        method: { type: [string, 'null'] }
+        amount_paise: { type: integer }
+        currency: { const: INR }
+        pay_url: { type: [string, 'null'], description: Where the customer pays; the placeholder page for the mock gateway }
+        invoice_number: { type: [string, 'null'] }
+        created_at: { type: string, format: date-time }
+        finished_at: { type: [string, 'null'], format: date-time }
+    Shipment:
+      type: object
+      required: [id, carrier, status]
+      properties:
+        id: { type: string, format: uuid }
+        carrier: { type: string }
+        awb: { type: [string, 'null'] }
+        status: { type: string, enum: [created, picked_up, in_transit, out_for_delivery, delivered, returned] }
+        eta: { type: [string, 'null'], format: date }
+        tracking_url: { type: [string, 'null'] }
+        events: { type: array, items: { type: object, properties: { status: { type: string }, message: { type: string }, at: { type: string, format: date-time } } } }
+    CheckoutResult:
+      type: object
+      required: [order_id, order_number, payment]
+      properties:
+        order_id: { type: string, format: uuid }
+        order_number: { type: string }
+        payment: { $ref: '#/components/schemas/Payment' }
     CatalogItem:
       type: object
       required: [slug, name, category, template_id, default_params, default_material, base_price_paise, specs_line, available]
