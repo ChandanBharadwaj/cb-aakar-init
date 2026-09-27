@@ -456,6 +456,36 @@ paths:
         '200': { description: Payment after confirmation, content: { application/json: { schema: { $ref: '#/components/schemas/Payment' } } } }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { description: "Not a mock payment or already final (payment_final)", $ref: '#/components/responses/Problem' }
+  /api/share/{code}:
+    get:
+      summary: What the unboxing card links to
+      description: Public, unauthenticated, rate-limited. The 8-character code is printed on the packaging card as /k/{code}. Answers with the piece and where to reprint or remix it; no customer data.
+      tags: [share]
+      security: []
+      parameters: [{ name: code, in: path, required: true, schema: { type: string, pattern: '^[A-Z2-7]{8}$' } }]
+      responses:
+        '200':
+          description: Shared piece
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, title, material_id, material_name, design_id, version_id, template_id, printed_at, studio, reprint_path, remix_path]
+                properties:
+                  code: { type: string }
+                  title: { type: string }
+                  specs_line: { type: string }
+                  material_id: { type: string }
+                  material_name: { type: string }
+                  design_id: { type: string, format: uuid }
+                  version_id: { type: string, format: uuid }
+                  template_id: { type: string }
+                  printed_at: { type: string, format: date }
+                  studio: { type: string }
+                  thumbnail_url: { type: [string, 'null'] }
+                  reprint_path: { type: string, description: "Storefront path that recreates this exact piece in the cart, e.g. /design/new?version=<id>&material=<id>" }
+                  remix_path: { type: string, description: "Storefront path that opens the design for editing, e.g. /design/<design_id>" }
+        '404': { $ref: '#/components/responses/Problem' }
   /internal/jobs/{jobId}/callback:
     post:
       summary: Direct-profile callback from the geometry service

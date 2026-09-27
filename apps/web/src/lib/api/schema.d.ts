@@ -1432,6 +1432,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/share/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the unboxing card links to
+         * @description Public, unauthenticated, rate-limited. The 8-character code is printed on the packaging card as /k/{code}. Answers with the piece and where to reprint or remix it; no customer data.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    code: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Shared piece */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            code: string;
+                            title: string;
+                            specs_line?: string;
+                            material_id: string;
+                            material_name: string;
+                            /** Format: uuid */
+                            design_id: string;
+                            /** Format: uuid */
+                            version_id: string;
+                            template_id: string;
+                            /** Format: date */
+                            printed_at: string;
+                            studio: string;
+                            thumbnail_url?: string | null;
+                            /** @description Storefront path that recreates this exact piece in the cart, e.g. /design/new?version=<id>&material=<id> */
+                            reprint_path: string;
+                            /** @description Storefront path that opens the design for editing, e.g. /design/<design_id> */
+                            remix_path: string;
+                        };
+                    };
+                };
+                404: components["responses"]["Problem"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/internal/jobs/{jobId}/callback": {
         parameters: {
             query?: never;
