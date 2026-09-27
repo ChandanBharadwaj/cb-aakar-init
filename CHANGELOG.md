@@ -19,6 +19,8 @@ All notable changes to Aakar. Format follows [Keep a Changelog](https://keepacha
 
 ## [0.1.0] — 2026-09-27 — Phase 0: Foundations
 
+Commit `bbaa597`. Not tagged yet: the session's git proxy rejects tag pushes, so run `git tag -a v0.1.0 bbaa597 -m "Phase 0: Foundations" && git push origin v0.1.0` from a machine with tag rights.
+
 ### Added
 - **Monorepo**: layout from PLAN §18.1, pnpm workspace, `Makefile`, editorconfig, gitignore.
 - **Contracts** (`packages/contracts`): JSON Schemas for the Design Spec, template descriptor, printability report, print estimate and price breakdown; RabbitMQ event envelope and `design.generate` / `design.progress` / `design.completed` / `design.failed` payloads; OpenAPI 3.1 for the storefront API, geometry and inspect services; worked examples and a validator (`pnpm --filter @aakar/contracts validate`).
@@ -51,6 +53,6 @@ All notable changes to Aakar. Format follows [Keep a Changelog](https://keepacha
 - `PLAN.md`: the product and engineering plan.
 - Design concept export (boards, logo, loader) as uploaded.
 
-[Unreleased]: https://github.com/ChandanBharadwaj/cb-aakar-init/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/ChandanBharadwaj/cb-aakar-init/compare/b6aab75...v0.1.0
+[Unreleased]: https://github.com/ChandanBharadwaj/cb-aakar-init/compare/bbaa597...HEAD
+[0.1.0]: https://github.com/ChandanBharadwaj/cb-aakar-init/compare/b6aab75...bbaa597
 [0.0.1]: https://github.com/ChandanBharadwaj/cb-aakar-init/commit/b6aab75
