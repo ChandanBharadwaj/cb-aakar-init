@@ -177,8 +177,8 @@ class CustomerLoopIntegrationTest extends AbstractIntegrationTest {
         assertThat(pending.get("events").get(0).get("message").asText()).isEqualTo("Awaiting payment");
         assertThat(pending.get("events").get(0).get("stage").asText()).isEqualTo("payment");
         assertThat(body(get("/api/payments/" + paymentId, bearer(token))).get("status").asText()).isEqualTo("created");
-        // the cart is still full until the payment goes through
-        assertThat(body(get("/api/cart", bearer(token))).get("items")).hasSize(1);
+        // checkout consumes the cart; an unpaid order is paid from the order page
+        assertThat(body(get("/api/cart", bearer(token))).get("items")).isEmpty(); // checkout consumed the cart
 
         // 5. The placeholder pay page reports success.
         ResponseEntity<String> completed = post("/api/payments/" + paymentId + "/mock/complete", "{\"outcome\": \"success\", \"method\": \"upi\"}", bearer(token));
@@ -295,7 +295,8 @@ class CustomerLoopIntegrationTest extends AbstractIntegrationTest {
         assertThat(order.get("events")).extracting(e -> e.get("message").asText()).containsExactly("Awaiting payment", "Payment failed");
         assertThat(order.get("events").get(1).get("stage").asText()).isEqualTo("payment");
         assertThat(order.get("payment").get("status").asText()).isEqualTo("failed");
-        assertThat(body(get("/api/cart", bearer(token))).get("items")).hasSize(1); // still there
+        assertThat(body(get("/api/cart", bearer(token))).get("items")).isEmpty(); // checkout consumed the cart
+        assertProblem(post("/api/checkout", "{\"address_id\": \"" + addressId + "\"}", bearer(token)), HttpStatus.CONFLICT, "cart_empty"); // no duplicate order
         assertProblem(post("/api/payments/" + firstPayment + "/mock/complete", "{\"outcome\": \"success\"}", bearer(token)), HttpStatus.CONFLICT, "payment_final");
 
         ResponseEntity<String> retried = post("/api/orders/" + orderId + "/payments", null, bearer(token));

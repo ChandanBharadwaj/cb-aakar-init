@@ -214,6 +214,19 @@ class AdminLoopIntegrationTest extends AbstractIntegrationTest {
         assertThat(codes.get(0)).containsEntry("design_id", paid.designId()).containsEntry("version_id", paid.versionId());
         assertThat(getBytes("/admin/api/orders/" + orderId + "/packaging-card.pdf", staff).getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(jdbc.queryForObject("select count(*) from share_codes where order_id = ?::uuid", Long.class, orderId)).isEqualTo(1L);
+        // the code on the card resolves publicly to the piece, never to the customer
+        String shareCode = (String) codes.get(0).get("code");
+        JsonNode shared = body(get("/api/share/" + shareCode.toLowerCase()));
+        assertThat(shared.get("code").asText()).isEqualTo(shareCode);
+        assertThat(shared.get("design_id").asText()).isEqualTo(paid.designId());
+        assertThat(shared.get("version_id").asText()).isEqualTo(paid.versionId());
+        assertThat(shared.get("material_id").asText()).isNotBlank();
+        assertThat(shared.get("studio").asText()).isEqualTo("Bengaluru");
+        assertThat(shared.get("reprint_path").asText()).isEqualTo("/k/" + shareCode);
+        assertThat(shared.get("remix_path").asText()).isEqualTo("/design/" + paid.designId());
+        assertThat(shared.has("customer")).isFalse();
+        assertThat(shared.toString()).doesNotContain(paid.phone());
+        assertProblem(get("/api/share/ZZZZZZZ2"), HttpStatus.NOT_FOUND, "not_found");
 
         // shipped and delivered: tracking events plus the customer messages
         JsonNode shipped = body(post("/admin/api/orders/" + orderId + "/advance", "{\"status\": \"shipped\"}", staff));

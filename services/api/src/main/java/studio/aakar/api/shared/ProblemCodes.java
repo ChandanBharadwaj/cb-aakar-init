@@ -34,6 +34,7 @@ public final class ProblemCodes {
     public static final String MATERIAL_EXISTS = "material_exists";
     public static final String SLUG_EXISTS = "slug_exists";
     public static final String PAYLOAD_TOO_LARGE = "payload_too_large";
+    public static final String RATE_LIMITED = "rate_limited";
 
     private ProblemCodes() {
     }

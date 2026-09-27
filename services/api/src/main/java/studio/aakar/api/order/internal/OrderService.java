@@ -133,6 +133,9 @@ class OrderService implements Orders {
                     position++));
         }
         lifecycle.placed(order, now);
+        // The cart is consumed by the order: a second checkout answers cart_empty instead of duplicating the
+        // order, and an unpaid order is paid later from the order page (POST /api/orders/{id}/payments).
+        carts.clear(Identity.user(userId));
         PaymentDto payment = payments.create(order.id(), number, userId, order.totalPaise());
         log.info("Order {} placed by user {}: {} line(s), {} paise, eta {}", number, userId, position, order.totalPaise(), eta);
         return new CheckoutResult(order.id(), number, payment);
