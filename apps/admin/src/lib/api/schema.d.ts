@@ -1137,6 +1137,10 @@ export interface paths {
                             live: boolean;
                             /** @description Slugs using this template */
                             catalog_items?: string[];
+                            /** @description Chhaap types the template accepts */
+                            features_supported?: ("emboss_text" | "motif" | "relief_image" | "hero_mesh")[];
+                            /** @description Bought-in parts the template is cut for */
+                            hardware?: components["schemas"]["HardwareRef"][];
                         }[];
                     };
                 };
@@ -1754,6 +1758,12 @@ export interface components {
             url?: string | null;
             /** Format: date-time */
             created_at: string;
+        };
+        HardwareRef: {
+            sku: string;
+            qty: number;
+            /** @description Customer-facing hardware name */
+            name?: string;
         };
     };
     responses: {

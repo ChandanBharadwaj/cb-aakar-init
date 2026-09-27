@@ -363,6 +363,8 @@ paths:
                     name: { type: string }
                     live: { type: boolean, description: False hides the template from Create and blocks new designs }
                     catalog_items: { type: array, items: { type: string }, description: Slugs using this template }
+                    features_supported: { type: array, items: { type: string, enum: [emboss_text, motif, relief_image, hero_mesh] }, description: Chhaap types the template accepts }
+                    hardware: { type: array, items: { $ref: 'aakar-api.v1.yaml#/components/schemas/HardwareRef' }, description: Bought-in parts the template is cut for }
   /admin/api/templates/{templateId}:
     put:
       tags: [templates]
