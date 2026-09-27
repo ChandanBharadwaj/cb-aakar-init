@@ -10,7 +10,7 @@
 | Decisions | [docs/adr](docs/adr/README.md) |
 | Run it locally | [docs/runbook-local.md](docs/runbook-local.md) |
 | Design boards | [design/](design/README.md) |
-| Status | **Phase 0 — Foundations** implemented: monorepo, contracts, tokens, first template, API, storefront viewer, local stack, CI |
+| Status | **Phase 0 — Foundations** done; Phase 1 starting. See [PROGRESS.md](PROGRESS.md) and the [CHANGELOG](CHANGELOG.md) |
 
 ## Layout
 

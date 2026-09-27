@@ -99,7 +99,7 @@ The brief and the exported boards diverge in a few places. Recommendations below
 | Typography | Clean sans-serif | Cormorant Garamond display + Manrope UI | Keep the boards. The serif carries the "craft" tone. |
 | Loading | Rotating mandala | Bloom draw-on loader + mandala in Create | Both: Bloom for page and route loads, mandala with stage text ("Weaving your design…") for generation. |
 | Order ID prefix | — | `KF-20931` (KalaForge legacy) | `AK-` prefix. Rename the zip and any remaining KalaForge references. |
-| Regional embossing | Telugu example | Telugu example | Launch with Latin + Devanagari + Telugu; add Tamil, Kannada, Bengali, Gujarati in Phase 2. |
+| Regional embossing | Telugu example | Telugu example | **Decided (ADR-0003):** all seven scripts at launch: Latin, Devanagari, Telugu, Tamil, Kannada, Bengali, Gujarati. |
 
 ---
 
@@ -607,7 +607,7 @@ Kraft box, marigold tape, sustainable fill, and the printed card: *Designed by Y
 
 - Twelve templates across the launch families; six SKUs from the Shop board photographed in real finishes for calibration.
 - Viewer: environments (`studio`, `teak_table_candlelight`, `desk_oak`), finish swap, size presets, exposed parameter sliders.
-- Text emboss in Latin, Devanagari and Telugu; planar and cylindrical projection.
+- Text emboss in all seven launch scripts (Latin, Devanagari, Telugu, Tamil, Kannada, Bengali, Gujarati) with HarfBuzz shaping and a golden-image test set per script; planar and cylindrical projection.
 - Printability report v1 (manifold, bed fit, wall thickness, centre of gravity).
 - Identity, cart, checkout with Razorpay, orders, SSE tracking, WhatsApp status texts.
 - Fulfilment: farm agent progress, ops console stages, packaging card PDF.
@@ -641,7 +641,7 @@ Kraft box, marigold tape, sustainable fill, and the printed card: *Designed by Y
 - Designer marketplace for community templates with revenue share.
 - Public share pages for time-lapses; referral loop.
 - B2B gifting (bulk nameplates, corporate awards).
-- Hindi and Telugu UI; Tamil, Kannada, Bengali, Gujarati embossing.
+- Hindi and Telugu UI.
 
 ---
 
@@ -679,9 +679,9 @@ With a very small team the order of work in §14 still holds: Platform and Front
 
 Decisions needed from the product owner before Phase 0 ends. Recommendations are in §3.
 
-1. **Surface theme**: cream pages with an indigo immersive stage, or indigo throughout.
-2. **Navigation labels**: Shop · Create · Remix in the UI, with Bazaar · Canvas · Karigar as codenames.
-3. **Launch scripts for embossing**: Latin + Devanagari + Telugu at launch.
+1. ~~**Surface theme**~~ Decided 27 Sep 2026: cream pages with an indigo stage (ADR-0001).
+2. ~~**Navigation labels**~~ Decided 27 Sep 2026: Shop · Create · Remix; Bazaar · Canvas · Karigar are codenames (ADR-0002).
+3. ~~**Launch scripts for embossing**~~ Decided 27 Sep 2026: all seven scripts at launch (ADR-0003).
 4. **Printers**: open-firmware machines (Klipper/Moonraker) for farm-agent integration, count for launch.
 5. **Generative provider** for Phase 3: hosted vendor versus self-hosted open model; decide by Phase 2 exit.
 6. **Hosting**: AWS ap-south-1 as proposed, or an alternative.

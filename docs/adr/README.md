@@ -4,9 +4,9 @@ One file per decision, numbered, never edited after acceptance (supersede instea
 
 | ADR | Decision | Status |
 |---|---|---|
-| [0001](0001-two-surfaces-one-palette.md) | Two surfaces, one palette: paper for browsing, indigo stage for the viewer | Proposed |
-| [0002](0002-navigation-labels.md) | Navigation says Shop · Create · Remix; Bazaar · Canvas · Karigar are codenames | Proposed |
-| [0003](0003-launch-embossing-scripts.md) | Launch embossing scripts: Latin, Devanagari, Telugu | Proposed |
+| [0001](0001-two-surfaces-one-palette.md) | Two surfaces, one palette: paper for browsing, indigo stage for the viewer | Accepted |
+| [0002](0002-navigation-labels.md) | Navigation says Shop · Create · Remix; Bazaar · Canvas · Karigar are codenames | Accepted |
+| [0003](0003-launch-embossing-scripts.md) | Launch embossing scripts: all seven (Latin, Devanagari, Telugu, Tamil, Kannada, Bengali, Gujarati) | Accepted |
 | [0004](0004-open-firmware-printers.md) | Open-firmware printers (Klipper/Moonraker) for the studio farm | Proposed |
 | [0005](0005-generative-provider-adapter.md) | Freeform generation behind an adapter; provider chosen at Phase 2 exit | Proposed |
 | [0006](0006-hosting-aws-mumbai.md) | Host on AWS ap-south-1 (Mumbai) | Proposed |
