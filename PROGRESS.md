@@ -122,11 +122,11 @@ Plan: [`docs/research/outcome-categories/implementation-plan.md`](docs/research/
 | Phase | Scope | Status | Evidence / resume pointer |
 |---|---|---|---|
 | 0 | Research report, notes, plan | ✅ Done | `docs/research/outcome-categories/` |
-| 1 | PR 1 contracts · PR 2 seed + `V9` + catalog module (families, shelves, hardware, policy fields) | ✅ Done | `5235c50`; `6f46202` + `d384b25` + `5920cbc` (review follow-ups); API 136 tests green |
-| 2 | PR 3a geometry features framework · PR 3b text + motif | 🟨 3a done (`d0e2814` + `010635c`; geometry 130, inspect 21); 3b not started | next: `features/emboss_text.py`, `features/motif.py` (PLAN §7.5) |
-| 3 | PR 4 carriers `keychain_tag`, `fridge_magnet`, `hanging_ornament`, `desk_nameplate`, `raw_print` (no params: size and orientation live on the form) | 🟨 in progress | `services/geometry/aakar_geometry/templates/`; afterwards sync `services/api/src/test/resources/fixtures/templates.json` and the web/admin mock descriptors from the real descriptors |
-| 4 | PR 5 API uploads + content review, features on create/edit, family resolution, hardware/setup pricing, print pack | ⬜ next | ADR-0014 written (`0ab8f09`); DesignSource has no `upload` yet; entities do not map `family_id`/`hardware`; `price_from_paise` null |
-| 5 | PR 6 storefront · PR 7 portal | 🟨 PR 7 done (`31d9c8e`, `65ae76e`); PR 6 compiles (`e22c99e` + `e0f6e85`), review polish in progress | `apps/web/src/components/design/` |
+| 1 | PR 1 contracts · PR 2 seed + `V9` + catalog module (families, shelves, hardware, policy fields) | ✅ Done | `5235c50`; `6f46202` + `d384b25` + `5920cbc`; `V10` caps the nameplate envelope at 250 mm |
+| 2 | PR 3a geometry features framework · PR 3b text + motif | 🟨 3a done (`d0e2814` + `010635c`); 3b in progress (Naam in seven scripts, Buti motif library) | `services/geometry/aakar_geometry/features/emboss_text.py`, `motif.py`; `packages/design-tokens/motifs/` |
+| 3 | PR 4 carriers `keychain_tag`, `fridge_magnet`, `hanging_ornament`, `desk_nameplate`, `raw_print` | ✅ Done (`debbefc` + `f7e7db5`; geometry 292) | descriptors exported to `packages/contracts/examples/template-descriptors.json` (`make descriptors`, drift-tested) |
+| 4 | PR 5 API uploads + review, content on designs, per-Avatar pricing, print pack | ✅ Done (`05599ea` + `046067f` + `2967d23`; API 175) | live smoke `make smoke-avatars` passed 27 Sep (`3a9763c`) |
+| 5 | PR 6 storefront · PR 7 portal | ✅ Done (web `e22c99e` + `e0f6e85` + `b929a04`; admin `31d9c8e` + `65ae76e`) | typecheck · lint · build clean |
 | 6 | PR 8 lithophane, plinth, pet tag, photo frame, keycap | ⬜ | |
 | 7 | PRs 9–12 Duniya experiences + Katha | ⬜ | |
 
@@ -153,8 +153,9 @@ Plan: [`docs/research/outcome-categories/implementation-plan.md`](docs/research/
 | Suite | Count | Last run |
 |---|---|---|
 | `services/inspect` pytest | 21 passed | 2026-09-26 |
-| `services/geometry` pytest | 130 passed | 2026-09-27 |
-| `services/api` Gradle test | 136 passed | 2026-09-27 |
+| `services/geometry` pytest | 292 passed | 2026-09-27 |
+| `services/api` Gradle test | 175 passed | 2026-09-27 |
+| Avatar order smoke, live (`make smoke-avatars`: photo keychain + Swaroop raw print → cart → OTP → checkout → mock pay → print pack) | passed | 2026-09-27 |
 | `apps/web` typecheck · lint · build | clean | 2026-09-27 |
 | `apps/admin` typecheck · lint · build | clean | 2026-09-27 |
 | End-to-end slice (live services) | passed | 2026-09-26 |
