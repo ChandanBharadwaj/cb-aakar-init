@@ -3,8 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatPaise, materialById } from "@aakar/design-tokens";
 import { api, isApiError, toProblem } from "@/lib/api/client";
-import { isAvailable, type CatalogItem, type Problem } from "@/lib/api/types";
-import { categoryLabel } from "@/lib/catalog";
+import { isAvailable, type CatalogItem, type Problem, type Shelf, type TemplateDescriptor } from "@/lib/api/types";
+import { categoryLabel, makeItYours } from "@/lib/catalog";
 import { AddToCartButton } from "@/components/cart/AddToCartButton";
 import { StartWithPiece } from "@/components/shop/StartWithPiece";
 import { ProblemCard } from "@/components/ui/ProblemCard";
@@ -22,6 +22,15 @@ async function load(slug: string): Promise<{ item?: CatalogItem; problem?: Probl
     if (isApiError(err) && err.status === 404) notFound();
     return { problem: toProblem(err) };
   }
+}
+
+/** Shelves and the template descriptor are niceties: the page renders without them. */
+async function extras(item: CatalogItem): Promise<{ shelves: Shelf[]; template?: TemplateDescriptor }> {
+  const [shelves, template] = await Promise.allSettled([api.catalog.shelves(), api.templates.get(item.template_id)]);
+  return {
+    shelves: shelves.status === "fulfilled" ? shelves.value : [],
+    template: template.status === "fulfilled" ? template.value : undefined,
+  };
 }
 
 export async function generateMetadata({ params }: ItemPageProps): Promise<Metadata> {
@@ -46,9 +55,12 @@ export default async function ItemPage({ params }: ItemPageProps) {
     );
   }
 
+  const { shelves, template } = await extras(item);
   const available = isAvailable(item);
   const finish = materialById(item.default_material);
   const image = item.media?.find((m) => m.kind === "image" || m.kind === "thumbnail")?.url ?? item.media?.[0]?.url;
+  const shelf = categoryLabel(item.category, shelves);
+  const personalise = makeItYours(item, template);
 
   return (
     <main className="mx-auto w-full max-w-[1180px] flex-1 px-4 pb-16 pt-2 sm:px-8 lg:px-11">
@@ -57,8 +69,8 @@ export default async function ItemPage({ params }: ItemPageProps) {
           Shop
         </Link>
         <span aria-hidden="true"> · </span>
-        <Link href={`/shop?category=${item.category}`} className="hover:text-surface-text">
-          {categoryLabel(item.category)}
+        <Link href={`/shop?category=${encodeURIComponent(item.category)}`} className="hover:text-surface-text">
+          {shelf}
         </Link>
       </nav>
 
@@ -81,17 +93,23 @@ export default async function ItemPage({ params }: ItemPageProps) {
 
         <div className="grid content-start gap-5">
           <div className="grid gap-2">
-            <span className="ak-eyebrow">{categoryLabel(item.category)}</span>
+            <span className="ak-eyebrow">{shelf}</span>
             <h1 className="font-display text-[40px] font-semibold leading-none">{item.name}</h1>
             <p className="text-sm text-surface-muted">{item.specs_line}</p>
           </div>
           <div className="font-display text-3xl font-bold">{formatPaise(item.base_price_paise)}</div>
           {item.description && <p className="max-w-prose text-[15px] leading-relaxed">{item.description}</p>}
+          {personalise && available && (
+            <Link href={personalise.href} className="ak-well flex items-center justify-between gap-3 p-3.5 text-sm transition-colors duration-base ease-ak hover:text-surface-accent">
+              <span className="font-semibold">{personalise.label}</span>
+              <span aria-hidden="true">→</span>
+            </Link>
+          )}
           <dl className="ak-well grid grid-cols-2 gap-x-4 gap-y-2 p-4 text-xs">
             <dt className="text-surface-muted">Default finish</dt>
             <dd className="font-semibold">{finish?.name ?? item.default_material}</dd>
             <dt className="text-surface-muted">Template</dt>
-            <dd className="font-semibold">{item.template_id.replace(/_/g, " ")}</dd>
+            <dd className="font-semibold">{template?.name ?? item.template_id.replace(/_/g, " ")}</dd>
             {item.environment && (
               <>
                 <dt className="text-surface-muted">Shown on</dt>

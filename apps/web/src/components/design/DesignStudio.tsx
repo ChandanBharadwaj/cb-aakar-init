@@ -6,7 +6,9 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatPaise } from "@aakar/design-tokens";
 import { api, toProblem } from "@/lib/api/client";
-import { boundsMm, glbUrl, type DesignVersion, type Problem, type TemplateDescriptor } from "@/lib/api/types";
+import { boundsMm, glbUrl, type DesignVersion, type Family, type Problem, type TemplateDescriptor } from "@/lib/api/types";
+import { hardwareNames, isRawFamily, RAW_FAMILY_ID } from "@/lib/families";
+import { familyLabel, featuresFromSpec, hasContentSlot, sameFeatures } from "@/lib/features";
 import { formatGrams, formatMm, formatPrintTime } from "@/lib/format";
 import { environmentLabel } from "@/lib/viewer/environments";
 import { useCartStore } from "@/store/cart";
@@ -15,6 +17,7 @@ import { toast } from "@/store/toast";
 import { BloomLoader } from "@/components/brand/BloomLoader";
 import { MandalaSpinner } from "@/components/brand/MandalaSpinner";
 import { StageNav } from "@/components/nav/StageNav";
+import { ContentSlotPanel } from "@/components/design/ContentSlotPanel";
 import { FinishChips } from "@/components/ui/FinishChips";
 import { ParamSliders } from "@/components/ui/ParamSliders";
 import { PriceBreakdown } from "@/components/ui/PriceBreakdown";
@@ -54,6 +57,7 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
   const [status, setStatus] = useState<LoadStatus>("loading");
   const [problem, setProblem] = useState<Problem>();
   const [template, setTemplate] = useState<TemplateDescriptor>();
+  const [family, setFamily] = useState<Family>();
   const [modelNotice, setModelNotice] = useState<string>();
   const [sculptProblem, setSculptProblem] = useState<Problem>();
   const [sculpting, setSculpting] = useState(false);
@@ -81,6 +85,7 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
     setStatus("loading");
     setProblem(undefined);
     setTemplate(undefined);
+    setFamily(undefined);
     setModelNotice(undefined);
 
     api.catalog.materials().then((m) => !cancelled && m.length > 0 && s.setMaterials(m)).catch(() => undefined);
@@ -110,6 +115,20 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
   const activeVersion = selectActiveVersion(store);
   const material = selectMaterial(store);
   const job = store.job;
+
+  // The Avatar this piece belongs to (design, version, or the spec's family id), fetched lazily for its codename and rules.
+  const familyId = design?.family_id ?? activeVersion?.family_id ?? activeVersion?.spec.family;
+  useEffect(() => {
+    if (!familyId) return;
+    let cancelled = false;
+    api.families
+      .get(familyId)
+      .then((f) => !cancelled && setFamily(f))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [familyId]);
 
   // Follow the job from the URL, or the one the design says is still generating.
   const effectiveJobId = urlJobId ?? (design?.status === "generating" ? design.latest_version?.job_id : undefined);
@@ -171,7 +190,10 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
   const prevVersion = versionIndex > 0 ? versionsAsc[versionIndex - 1] : undefined;
   const nextVersion = versionIndex >= 0 ? versionsAsc[versionIndex + 1] : undefined;
 
-  const dirty = activeVersion ? !sameParams(store.paramsDraft, activeVersion.spec.params) : false;
+  // Dirty when the sliders or the Chhaap differ from the version on stage; one Sculpt sends both.
+  const paramsDirty = activeVersion ? !sameParams(store.paramsDraft, activeVersion.spec.params) : false;
+  const featuresDirty = activeVersion ? !sameFeatures(store.featuresDraft, featuresFromSpec(activeVersion.spec)) : false;
+  const dirty = paramsDirty || featuresDirty;
   const busy = Boolean(job && job.stage !== "failed");
 
   async function sculpt() {
@@ -179,7 +201,7 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
     setSculpting(true);
     setSculptProblem(undefined);
     try {
-      const accepted = await api.versions.editParams(activeVersion.id, { params: store.paramsDraft, material: material.id });
+      const accepted = await api.versions.editParams(activeVersion.id, { params: store.paramsDraft, material: material.id, features: store.featuresDraft });
       useDesignStore.getState().startJob(accepted.job_id);
       router.replace(`/design/${designId}?job=${encodeURIComponent(accepted.job_id)}`);
     } catch (err) {
@@ -187,6 +209,13 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
     } finally {
       setSculpting(false);
     }
+  }
+
+  function undo() {
+    if (!activeVersion) return;
+    const s = useDesignStore.getState();
+    s.resetParams(activeVersion.spec.params);
+    s.resetFeatures(activeVersion.spec);
   }
 
   const price = store.price.status === "ready" ? store.price.price : store.price.status === "loading" || store.price.status === "error" ? store.price.previous : undefined;
@@ -218,14 +247,34 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
 
   const bounds = boundsMm(activeVersion);
   const model = glbUrl(activeVersion);
-  const environment = template?.environment;
+  const environment = template?.environment ?? family?.environment;
+  const raw = familyId === RAW_FAMILY_ID || (family ? isRawFamily(family) : false);
+  const hardware = hardwareNames(activeVersion?.hardware);
+  const minWall = template?.constraints.min_wall_mm ?? 1.2;
+  const rawNudge = raw && activeVersion?.printability?.passed === false && !busy ? `The studio needs walls of at least ${formatMm(minWall, 1)} here; try a larger size.` : undefined;
+
+  const eyebrow = family
+    ? familyLabel(family)
+    : design?.source === "shop"
+      ? "From the Shop"
+      : design?.source === "remix"
+        ? "Remix"
+        : design?.source === "upload"
+          ? "Print as it is"
+          : "Create";
+
+  const fromCreate = design?.source === "create" || design?.source === "upload";
+  const backHref = design?.catalog_item_slug ? `/shop/${design.catalog_item_slug}` : fromCreate && familyId ? `/create/${encodeURIComponent(familyId)}` : "/shop";
+  const backLabel = design?.catalog_item_slug ? "Back to the Shop" : fromCreate && familyId ? "Back to Create" : "Back to the Shop";
 
   const tryAgainHref =
     design?.source === "shop" && design.catalog_item_slug
       ? `/design/new?item=${encodeURIComponent(design.catalog_item_slug)}`
-      : template
-        ? `/design/new?template=${encodeURIComponent(template.id)}`
-        : "/shop";
+      : fromCreate && familyId
+        ? `/create/${encodeURIComponent(familyId)}`
+        : template
+          ? `/design/new?template=${encodeURIComponent(template.id)}`
+          : "/shop";
 
   if (status === "loading") {
     return (
@@ -250,7 +299,7 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
   return (
     <StageShell
       nav={
-        <StageNav section="Create" backHref={design.catalog_item_slug ? `/shop/${design.catalog_item_slug}` : "/shop"} backLabel="Back to the Shop">
+        <StageNav section="Create" backHref={backHref} backLabel={backLabel}>
           <div className="flex items-center gap-1 text-xs text-surface-muted" aria-label="Versions">
             <button
               type="button"
@@ -278,10 +327,10 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
       }
     >
       <div className="grid flex-1 grid-cols-1 lg:flex-none lg:h-[calc(100dvh-64px)] lg:min-h-0 lg:grid-cols-[280px_minmax(0,1fr)_312px] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden">
-        {/* Left: title, karigar's note, params */}
+        {/* Left: title, karigar's note, params, the Chhaap */}
         <aside className="ak-panel order-3 grid content-start gap-5 border-t border-surface-border p-5 lg:order-1 lg:min-h-0 lg:overflow-y-auto lg:border-r lg:border-t-0">
           <div className="grid gap-1.5">
-            <div className="ak-eyebrow">{design.source === "shop" ? "From the Shop" : design.source === "remix" ? "Remix" : "Create"}</div>
+            <div className="ak-eyebrow">{eyebrow}</div>
             <h1 className="font-display text-3xl font-semibold leading-tight">{design.title}</h1>
             {template && (
               <p className="text-xs text-surface-muted">
@@ -305,18 +354,27 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
                 onChange={(k, v) => useDesignStore.getState().setParam(k, v)}
                 disabled={busy || sculpting}
               />
+              {hasContentSlot(template) && (
+                <ContentSlotPanel
+                  template={template}
+                  family={family}
+                  features={store.featuresDraft}
+                  onChange={(anchorId, feature) => useDesignStore.getState().setFeature(anchorId, feature)}
+                  disabled={busy || sculpting}
+                />
+              )}
               <div className="grid gap-2">
                 <button type="button" className="ak-btn ak-btn-primary" onClick={sculpt} disabled={!dirty || busy || sculpting || !activeVersion} aria-busy={sculpting}>
                   {sculpting ? "Sending to the studio…" : "Sculpt"}
                 </button>
                 {dirty && activeVersion && (
-                  <button type="button" className="ak-btn ak-btn-secondary min-h-9 text-xs" onClick={() => useDesignStore.getState().resetParams(activeVersion.spec.params)} disabled={busy}>
+                  <button type="button" className="ak-btn ak-btn-secondary min-h-9 text-xs" onClick={undo} disabled={busy}>
                     Undo changes
                   </button>
                 )}
                 {sculptProblem && (
                   <p role="alert" className="text-xs text-danger">
-                    {sculptProblem.detail ?? sculptProblem.title}
+                    {sculptProblem.code === "upload_not_ready" ? "A file in your Chhaap is still with a reviewer." : (sculptProblem.detail ?? sculptProblem.title)}
                   </p>
                 )}
               </div>
@@ -369,7 +427,9 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
               {job.stage === "failed" ? (
                 <div className="ak-card grid max-w-sm gap-4 p-6 text-center">
                   <div className="font-display text-2xl font-semibold">Something went wrong</div>
-                  <p className="text-sm text-surface-muted">{job.message || "The studio couldn't finish this version."}</p>
+                  <p className="text-sm text-surface-muted">
+                    {job.errorCode === "content_unusable" ? "We couldn't repair this file. Try another export from your 3D program." : job.message || "The studio couldn't finish this version."}
+                  </p>
                   {job.errorCode && <span className="font-mono text-[11px] text-surface-muted">{job.errorCode}</span>}
                   <div className="flex justify-center gap-2">
                     <Link href={tryAgainHref} className="ak-btn ak-btn-primary ak-btn-pill">
@@ -405,9 +465,15 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
             <Stat label="Height" value={bounds ? formatMm(bounds[2]) : undefined} hint={bounds ? `${formatMm(bounds[0])} × ${formatMm(bounds[1])} × ${formatMm(bounds[2])}` : undefined} />
             <Stat label="Weight" value={price ? formatGrams(price.mass_g) : undefined} />
             <Stat label="Print time" value={activeVersion?.print_estimate ? formatPrintTime(activeVersion.print_estimate.print_seconds) : undefined} />
+            {hardware && <Stat label="Comes with" value={hardware} />}
           </div>
 
           <StabilityCard report={activeVersion?.printability} pending={busy || activeVersion?.status === "generating"} />
+          {rawNudge && (
+            <p role="status" className="text-xs leading-snug text-warning">
+              {rawNudge}
+            </p>
+          )}
 
           <PriceBreakdown price={price} loading={store.price.status === "loading"} error={store.price.status === "error" ? store.price.detail : undefined} />
 

@@ -3,15 +3,20 @@
 // Serves the Phase 0 contract shapes (designs, jobs, SSE) and the Phase 1 customer loop (ADR-0013):
 // phone OTP with a dev code, guest → user attach, addresses, cart, serviceability, checkout, a mock
 // payment gateway completed from the placeholder pay page, orders that advance a stage every few
-// seconds, and an order SSE stream. Everything is in memory.
+// seconds, and an order SSE stream. Outcome categories (Avatars) come from packages/design-tokens/families.json:
+// shelves, families with their live templates, customer uploads (multipart, kept in memory and served back under
+// /media/uploads/), features (the Chhaap) on designs and param edits, hardware and setup price lines and family
+// minimums. Everything is in memory.
 //
 // Usage: node scripts/mock-api.mjs [port=8080] [--fail]
 //   --fail                    every third generation job fails
 //   AAKAR_WEB_URL             where pay_url points (default http://localhost:3000)
 //   AAKAR_ORDER_STAGE_MS      ms between order stages after payment (default 8000)
 //   Dev OTP code is always 123456. Pincodes starting with 9 are not serviceable.
+//   Uploads whose file name contains "review" answer pending_review; a model file named "*broken*" fails its job
+//   with content_unusable; a raw print under 30 mm completes with printability.passed=false (thin walls).
 import http from "node:http";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -20,6 +25,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "../../..");
 const materials = JSON.parse(readFileSync(path.join(root, "packages/design-tokens/materials.json"), "utf8"));
 const completed = JSON.parse(readFileSync(path.join(root, "packages/contracts/examples/design.completed.example.json"), "utf8"));
+const familiesSeed = JSON.parse(readFileSync(path.join(root, "packages/design-tokens/families.json"), "utf8"));
+const hardwareItems = new Map(familiesSeed.hardware_items.map((h) => [h.sku, h]));
 
 const PORT = Number(process.argv[2] && !process.argv[2].startsWith("--") ? process.argv[2] : 8080);
 const FAIL_EVERY_THIRD = process.argv.includes("--fail");
@@ -60,15 +67,83 @@ const templates = [
     anchors: [], constraints: { min_wall_mm: 1.6, max_overhang_deg: 50, bed_mm: [250, 250, 250] },
     materials: ["basic_white", "terracotta_matte", "sandalwood_silk", "indigo_matte"], style_variants: [], features_supported: [],
   },
+  {
+    id: "keychain_tag", version: 1, family: "keychain", name: "Saathi Tag",
+    description: "A palm-sized plate with a ring loop; your photo or name sits in relief on the face.", environment: "studio",
+    params: {
+      shape: { type: "enum", label: "Shape", default: "rounded", options: ["rect", "rounded", "circle", "heart"], group: "Shape" },
+      width_mm: { type: "number", label: "Width", unit: "mm", default: 45, min: 30, max: 60, step: 1, group: "Size" },
+      thickness_mm: { type: "number", label: "Thickness", unit: "mm", default: 3, min: 2.4, max: 4, step: 0.1, group: "Size" },
+      hole_d_mm: { type: "number", label: "Ring hole", unit: "mm", default: 4.2, min: 4, max: 6, step: 0.1, group: "Details" },
+    },
+    anchors: [
+      { id: "face", label: "Face", kind: "surface", projection: "planar", size_mm: [36, 36], bleed_mm: 2, accepts: ["relief_image", "emboss_text", "motif"], max_relief_mm: 1.5, max_text_height_mm: 14 },
+      { id: "back", label: "Back", kind: "surface", projection: "planar", size_mm: [36, 36], bleed_mm: 2, accepts: ["emboss_text", "motif"], max_relief_mm: 1.0, max_text_height_mm: 12 },
+    ],
+    constraints: { min_wall_mm: 1.2, max_overhang_deg: 55, bed_mm: [250, 250, 250] },
+    materials: ["basic_white", "terracotta_matte", "terracotta_silk", "polished_brass", "sandalwood_silk", "indigo_matte"],
+    style_variants: [], features_supported: ["relief_image", "emboss_text", "motif"], hardware: [{ sku: "split_ring_25", qty: 1 }],
+  },
+  {
+    id: "raw_print", version: 1, family: "raw_print", name: "Print as it is",
+    description: "Your own model file, checked, sized and printed as it is.", environment: "studio",
+    params: {
+      longest_mm: { type: "number", label: "Longest side", unit: "mm", default: 80, min: 20, max: 240, step: 1, group: "Size" },
+      orientation: { type: "enum", label: "Orientation", default: "as_uploaded", options: ["as_uploaded", "lay_flat"], group: "Shape" },
+    },
+    anchors: [{ id: "body", label: "Body", kind: "volume", projection: "planar", bounds_mm: [240, 240, 240], accepts: ["hero_mesh"] }],
+    constraints: { min_wall_mm: 1.2, max_overhang_deg: 55, bed_mm: [250, 250, 250] },
+    materials: ["basic_white", "terracotta_matte", "terracotta_silk", "polished_brass", "sandalwood_silk", "indigo_matte"],
+    style_variants: [], features_supported: ["hero_mesh"], hardware: [],
+  },
 ];
 
+// ---- Outcome families (Avatars) from the seed: shelves, hardware, families + their live templates ----
+const shelves = [...familiesSeed.shelves].sort((a, b) => (a.sort_order ?? 100) - (b.sort_order ?? 100));
+const familyById = (id) => familiesSeed.families.find((f) => f.id === id);
+/** Placeholder price rules from the plan (open decision 3): family minimums, a setup fee for raw prints, hardware markup. */
+const FAMILY_RULES = {
+  keychain: { minimum_subtotal_paise: 24900 },
+  fridge_magnet: { minimum_subtotal_paise: 29900 },
+  ornament: { minimum_subtotal_paise: 34900 },
+  nameplate: { minimum_subtotal_paise: 59900 },
+  raw_print: { minimum_subtotal_paise: 34900, setup_fee_paise: 9900 },
+};
+const HARDWARE_MARKUP = 0.3;
+const withName = (h) => ({ sku: h.sku, qty: h.qty, ...(hardwareItems.get(h.sku) ? { name: hardwareItems.get(h.sku).name } : {}) });
+const familyReady = (f) => templates.some((t) => t.id === f.default_template_id);
+function familyView(f) {
+  return {
+    ...f,
+    hardware: (f.hardware ?? []).map(withName),
+    ready: familyReady(f),
+    templates: templates.filter((t) => t.family === f.id),
+    price_from_paise: FAMILY_RULES[f.id]?.minimum_subtotal_paise ?? null,
+  };
+}
+/** The hardware packed with a version: the template's list when it has one, else the family default. */
+function hardwareFor(template, family) {
+  const list = template?.hardware?.length ? template.hardware : (family?.hardware ?? []);
+  return list.map(withName);
+}
+function materialAllowed(family, materialId) {
+  const rules = family?.material_rules;
+  const m = materialOf(materialId);
+  if (!rules || !m) return true;
+  if (rules.allowed && !rules.allowed.includes(m.id)) return false;
+  if (rules.heat_safe_only && !m.heat_safe) return false;
+  if ((rules.excluded_finish_classes ?? []).includes(m.finish_class)) return false;
+  return true;
+}
+
 const items = [
-  { slug: "jharokha-phone-stand", name: "Jharokha Phone Stand", category: "desk_tech", template_id: "jharokha_phone_stand", default_params: { width_mm: 92, depth_mm: 78, height_mm: 120, tilt_deg: 70, lip_height_mm: 12, wall_mm: 3.2, arch_cusps: 5 }, default_material: "terracotta_silk", base_price_paise: 49900, specs_line: "Fits phones to 6.9″ · 92 × 78 × 120 mm · 64 g", environment: "desk_oak", description: "A cusped jharokha arch, printed in one piece, that holds any phone at a comfortable tilt.", available: true },
-  { slug: "ajrakh-coasters", name: "Ajrakh Coasters · set of 4", category: "kitchen", template_id: "jharokha_phone_stand", default_params: {}, default_material: "indigo_matte", base_price_paise: 64900, specs_line: "100 mm · heat-safe to 90 °C · 28 g each", environment: "kitchen_marble", available: false },
-  { slug: "fluted-planter", name: "Fluted Planter · drainage tray", category: "home_decor", template_id: "fluted_planter", default_params: { diameter_mm: 140, height_mm: 130, flutes: 24, tray: true }, default_material: "terracotta_matte", base_price_paise: 89900, specs_line: "140 mm pot · fits 4″ nursery plants · 210 g", environment: "balcony_daylight", available: true },
-  { slug: "kantha-nameplate", name: "Nameplate · Kantha border", category: "nameplates", template_id: "jharokha_phone_stand", default_params: {}, default_material: "polished_brass", base_price_paise: 119900, specs_line: "300 × 110 mm · raised letters · screws included", environment: "studio", available: false },
-  { slug: "elephant-bookends", name: "Elephant Bookends", category: "gifting", template_id: "jharokha_phone_stand", default_params: {}, default_material: "sandalwood_silk", base_price_paise: 134900, specs_line: "180 mm tall · weighted · holds 6 kg of books", environment: "teak_table_candlelight", available: false },
-  { slug: "headphone-stand-pillar", name: "Headphone Stand · Pillar", category: "desk_tech", template_id: "jharokha_phone_stand", default_params: {}, default_material: "basic_white", base_price_paise: 57900, specs_line: "270 mm tall · weighted base · 180 g", environment: "desk_oak", available: false },
+  { slug: "saathi-photo-keychain", name: "Saathi · Photo keychain", category: "keychains_charms", family_id: "keychain", template_id: "keychain_tag", default_params: { shape: "rounded", width_mm: 45, thickness_mm: 3, hole_d_mm: 4.2 }, default_material: "indigo_matte", base_price_paise: 24900, specs_line: "45 mm · steel split ring · 9 g", environment: "studio", description: "A palm-sized charm with a steel ring. Your photo or name sits in relief on the face; the ring loop is part of the print.", available: true },
+  { slug: "jharokha-phone-stand", name: "Jharokha Phone Stand", category: "desk_tech", family_id: "phone_stand", template_id: "jharokha_phone_stand", default_params: { width_mm: 92, depth_mm: 78, height_mm: 120, tilt_deg: 70, lip_height_mm: 12, wall_mm: 3.2, arch_cusps: 5 }, default_material: "terracotta_silk", base_price_paise: 49900, specs_line: "Fits phones to 6.9″ · 92 × 78 × 120 mm · 64 g", environment: "desk_oak", description: "A cusped jharokha arch, printed in one piece, that holds any phone at a comfortable tilt.", available: true },
+  { slug: "ajrakh-coasters", name: "Ajrakh Coasters · set of 4", category: "kitchen", family_id: "coaster", template_id: "jharokha_phone_stand", default_params: {}, default_material: "indigo_matte", base_price_paise: 64900, specs_line: "100 mm · heat-safe to 90 °C · 28 g each", environment: "kitchen_marble", available: false },
+  { slug: "fluted-planter", name: "Fluted Planter · drainage tray", category: "home_decor", family_id: "planter", template_id: "fluted_planter", default_params: { diameter_mm: 140, height_mm: 130, flutes: 24, tray: true }, default_material: "terracotta_matte", base_price_paise: 89900, specs_line: "140 mm pot · fits 4″ nursery plants · 210 g", environment: "balcony_daylight", available: true },
+  { slug: "kantha-nameplate", name: "Nameplate · Kantha border", category: "nameplates", family_id: "nameplate", template_id: "jharokha_phone_stand", default_params: {}, default_material: "polished_brass", base_price_paise: 119900, specs_line: "300 × 110 mm · raised letters · screws included", environment: "studio", available: false },
+  { slug: "elephant-bookends", name: "Elephant Bookends", category: "gifting", family_id: "bookend", template_id: "jharokha_phone_stand", default_params: {}, default_material: "sandalwood_silk", base_price_paise: 134900, specs_line: "180 mm tall · weighted · holds 6 kg of books", environment: "teak_table_candlelight", available: false },
+  { slug: "headphone-stand-pillar", name: "Headphone Stand · Pillar", category: "desk_tech", family_id: "headphone_stand", template_id: "jharokha_phone_stand", default_params: {}, default_material: "basic_white", base_price_paise: 57900, specs_line: "270 mm tall · weighted base · 180 g", environment: "desk_oak", available: false },
 ];
 
 // ---- Phase 0 state: designs, versions, jobs -------------------------------------------------
@@ -77,6 +152,7 @@ const versions = new Map();
 const jobs = new Map();
 const streams = new Map(); // jobId -> Set<res>
 let jobCount = 0;
+const uploads = new Map(); // uploadId -> { meta: Upload, data: Buffer, contentType, filename, owner }
 
 // ---- Phase 1 state: identity, addresses, carts, orders, payments -----------------------------
 const users = new Map(); // id -> User
@@ -96,26 +172,47 @@ const policy = materials.pricing_policy;
 const now = () => new Date().toISOString();
 const materialOf = (id) => materials.materials.find((x) => x.id === id);
 
-function price(estimate, materialId) {
+const round9 = (paise) => (Math.ceil(paise / 100 / 10) * 10 - 1) * 100;
+/** `ctx` = { familyId, hardware } from the version: adds the hardware and setup lines and the family minimum. */
+function price(estimate, materialId, ctx = {}) {
   const m = materialOf(materialId) ?? materials.materials[0];
   const mass = +(estimate.extruded_volume_cm3 * m.density_g_cm3).toFixed(1);
   const material = Math.round(mass * m.rate_per_g_paise);
   const machine = Math.round((estimate.print_seconds / 3600) * policy.machine_rate_paise_per_hour);
   const finishing = policy.finishing_fee_paise[m.finish_class];
-  const raw = material + machine + finishing;
-  const subtotal = (Math.ceil(raw / 100 / 10) * 10 - 1) * 100;
-  const shipping = subtotal >= policy.free_shipping_above_paise ? 0 : policy.shipping_flat_paise;
   const h = Math.floor(estimate.print_seconds / 3600), min = Math.round((estimate.print_seconds % 3600) / 60);
+  const lines = [
+    { code: "material", label: `Material · ${Math.round(mass)} g ${m.name}`, amount_paise: material },
+    { code: "machine_time", label: `Print time · ${h} h ${String(min).padStart(2, "0")} m`, amount_paise: machine },
+    { code: "finishing", label: m.finish_class === "silk" ? "Hand sanding & sealing" : "Hand finishing", amount_paise: finishing },
+  ];
+  const hw = (ctx.hardware ?? []).map((x) => ({ ...x, item: hardwareItems.get(x.sku) })).filter((x) => x.item);
+  if (hw.length > 0) {
+    lines.push({
+      code: "hardware",
+      label: `Hardware · ${hw.map((x) => (x.qty > 1 ? `${x.qty} × ${x.item.name}` : x.item.name)).join(", ")}`,
+      detail: "Bought-in parts packed with the piece",
+      amount_paise: Math.round(hw.reduce((n, x) => n + x.qty * x.item.unit_cost_paise * (1 + HARDWARE_MARKUP), 0)),
+    });
+  }
+  const rule = FAMILY_RULES[ctx.familyId];
+  if (rule?.setup_fee_paise) lines.push({ code: "setup", label: "Checking and setting up your file", amount_paise: rule.setup_fee_paise });
+  const raw = lines.reduce((n, l) => n + l.amount_paise, 0);
+  let subtotal = round9(raw);
+  let minimum;
+  if (rule?.minimum_subtotal_paise && subtotal < rule.minimum_subtotal_paise) {
+    minimum = round9(rule.minimum_subtotal_paise);
+    subtotal = minimum;
+  }
+  const shipping = subtotal >= policy.free_shipping_above_paise ? 0 : policy.shipping_flat_paise;
   return {
-    currency: "INR", material_id: m.id, mass_g: mass, print_seconds: estimate.print_seconds,
-    lines: [
-      { code: "material", label: `Material · ${Math.round(mass)} g ${m.name}`, amount_paise: material },
-      { code: "machine_time", label: `Print time · ${h} h ${String(min).padStart(2, "0")} m`, amount_paise: machine },
-      { code: "finishing", label: m.finish_class === "silk" ? "Hand sanding & sealing" : "Hand finishing", amount_paise: finishing },
-    ],
+    currency: "INR", material_id: m.id, mass_g: mass, print_seconds: estimate.print_seconds, lines,
     subtotal_paise: subtotal, shipping_paise: shipping, shipping_label: policy.shipping_label, total_paise: subtotal + shipping, policy_version: policy.version,
+    ...(ctx.familyId ? { family_id: ctx.familyId } : {}),
+    ...(minimum ? { minimum_subtotal_paise: minimum } : {}),
   };
 }
+const priceCtx = (v) => ({ familyId: v.family_id ?? undefined, hardware: v.hardware ?? [] });
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "content-type, last-event-id, authorization, x-aakar-guest", "Access-Control-Allow-Methods": "GET, POST, PATCH, PUT, DELETE, OPTIONS" };
 function problem(res, status, code, detail) {
@@ -172,7 +269,7 @@ function cartItemView(it) {
   const v = versions.get(it.version_id);
   const d = designs.get(v.design_id);
   const m = materialOf(it.material) ?? materials.materials[0];
-  const unit = v.status === "ready" ? price(v.print_estimate, m.id) : { ...price(completed.print_estimate, m.id), subtotal_paise: 0, total_paise: 0 };
+  const unit = v.status === "ready" ? price(v.print_estimate, m.id, priceCtx(v)) : { ...price(completed.print_estimate, m.id, priceCtx(v)), subtotal_paise: 0, total_paise: 0 };
   return {
     id: it.id, design_id: v.design_id, version_id: v.id, version_no: v.version_no, title: d?.title ?? "Your piece",
     specs_line: specsLine(v, m, unit), material_id: m.id, material_name: m.name, qty: it.qty,
@@ -294,10 +391,12 @@ function startJob(design, spec, parentVersionId) {
       throw fail(422, "param_out_of_range", `${p.label} must be between ${p.min} and ${p.max} ${p.unit}`);
     }
   }
+  const family = familyById(design.family_id ?? template.family);
   const versionNo = design.versions_count + 1;
   const version = {
     id: randomUUID(), design_id: design.id, version_no: versionNo, parent_version_id: parentVersionId ?? null, status: "generating",
-    spec, template: { id: template.id, version: template.version }, created_by: "user", created_at: now(),
+    spec, template: { id: template.id, version: template.version }, family_id: family?.id ?? null, hardware: hardwareFor(template, family),
+    created_by: "user", created_at: now(),
   };
   const job = { id: randomUUID(), design_id: design.id, version_id: version.id, version_no: versionNo, type: "generate", status: "queued", stage: "queued", message: "Queued", error_code: null, attempts: 1, created_at: now(), started_at: null, finished_at: null, sequence: 0, events: [] };
   version.job_id = job.id;
@@ -307,9 +406,13 @@ function startJob(design, spec, parentVersionId) {
   design.status = "generating";
   design.latest_version = version;
   jobCount += 1;
-  const failThis = FAIL_EVERY_THIRD && jobCount % 3 === 0;
+  const hero = (spec.features ?? []).find((f) => f.type === "hero_mesh");
+  const heroFile = hero ? uploads.get(hero.source?.upload_id)?.filename ?? "" : "";
+  const contentUnusable = hero && /broken/i.test(heroFile);
+  const failThis = (FAIL_EVERY_THIRD && jobCount % 3 === 0) || contentUnusable;
+  const longest = hero ? Number(hero.longest_mm ?? spec.params.longest_mm ?? 80) : undefined;
 
-  const scale = (spec.params.height_mm ?? 120) / 120;
+  const scale = hero ? longest / 120 : template.id === "keychain_tag" ? (spec.params.width_mm ?? 45) / 120 : (spec.params.height_mm ?? 120) / 120;
   const steps = [
     ["understanding", "Reading the template", 10],
     ["sculpting", "Weaving your design", 40],
@@ -324,21 +427,46 @@ function startJob(design, spec, parentVersionId) {
   }
   setTimeout(() => {
     if (failThis) {
-      job.status = "failed"; job.error_code = "geometry_failed"; job.finished_at = now();
+      const code = contentUnusable ? "content_unusable" : "geometry_failed";
+      job.status = "failed"; job.error_code = code; job.finished_at = now();
       version.status = "failed"; design.status = "failed";
-      emit(job, "failed", "The arch collapsed at this width. Try a smaller tilt.", 100, { error_code: "geometry_failed" });
+      emit(job, "failed", contentUnusable ? "We couldn't repair this file. Try another export from your 3D program." : "The arch collapsed at this width. Try a smaller tilt.", 100, { error_code: code });
       return;
     }
     const est = { ...completed.print_estimate, print_seconds: Math.round(completed.print_estimate.print_seconds * scale), extruded_volume_cm3: +(completed.print_estimate.extruded_volume_cm3 * scale).toFixed(1) };
-    const bounds = [spec.params.width_mm ?? spec.params.diameter_mm ?? 92, spec.params.depth_mm ?? spec.params.diameter_mm ?? 78, spec.params.height_mm ?? 120];
+    const bounds = hero
+      ? [longest, +(longest * 0.6).toFixed(1), +(longest * 0.8).toFixed(1)]
+      : template.id === "keychain_tag"
+        ? [spec.params.width_mm ?? 45, +((spec.params.width_mm ?? 45) * 1.15).toFixed(1), spec.params.thickness_mm ?? 3]
+        : [spec.params.width_mm ?? spec.params.diameter_mm ?? 92, spec.params.depth_mm ?? spec.params.diameter_mm ?? 78, spec.params.height_mm ?? 120];
+    // A raw print under 30 mm comes out with walls thinner than the 1.2 mm floor: completes, but is not purchasable.
+    const thin = hero && template.family === "raw_print" && longest < 30;
+    const printability = {
+      ...completed.printability,
+      passed: thin ? false : completed.printability.passed,
+      geometry: { ...completed.printability.geometry, bounds_mm: bounds },
+      checks: thin
+        ? { ...completed.printability.checks, thinnest_wall: { status: "fail", summary: `0.8 mm at ${longest} mm · below 1.2 mm`, value: 0.8, unit: "mm", threshold: 1.2 } }
+        : completed.printability.checks,
+    };
+    const anchorLabel = (id) => template.anchors.find((a) => a.id === id)?.label?.toLowerCase() ?? id;
+    const content = (spec.features ?? []).map((f) =>
+      f.type === "emboss_text" ? `your Naam “${f.text}” on the ${anchorLabel(f.anchor)}`
+        : f.type === "relief_image" ? `your photo ${f.mode === "deboss" ? "cut into" : "raised on"} the ${anchorLabel(f.anchor)}`
+          : f.type === "hero_mesh" ? `your own form at ${longest} mm` : `a ${f.motif_id.replace(/_/g, " ")} motif on the ${anchorLabel(f.anchor)}`);
+    const contentNote = content.length ? ` I set ${content.length > 1 ? `${content.slice(0, -1).join(", ")} and ${content[content.length - 1]}` : content[0]}.` : "";
     Object.assign(version, {
       status: "ready",
       assets: completed.assets,
       geometry: { bounds_mm: bounds, volume_cm3: completed.printability.geometry.volume_cm3, surface_cm2: completed.printability.geometry.surface_cm2, triangles: completed.printability.geometry.triangles },
-      printability: { ...completed.printability, geometry: { ...completed.printability.geometry, bounds_mm: bounds } },
+      printability,
       print_estimate: est,
-      price: price(est, spec.material),
-      karigar_note: versionNo === 1 ? completed.karigar_note : `Version ${versionNo}: I re-sculpted the ${template.name.toLowerCase()} at ${spec.params.height_mm ?? 120} mm tall and kept the walls at ${spec.params.wall_mm ?? 3.2} mm.`,
+      price: price(est, spec.material, priceCtx(version)),
+      karigar_note: hero && template.family === "raw_print"
+        ? `Your file, repaired and set at ${longest} mm on its longest side, ${spec.params.orientation === "lay_flat" ? "laid flat on its widest face" : "printed as you sent it"}.${thin ? " The thinnest wall came out under 1.2 mm; a larger size fixes that." : ""}`
+        : versionNo === 1
+          ? (template.id === "keychain_tag" ? `A ${spec.params.shape ?? "rounded"} Saathi tag, ${spec.params.width_mm ?? 45} mm wide with a ${spec.params.hole_d_mm ?? 4.2} mm ring hole.` : completed.karigar_note) + contentNote
+          : `Version ${versionNo}: I re-sculpted the ${template.name.toLowerCase()} at ${spec.params.height_mm ?? spec.params.width_mm ?? 120} mm and kept the walls at ${spec.params.wall_mm ?? spec.params.thickness_mm ?? 3.2} mm.${contentNote}`,
     });
     job.status = "succeeded"; job.finished_at = now();
     design.status = "ready";
@@ -368,6 +496,53 @@ const server = http.createServer(async (req, res) => {
       return item ? json(res, 200, item) : problem(res, 404, "not_found", "No piece with that name.");
     }
     if (p === "/api/catalog/materials") return json(res, 200, materials.materials);
+    if (p === "/api/catalog/shelves") return json(res, 200, shelves);
+    // ---- outcome families (Avatars): available with a live template; the raw family included ----
+    if (p === "/api/families") {
+      const kind = url.searchParams.get("kind");
+      const list = familiesSeed.families.filter((f) => f.available && familyReady(f) && (!kind || f.kind === kind)).sort((a, b) => (a.sort_order ?? 100) - (b.sort_order ?? 100));
+      return json(res, 200, list.map(familyView));
+    }
+    if ((m = p.match(/^\/api\/families\/([^/]+)$/))) {
+      const f = familyById(decodeURIComponent(m[1]));
+      return f ? json(res, 200, familyView(f)) : problem(res, 404, "unknown_family", "No Avatar with that name.");
+    }
+    // ---- uploads: multipart file + kind, kept in memory and served back under /media/uploads/ ----
+    if (p === "/api/uploads" && method === "POST") {
+      const who = identity(req);
+      if (!who) return problem(res, 400, "bad_request", "Send X-Aakar-Guest or sign in.");
+      const ct = String(req.headers["content-type"] ?? "");
+      const boundary = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(ct);
+      if (!ct.startsWith("multipart/form-data") || !boundary) return problem(res, 400, "bad_request", "Send multipart/form-data with file and kind.");
+      const parts = parseMultipart(await readRawBody(req), (boundary[1] ?? boundary[2]).trim());
+      const file = parts.find((x) => x.name === "file");
+      const kind = parts.find((x) => x.name === "kind")?.data.toString("utf8").trim();
+      if (!file || !["image", "model"].includes(kind)) return problem(res, 400, "bad_request", "Send file and kind (image | model).");
+      const ext = String(file.filename ?? "").toLowerCase().split(".").pop() ?? "";
+      const format = ext === "jpeg" ? "jpg" : ext;
+      const allowed = kind === "image" ? UPLOAD_FORMATS.image : UPLOAD_FORMATS.model;
+      if (!allowed.includes(format)) return problem(res, 422, "unsupported_format", `${kind === "image" ? "Photos" : "Model files"} can be ${allowed.join(", ")}.`);
+      const max = kind === "image" ? 15 * 1024 * 1024 : 50 * 1024 * 1024;
+      if (file.data.length > max) return problem(res, 413, "payload_too_large", `Files can be up to ${Math.round(max / 1024 / 1024)} MB.`);
+      const id = randomUUID();
+      const pending = /review/i.test(file.filename ?? "");
+      const meta = {
+        id, kind, format, bytes: file.data.length, sha256: createHash("sha256").update(file.data).digest("hex"),
+        status: pending ? "pending_review" : "ready", url: pending ? null : `http://${req.headers.host ?? `localhost:${PORT}`}/media/uploads/${id}.${format}`, created_at: now(),
+      };
+      uploads.set(id, { meta, data: file.data, contentType: UPLOAD_MIME[format] ?? "application/octet-stream", filename: file.filename ?? `${id}.${format}`, owner: who.key });
+      return json(res, 201, meta);
+    }
+    if ((m = p.match(/^\/api\/uploads\/([^/]+)$/))) {
+      const up = uploads.get(m[1]);
+      return up ? json(res, 200, up.meta) : problem(res, 404, "not_found", "No such upload.");
+    }
+    if ((m = p.match(/^\/media\/uploads\/([^/.]+)\.[a-z0-9]+$/))) {
+      const up = uploads.get(m[1]);
+      if (!up || up.meta.status !== "ready") return problem(res, 404, "not_found", "No such file.");
+      res.writeHead(200, { "Content-Type": up.contentType, "Content-Length": up.data.length, "Cache-Control": "private, max-age=3600", ...CORS });
+      return res.end(up.data);
+    }
     if (p === "/api/templates") return json(res, 200, templates);
     if ((m = p.match(/^\/api\/templates\/([^/]+)$/))) {
       const t = templates.find((x) => x.id === decodeURIComponent(m[1]));
@@ -376,8 +551,12 @@ const server = http.createServer(async (req, res) => {
     if (p === "/api/designs" && method === "POST") {
       const who = identity(req);
       const body = JSON.parse(await readBody(req));
-      if (body.prompt || body.source === "create") return problem(res, 422, "not_yet_available", "Describing a piece in words arrives in Phase 2.");
-      let template, params, material, title, slug = null;
+      // Prompt-only Create still waits for the co-designer; an Avatar (family_id) or template is a real start.
+      if (!body.catalog_item_slug && !body.family_id && !body.template_id) {
+        if (body.prompt || body.source === "create") return problem(res, 422, "not_yet_available", "Describing a piece in words arrives in Phase 2.");
+        return problem(res, 400, "bad_request", "Send catalog_item_slug, family_id or template_id.");
+      }
+      let template, params, material, title, slug = null, family = null;
       if (body.catalog_item_slug) {
         const item = items.find((i) => i.slug === body.catalog_item_slug);
         if (!item) return problem(res, 404, "not_found", "No piece with that name.");
@@ -385,16 +564,29 @@ const server = http.createServer(async (req, res) => {
         template = templates.find((t) => t.id === item.template_id);
         params = { ...defaults(template), ...item.default_params, ...(body.params ?? {}) };
         material = body.material ?? item.default_material; title = item.name; slug = item.slug;
-      } else if (body.template_id) {
+        family = familyById(item.family_id ?? template.family) ?? null;
+      } else if (body.family_id) {
+        family = familyById(body.family_id);
+        if (!family) return problem(res, 404, "unknown_family", "No Avatar with that name.");
+        if (!family.available) return problem(res, 422, "family_not_available", `${family.codename} isn't open yet.`);
+        const templateId = body.template_id ?? family.default_template_id;
+        template = templates.find((t) => t.id === templateId && t.family === family.id);
+        if (!template) return problem(res, 422, "template_not_available", `${family.codename}'s template isn't live yet.`);
+        params = { ...defaults(template), ...(body.params ?? {}) };
+        material = body.material ?? template.materials[0]; title = body.title ?? `${family.codename} · ${family.name}`;
+      } else {
         template = templates.find((t) => t.id === body.template_id);
         if (!template) return problem(res, 404, "not_found", "No such template.");
         params = { ...defaults(template), ...(body.params ?? {}) };
         material = body.material ?? template.materials[0]; title = body.title ?? template.name;
-      } else return problem(res, 400, "bad_request", "Send catalog_item_slug or template_id.");
-      const design = { id: randomUUID(), source: body.source, catalog_item_slug: slug, title, status: "generating", created_at: now(), versions_count: 0 };
+        family = familyById(template.family) ?? null;
+      }
+      if (family && !materialAllowed(family, material)) return problem(res, 422, "validation_failed", `${materialOf(material)?.name ?? material} isn't offered for ${family.codename}.`);
+      const features = resolveFeatures(body.features ?? [], template);
+      const design = { id: randomUUID(), source: body.source, catalog_item_slug: slug, family_id: family?.id ?? null, title, status: "generating", created_at: now(), versions_count: 0 };
       Object.defineProperty(design, "owner", { value: who?.key ?? null, writable: true, enumerable: false });
       designs.set(design.id, design);
-      const spec = { spec_version: "1.0", family: template.family, template: `${template.id}@${template.version}`, params, features: [], style: "none", material, constraints: template.constraints };
+      const spec = { spec_version: "1.0", family: template.family, template: `${template.id}@${template.version}`, params, features, style: "none", material, constraints: template.constraints };
       return json(res, 202, startJob(design, spec));
     }
     if ((m = p.match(/^\/api\/designs\/([^/]+)$/))) {
@@ -414,7 +606,9 @@ const server = http.createServer(async (req, res) => {
       const v = versions.get(m[1]);
       if (!v) return problem(res, 404, "not_found", "No such version.");
       const body = JSON.parse(await readBody(req));
-      const spec = { ...v.spec, params: { ...v.spec.params, ...body.params }, material: body.material ?? v.spec.material };
+      const template = templates.find((t) => t.id === v.spec.template.split("@")[0]) ?? templates[0];
+      const features = body.features === undefined || body.features === null ? (v.spec.features ?? []) : resolveFeatures(body.features, template);
+      const spec = { ...v.spec, params: { ...v.spec.params, ...body.params }, material: body.material ?? v.spec.material, features };
       return json(res, 202, startJob(designs.get(v.design_id), spec, v.id));
     }
     if ((m = p.match(/^\/api\/versions\/([^/]+)\/printability$/))) {
@@ -428,7 +622,7 @@ const server = http.createServer(async (req, res) => {
       if (v.status !== "ready") return problem(res, 409, "version_not_ready", "Still sculpting.");
       const mat = url.searchParams.get("material");
       if (!materialOf(mat)) return problem(res, 404, "not_found", "No such finish.");
-      return json(res, 200, price(v.print_estimate, mat));
+      return json(res, 200, price(v.print_estimate, mat, priceCtx(v)));
     }
     if ((m = p.match(/^\/api\/jobs\/([^/]+)$/))) {
       const j = jobs.get(m[1]);
@@ -714,6 +908,86 @@ function validateAddress(body) {
 function defaults(template) {
   return Object.fromEntries(Object.entries(template.params).map(([k, v]) => [k, v.default]));
 }
+
+// ---- Features (the Chhaap): schemas/design-spec.v1.json $defs, validated against the template descriptor ----
+const FEATURE_TYPES = ["emboss_text", "motif", "relief_image", "hero_mesh"];
+const UPLOAD_FORMATS = { image: ["png", "jpg", "webp", "heic"], model: ["stl", "glb", "3mf", "obj", "ply", "off", "gltf"] };
+const UPLOAD_MIME = { png: "image/png", jpg: "image/jpeg", webp: "image/webp", heic: "image/heic", stl: "model/stl", glb: "model/gltf-binary", gltf: "model/gltf+json", "3mf": "model/3mf", obj: "model/obj", ply: "application/octet-stream", off: "application/octet-stream" };
+const SCRIPTS = [["devanagari", /[\u0900-\u097F]/], ["bengali", /[\u0980-\u09FF]/], ["gujarati", /[\u0A80-\u0AFF]/], ["tamil", /[\u0B80-\u0BFF]/], ["telugu", /[\u0C00-\u0C7F]/], ["kannada", /[\u0C80-\u0CFF]/]];
+const detectScript = (text) => SCRIPTS.find(([, re]) => re.test(text))?.[0] ?? "latin";
+/** Type ∈ features_supported, anchor exists and accepts it, one feature per anchor, upload resolvable → the url filled in. */
+function resolveFeatures(list, template) {
+  if (!Array.isArray(list)) throw fail(400, "bad_request", "features must be an array.");
+  if (list.length > 8) throw fail(422, "validation_failed", "At most 8 features.");
+  const seen = new Set();
+  return list.map((f) => {
+    if (!f || typeof f !== "object" || !FEATURE_TYPES.includes(f.type)) throw fail(422, "validation_failed", "Unknown feature type.");
+    if (!(template.features_supported ?? []).includes(f.type)) throw fail(422, "unsupported_feature", `${template.name} doesn't take ${f.type}.`);
+    const anchor = template.anchors.find((a) => a.id === f.anchor);
+    if (!anchor) throw fail(422, "validation_failed", `No anchor ${f.anchor} on ${template.name}.`);
+    if (!(anchor.accepts ?? template.features_supported ?? []).includes(f.type)) throw fail(422, "unsupported_feature", `${anchor.label} doesn't take ${f.type}.`);
+    if (seen.has(anchor.id)) throw fail(422, "validation_failed", `Only one feature per anchor (${anchor.label}).`);
+    seen.add(anchor.id);
+    const out = { ...f };
+    if (f.type === "emboss_text") {
+      if (typeof f.text !== "string" || !f.text.trim() || f.text.length > 40) throw fail(422, "validation_failed", "Text must be 1–40 characters.");
+      out.script ??= detectScript(f.text); out.depth_mm ??= 1.2; out.projection ??= "planar"; out.mode ??= "emboss";
+    } else if (f.type === "motif") {
+      if (typeof f.motif_id !== "string") throw fail(422, "validation_failed", "motif_id is required.");
+      out.scale ??= 1; out.depth_mm ??= 1; out.mode ??= "deboss";
+    } else {
+      const up = uploads.get(f.source?.upload_id);
+      if (!up) throw fail(404, "not_found", "That upload isn't known to the studio.");
+      if (up.meta.status === "pending_review") throw fail(409, "upload_not_ready", "This file is still with a reviewer.");
+      if (up.meta.status === "rejected") throw fail(422, "upload_rejected", "This file can't be printed.");
+      const expect = f.type === "relief_image" ? "image" : "model";
+      if (up.meta.kind !== expect) throw fail(422, "validation_failed", `${f.type} needs ${expect === "image" ? "a photo" : "a model file"}.`);
+      out.source = { upload_id: up.meta.id, url: up.meta.url, format: up.meta.format, origin: "upload" };
+      if (f.type === "relief_image") {
+        out.mode ??= "emboss"; out.relief_mm ??= 0.6; out.fit ??= "contain"; out.invert ??= false; out.cutout ??= "none";
+        if (out.relief_mm < 0.2 || out.relief_mm > 3) throw fail(422, "param_out_of_range", "Relief must be between 0.2 and 3 mm.");
+        if (anchor.max_relief_mm && out.relief_mm > anchor.max_relief_mm) throw fail(422, "param_out_of_range", `Relief on the ${anchor.label.toLowerCase()} can be at most ${anchor.max_relief_mm} mm.`);
+      } else {
+        out.fit ??= "contain"; out.yaw_deg ??= 0; out.orientation ??= "as_uploaded";
+        if (out.longest_mm !== undefined && (out.longest_mm < 5 || out.longest_mm > 250)) throw fail(422, "param_out_of_range", "Longest side must be between 5 and 250 mm.");
+      }
+    }
+    return out;
+  });
+}
+/** Minimal multipart/form-data parser: [{ name, filename, type, data: Buffer }]. */
+function parseMultipart(buf, boundary) {
+  const delim = Buffer.from(`--${boundary}`);
+  const parts = [];
+  let cursor = buf.indexOf(delim);
+  while (cursor !== -1) {
+    cursor += delim.length;
+    if (buf.subarray(cursor, cursor + 2).toString() === "--") break;
+    if (buf[cursor] === 13 && buf[cursor + 1] === 10) cursor += 2;
+    const headerEnd = buf.indexOf("\r\n\r\n", cursor);
+    if (headerEnd === -1) break;
+    const headers = buf.subarray(cursor, headerEnd).toString("utf8");
+    const next = buf.indexOf(delim, headerEnd + 4);
+    if (next === -1) break;
+    let end = next;
+    if (buf[end - 2] === 13 && buf[end - 1] === 10) end -= 2;
+    parts.push({
+      name: /name="([^"]*)"/i.exec(headers)?.[1],
+      filename: /filename="([^"]*)"/i.exec(headers)?.[1],
+      type: /content-type:\s*([^\r\n]+)/i.exec(headers)?.[1],
+      data: buf.subarray(headerEnd + 4, end),
+    });
+    cursor = next;
+  }
+  return parts;
+}
+function readRawBody(req) {
+  return new Promise((resolve) => {
+    const chunks = [];
+    req.on("data", (c) => chunks.push(c));
+    req.on("end", () => resolve(Buffer.concat(chunks)));
+  });
+}
 function readBody(req) {
   return new Promise((resolve) => {
     let s = "";
@@ -722,4 +996,4 @@ function readBody(req) {
   });
 }
 
-server.listen(PORT, () => console.log(`Aakar mock API on http://localhost:${PORT}${FAIL_EVERY_THIRD ? " (every third job fails)" : ""} · pay pages on ${WEB_URL} · dev OTP ${DEV_CODE} · order stage every ${ORDER_STAGE_MS} ms`));
+server.listen(PORT, () => console.log(`Aakar mock API on http://localhost:${PORT}${FAIL_EVERY_THIRD ? " (every third job fails)" : ""} · ${familiesSeed.families.filter((f) => f.available && familyReady(f)).length} Avatars live · pay pages on ${WEB_URL} · dev OTP ${DEV_CODE} · order stage every ${ORDER_STAGE_MS} ms`));

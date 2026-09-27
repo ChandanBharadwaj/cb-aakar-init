@@ -1,7 +1,8 @@
 "use client";
 
 import { create } from "zustand";
-import type { Design, DesignVersion, JobStageEvent, Material, ParamValues, PriceBreakdown, Stage } from "@/lib/api/types";
+import type { Design, DesignSpec, DesignVersion, JobStageEvent, Material, ParamValues, PriceBreakdown, Stage } from "@/lib/api/types";
+import { featuresFromSpec, withFeature, type Feature } from "@/lib/features";
 import { FALLBACK_MATERIALS } from "@/lib/viewer/materials";
 
 export interface JobProgress {
@@ -29,6 +30,8 @@ interface DesignState {
   price: PriceState;
   job?: JobProgress;
   paramsDraft: ParamValues;
+  /** The Chhaap being edited: at most one feature per anchor; sent whole with the next Sculpt. */
+  featuresDraft: Feature[];
 
   setDesign(design: Design): void;
   setVersions(versions: DesignVersion[]): void;
@@ -41,6 +44,10 @@ interface DesignState {
   clearJob(): void;
   setParam(key: string, value: ParamValues[string]): void;
   resetParams(values: ParamValues): void;
+  /** Put `feature` on an anchor, or clear the anchor with null. */
+  setFeature(anchorId: string, feature: Feature | null): void;
+  /** Rebuild the draft from a version's spec (undo, or a new version arriving). */
+  resetFeatures(fromSpec: Pick<DesignSpec, "features"> | undefined): void;
   reset(): void;
 }
 
@@ -53,6 +60,7 @@ const initial = {
   price: { status: "idle" } as PriceState,
   job: undefined,
   paramsDraft: {} as ParamValues,
+  featuresDraft: [] as Feature[],
 };
 
 export const useDesignStore = create<DesignState>()((set, get) => ({
@@ -65,6 +73,7 @@ export const useDesignStore = create<DesignState>()((set, get) => ({
       activeVersionId: latest?.id ?? s.activeVersionId,
       materialId: s.materialId ?? latest?.spec.material ?? s.materials[0]?.id,
       paramsDraft: latest ? { ...latest.spec.params } : s.paramsDraft,
+      featuresDraft: latest ? featuresFromSpec(latest.spec) : s.featuresDraft,
       price: latest?.price ? { status: "ready", price: latest.price } : s.price,
     }));
   },
@@ -76,6 +85,7 @@ export const useDesignStore = create<DesignState>()((set, get) => ({
     set({
       activeVersionId: id,
       paramsDraft: version ? { ...version.spec.params } : get().paramsDraft,
+      featuresDraft: version ? featuresFromSpec(version.spec) : get().featuresDraft,
       price: version?.price && version.price.material_id === get().materialId ? { status: "ready", price: version.price } : { status: "idle" },
     });
   },
@@ -105,6 +115,10 @@ export const useDesignStore = create<DesignState>()((set, get) => ({
   setParam: (key, value) => set((s) => ({ paramsDraft: { ...s.paramsDraft, [key]: value } })),
 
   resetParams: (values) => set({ paramsDraft: { ...values } }),
+
+  setFeature: (anchorId, feature) => set((s) => ({ featuresDraft: withFeature(s.featuresDraft, anchorId, feature) })),
+
+  resetFeatures: (fromSpec) => set({ featuresDraft: featuresFromSpec(fromSpec) }),
 
   reset: () => set({ ...initial }),
 }));

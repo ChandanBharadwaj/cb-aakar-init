@@ -1,5 +1,6 @@
 // Small typed fetch wrapper over the Aakar API (packages/contracts/openapi/aakar-api.v1.yaml).
 // The API speaks snake_case JSON and RFC 9457 Problem Details with a stable `code`.
+import type { Feature } from "@/lib/features";
 import { clearToken, identityHeaders } from "@/lib/identity";
 import type {
   Address,
@@ -14,13 +15,15 @@ import type {
   Design,
   DesignAccepted,
   DesignVersion,
+  EditParamsRequest,
+  Family,
+  FamilyKind,
   Job,
   Material,
   MockCompleteRequest,
   Order,
   OrderSummary,
   OtpRequestResult,
-  ParamValues,
   Payment,
   PriceBreakdown,
   PrintabilityReport,
@@ -28,9 +31,18 @@ import type {
   ProfilePatch,
   Serviceability,
   Session,
+  SharedPiece,
+  Shelf,
   TemplateDescriptor,
+  Upload,
+  UploadKind,
   User,
- SharedPiece } from "./types";
+} from "./types";
+
+/** `CreateDesignRequest` with typed Chhaap features (the contract types them as open objects). */
+export type CreateDesignBody = Omit<CreateDesignRequest, "features"> & { features?: Feature[] };
+/** `POST /api/versions/{id}/params` body: `features` replaces the parent's when present; omitted or null keeps them. */
+export type EditParamsBody = Omit<EditParamsRequest, "features"> & { features?: Feature[] | null };
 
 const PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
@@ -93,8 +105,13 @@ async function parseProblem(res: Response): Promise<Problem> {
 }
 
 export interface RequestOptions extends Omit<RequestInit, "body"> {
+  /** JSON-encoded, or sent as-is when it is a `FormData` (the browser sets the multipart boundary). */
   body?: unknown;
   query?: Record<string, string | number | boolean | undefined>;
+}
+
+function isFormData(body: unknown): body is FormData {
+  return typeof FormData !== "undefined" && body instanceof FormData;
 }
 
 /**
@@ -110,6 +127,7 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
     for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, String(v));
   }
   const identity = identityHeaders();
+  const multipart = isFormData(body);
   let res: Response;
   try {
     res = await fetch(url, {
@@ -119,10 +137,10 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
       headers: {
         Accept: "application/json, application/problem+json",
         ...identity,
-        ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...(body !== undefined && !multipart ? { "Content-Type": "application/json" } : {}),
         ...(headers as Record<string, string> | undefined),
       },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : multipart ? body : JSON.stringify(body),
     });
   } catch (err) {
     throw new ApiError(0, { ...UNREACHABLE, detail: `${UNREACHABLE.detail} (${err instanceof Error ? err.message : "network error"})` });
@@ -140,19 +158,41 @@ export const api = {
     items: (query?: { category?: string; q?: string }) => request<CatalogItem[]>("/api/catalog/items", { query }),
     item: (slug: string) => request<CatalogItem>(`/api/catalog/items/${encodeURIComponent(slug)}`),
     materials: () => request<Material[]>("/api/catalog/materials"),
+    /** Shop shelves (catalog categories) in display order; `CatalogItem.category` is a shelf id. */
+    shelves: () => request<Shelf[]>("/api/catalog/shelves"),
+  },
+  families: {
+    /** Outcome categories (Avatars) that are available with a live template; includes the raw family (Swaroop). */
+    list: (kind?: FamilyKind) => request<Family[]>("/api/families", { query: { kind } }),
+    get: (id: string) => request<Family>(`/api/families/${encodeURIComponent(id)}`),
+  },
+  uploads: {
+    /**
+     * Customer content for the Chhaap: an image for a photo relief or a model file for a hero form / Swaroop.
+     * Multipart `file` + `kind`; the browser sets the boundary, the identity headers travel as usual.
+     */
+    create: (file: File, kind: UploadKind) => {
+      const form = new FormData();
+      form.append("file", file, file.name);
+      form.append("kind", kind);
+      return request<Upload>("/api/uploads", { method: "POST", body: form });
+    },
+    get: (id: string) => request<Upload>(`/api/uploads/${encodeURIComponent(id)}`),
   },
   templates: {
     list: () => request<TemplateDescriptor[]>("/api/templates"),
     get: (id: string) => request<TemplateDescriptor>(`/api/templates/${encodeURIComponent(id)}`),
   },
   designs: {
-    create: (body: CreateDesignRequest) => request<DesignAccepted>("/api/designs", { method: "POST", body }),
+    /** Shop (`catalog_item_slug`), Remix (`template_id`), Avatar (`family_id` + `features`) or Swaroop (`source: upload`) path. */
+    create: (body: CreateDesignBody) => request<DesignAccepted>("/api/designs", { method: "POST", body }),
     get: (id: string) => request<Design>(`/api/designs/${encodeURIComponent(id)}`),
     versions: (id: string) => request<DesignVersion[]>(`/api/designs/${encodeURIComponent(id)}/versions`),
   },
   versions: {
     get: (versionId: string) => request<DesignVersion>(`/api/versions/${encodeURIComponent(versionId)}`),
-    editParams: (versionId: string, body: { params: ParamValues; material?: string }) =>
+    /** Sliders, finish and the Chhaap in one call → a new version and job. */
+    editParams: (versionId: string, body: EditParamsBody) =>
       request<DesignAccepted>(`/api/versions/${encodeURIComponent(versionId)}/params`, { method: "POST", body }),
     printability: (versionId: string) =>
       request<PrintabilityReport>(`/api/versions/${encodeURIComponent(versionId)}/printability`),

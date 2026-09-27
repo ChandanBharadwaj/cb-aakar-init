@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { api, toProblem } from "@/lib/api/client";
-import type { CreateDesignRequest, Problem } from "@/lib/api/types";
+import { api, toProblem, type CreateDesignBody } from "@/lib/api/client";
+import type { Problem } from "@/lib/api/types";
 import { BloomLoader } from "@/components/brand/BloomLoader";
 import { ProblemCard } from "@/components/ui/ProblemCard";
 
@@ -20,7 +20,7 @@ export function NewDesignRunner() {
   useEffect(() => {
     if (started.current || (!item && !template)) return;
     started.current = true;
-    const body: CreateDesignRequest = item ? { source: "shop", catalog_item_slug: item } : { source: "remix", template_id: template ?? undefined };
+    const body: CreateDesignBody = item ? { source: "shop", catalog_item_slug: item } : { source: "remix", template_id: template ?? undefined };
     api.designs
       .create(body)
       .then((accepted) => router.replace(`/design/${accepted.design_id}?job=${encodeURIComponent(accepted.job_id)}`))

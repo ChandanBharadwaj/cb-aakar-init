@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { api, toProblem } from "@/lib/api/client";
+import type { MakeItYours } from "@/lib/catalog";
+import { makeItYours, shelvesFromItems, shopItems } from "@/lib/catalog";
 import { BloomLoader } from "@/components/brand/BloomLoader";
 import { ShopGrid } from "@/components/shop/ShopGrid";
 import { ProblemCard } from "@/components/ui/ProblemCard";
@@ -32,12 +34,22 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
   );
 }
 
-/** Streams in after the shell so the heading paints while the API answers. */
+/**
+ * Streams in after the shell so the heading paints while the API answers. Items are required; the shelves
+ * and the template descriptors (for the "Make it yours" line) are niceties with a fallback.
+ */
 async function Catalogue({ category }: { category?: string }) {
-  try {
-    const items = await api.catalog.items();
-    return <ShopGrid items={items} initialCategory={category} />;
-  } catch (err) {
-    return <ProblemCard problem={toProblem(err)} title="Couldn't reach the studio" action={{ href: "/shop", label: "Try again" }} />;
+  const [itemsResult, shelvesResult, templatesResult] = await Promise.allSettled([api.catalog.items(), api.catalog.shelves(), api.templates.list()]);
+  if (itemsResult.status === "rejected") {
+    return <ProblemCard problem={toProblem(itemsResult.reason)} title="Couldn't reach the studio" action={{ href: "/shop", label: "Try again" }} />;
   }
+  const items = shopItems(itemsResult.value);
+  const shelves = shelvesResult.status === "fulfilled" && shelvesResult.value.length > 0 ? shelvesResult.value : shelvesFromItems(items);
+  const templates = new Map((templatesResult.status === "fulfilled" ? templatesResult.value : []).map((t) => [t.id, t]));
+  const personalise: Record<string, MakeItYours> = {};
+  for (const item of items) {
+    const line = makeItYours(item, templates.get(item.template_id));
+    if (line) personalise[item.slug] = line;
+  }
+  return <ShopGrid items={items} shelves={shelves} initialCategory={category} personalise={personalise} />;
 }
