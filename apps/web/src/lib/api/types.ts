@@ -2,7 +2,7 @@
 // The JSON-Schema documents referenced by the contract carry a `$defs` block that
 // openapi-typescript surfaces as a (required) property; we strip it here so the
 // aliases describe what the API actually sends.
-import type { components } from "./schema";
+import type { components, paths } from "./schema";
 
 type Schemas = components["schemas"];
 
@@ -28,6 +28,34 @@ export type PrintabilityCheck = Schemas["check"];
 export type PrintabilityCheckId = keyof PrintabilityReport["checks"];
 export type PrintEstimate = Schemas["print-estimate.v1"];
 export type PriceBreakdown = Schemas["price-breakdown.v1"];
+
+// Phase 1 (ADR-0013): identity, cart, checkout, orders, payments.
+export type User = Schemas["User"];
+export type Session = Schemas["Session"];
+export type AddressInput = Schemas["AddressInput"];
+export type Address = Schemas["Address"];
+export type Cart = Schemas["Cart"];
+export type CartItem = Schemas["CartItem"];
+export type OrderStatus = Schemas["OrderStatus"];
+export type OrderStage = Schemas["OrderStage"];
+export type OrderItem = Schemas["OrderItem"];
+export type OrderSummary = Schemas["OrderSummary"];
+export type Order = Schemas["Order"];
+export type OrderEvent = Schemas["OrderEvent"];
+export type Payment = Schemas["Payment"];
+export type PaymentStatus = Payment["status"];
+export type Shipment = Schemas["Shipment"];
+export type CheckoutResult = Schemas["CheckoutResult"];
+
+export type OtpRequestResult = paths["/api/auth/otp/request"]["post"]["responses"][202]["content"]["application/json"];
+export type OtpVerifyRequest = paths["/api/auth/otp/verify"]["post"]["requestBody"]["content"]["application/json"];
+export type ProfilePatch = paths["/api/auth/me"]["patch"]["requestBody"]["content"]["application/json"];
+export type CartAddRequest = paths["/api/cart/items"]["post"]["requestBody"]["content"]["application/json"];
+export type CartItemPatch = paths["/api/cart/items/{itemId}"]["patch"]["requestBody"]["content"]["application/json"];
+export type Serviceability = paths["/api/shipping/serviceability"]["get"]["responses"][200]["content"]["application/json"];
+export type CheckoutRequest = paths["/api/checkout"]["post"]["requestBody"]["content"]["application/json"];
+export type MockCompleteRequest = paths["/api/payments/{paymentId}/mock/complete"]["post"]["requestBody"]["content"]["application/json"];
+export type PaymentMethod = NonNullable<MockCompleteRequest["method"]>;
 
 export type ParamValue = number | boolean | string;
 export type ParamValues = Record<string, ParamValue>;

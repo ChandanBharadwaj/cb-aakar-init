@@ -1,18 +1,35 @@
 // Small typed fetch wrapper over the Aakar API (packages/contracts/openapi/aakar-api.v1.yaml).
 // The API speaks snake_case JSON and RFC 9457 Problem Details with a stable `code`.
+import { clearToken, identityHeaders } from "@/lib/identity";
 import type {
+  Address,
+  AddressInput,
+  Cart,
+  CartAddRequest,
+  CartItemPatch,
   CatalogItem,
+  CheckoutRequest,
+  CheckoutResult,
   CreateDesignRequest,
   Design,
   DesignAccepted,
   DesignVersion,
   Job,
   Material,
+  MockCompleteRequest,
+  Order,
+  OrderSummary,
+  OtpRequestResult,
   ParamValues,
+  Payment,
   PriceBreakdown,
   PrintabilityReport,
   Problem,
+  ProfilePatch,
+  Serviceability,
+  Session,
   TemplateDescriptor,
+  User,
 } from "./types";
 
 const PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
@@ -80,12 +97,19 @@ export interface RequestOptions extends Omit<RequestInit, "body"> {
   query?: Record<string, string | number | boolean | undefined>;
 }
 
+/**
+ * Fetches `path` on the API. In the browser every call carries the identity headers
+ * (`X-Aakar-Guest`, and `Authorization: Bearer` once signed in). A 401 while holding a
+ * token means the token is no longer good, so it is forgotten; the OTP endpoints are
+ * exempt because they answer 401 for a wrong code.
+ */
 export async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   const { body, query, headers, ...init } = opts;
   const url = new URL(apiUrl(path));
   if (query) {
     for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, String(v));
   }
+  const identity = identityHeaders();
   let res: Response;
   try {
     res = await fetch(url, {
@@ -94,6 +118,7 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
       method: init.method ?? (body === undefined ? "GET" : "POST"),
       headers: {
         Accept: "application/json, application/problem+json",
+        ...identity,
         ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
         ...(headers as Record<string, string> | undefined),
       },
@@ -102,7 +127,10 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
   } catch (err) {
     throw new ApiError(0, { ...UNREACHABLE, detail: `${UNREACHABLE.detail} (${err instanceof Error ? err.message : "network error"})` });
   }
-  if (!res.ok) throw new ApiError(res.status, await parseProblem(res));
+  if (!res.ok) {
+    if (res.status === 401 && identity.Authorization && !path.startsWith("/api/auth/otp")) clearToken();
+    throw new ApiError(res.status, await parseProblem(res));
+  }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
@@ -135,6 +163,46 @@ export const api = {
     get: (jobId: string) => request<Job>(`/api/jobs/${encodeURIComponent(jobId)}`),
     /** SSE endpoint: `event: stage`, JSON data shaped like JobStageEvent. */
     eventsUrl: (jobId: string) => apiUrl(`/api/jobs/${encodeURIComponent(jobId)}/events`),
+  },
+  auth: {
+    /** `phone` is E.164, e.g. +919876543210. The local profile returns `dev_code`. */
+    requestOtp: (phone: string) => request<OtpRequestResult>("/api/auth/otp/request", { method: "POST", body: { phone } }),
+    /** Signs in and attaches the guest's designs and cart; the caller stores `access_token`. */
+    verifyOtp: (request_id: string, code: string) => request<Session>("/api/auth/otp/verify", { method: "POST", body: { request_id, code } }),
+    me: () => request<User>("/api/auth/me"),
+    updateMe: (body: ProfilePatch) => request<User>("/api/auth/me", { method: "PATCH", body }),
+    logout: () => request<void>("/api/auth/logout", { method: "POST" }),
+  },
+  addresses: {
+    list: () => request<Address[]>("/api/me/addresses"),
+    create: (body: AddressInput) => request<Address>("/api/me/addresses", { method: "POST", body }),
+    update: (addressId: string, body: AddressInput) => request<Address>(`/api/me/addresses/${encodeURIComponent(addressId)}`, { method: "PUT", body }),
+    remove: (addressId: string) => request<void>(`/api/me/addresses/${encodeURIComponent(addressId)}`, { method: "DELETE" }),
+  },
+  cart: {
+    get: () => request<Cart>("/api/cart"),
+    clear: () => request<Cart>("/api/cart", { method: "DELETE" }),
+    add: (body: CartAddRequest) => request<Cart>("/api/cart/items", { method: "POST", body }),
+    update: (itemId: string, body: CartItemPatch) => request<Cart>(`/api/cart/items/${encodeURIComponent(itemId)}`, { method: "PATCH", body }),
+    remove: (itemId: string) => request<Cart>(`/api/cart/items/${encodeURIComponent(itemId)}`, { method: "DELETE" }),
+  },
+  shipping: {
+    serviceability: (pincode: string) => request<Serviceability>("/api/shipping/serviceability", { query: { pincode } }),
+  },
+  checkout: (body: CheckoutRequest) => request<CheckoutResult>("/api/checkout", { method: "POST", body }),
+  orders: {
+    list: () => request<OrderSummary[]>("/api/orders"),
+    get: (orderId: string) => request<Order>(`/api/orders/${encodeURIComponent(orderId)}`),
+    /** SSE endpoint: `event: stage`, JSON data shaped like OrderEvent; needs the bearer token, so it is read with fetch, not EventSource. */
+    eventsUrl: (orderId: string) => apiUrl(`/api/orders/${encodeURIComponent(orderId)}/events`),
+    /** A fresh payment attempt for an order still awaiting payment. */
+    newPayment: (orderId: string) => request<Payment>(`/api/orders/${encodeURIComponent(orderId)}/payments`, { method: "POST" }),
+  },
+  payments: {
+    get: (paymentId: string) => request<Payment>(`/api/payments/${encodeURIComponent(paymentId)}`),
+    /** The placeholder gateway page reports the outcome (mock gateway only). */
+    mockComplete: (paymentId: string, body: MockCompleteRequest) =>
+      request<Payment>(`/api/payments/${encodeURIComponent(paymentId)}/mock/complete`, { method: "POST", body }),
   },
 };
 

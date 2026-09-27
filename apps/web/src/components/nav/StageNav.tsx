@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BloomMark } from "@/components/brand/BloomMark";
+import { CartLink, NavIdentity } from "./NavIdentity";
 
 export interface StageNavProps {
   section: string;
@@ -9,7 +10,7 @@ export interface StageNavProps {
   children?: React.ReactNode;
 }
 
-/** Compact header for stage (indigo) pages: back · Bloom + Aakar · section · optional right slot. */
+/** Compact header for stage (indigo) pages: back · Bloom + Aakar · section · optional right slot · Cart · account. */
 export function StageNav({ section, backHref = "/shop", backLabel = "Back", children }: StageNavProps) {
   return (
     <header className="relative z-10 flex items-center justify-between gap-4 px-4 py-3 sm:px-6">
@@ -27,7 +28,11 @@ export function StageNav({ section, backHref = "/shop", backLabel = "Back", chil
         </Link>
         <span className="ak-eyebrow">{section}</span>
       </div>
-      <div className="flex items-center gap-2">{children}</div>
+      <div className="flex items-center gap-3">
+        {children}
+        <CartLink className="hidden sm:inline" />
+        <NavIdentity compact />
+      </div>
     </header>
   );
 }

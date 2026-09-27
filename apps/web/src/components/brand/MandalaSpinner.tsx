@@ -3,6 +3,8 @@ import type { Stage } from "@/lib/api/types";
 
 export interface MandalaSpinnerProps {
   stage?: Stage | StageId;
+  /** Overrides the stage copy, e.g. an order stage on the tracking board. */
+  title?: string;
   /** Server message for the stage; shown under the stage title when it adds something. */
   message?: string;
   percent?: number;
@@ -22,8 +24,8 @@ export function stageTitle(stage: Stage | StageId | undefined): string {
  * Generation spinner: a mandala of rotated jaali petals turning slowly (animate-mandala,
  * 9 s) with the customer-facing stage copy from the tokens underneath.
  */
-export function MandalaSpinner({ stage, message, percent, size = 128, className }: MandalaSpinnerProps) {
-  const title = stageTitle(stage);
+export function MandalaSpinner({ stage, title: titleOverride, message, percent, size = 128, className }: MandalaSpinnerProps) {
+  const title = titleOverride ?? stageTitle(stage);
   const rings = { inner: 8, outer: 16 };
   return (
     <div role="status" aria-live="polite" className={["grid justify-items-center gap-4 text-center", className].filter(Boolean).join(" ")}>

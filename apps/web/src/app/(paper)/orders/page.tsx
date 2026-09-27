@@ -1,14 +1,19 @@
 import type { Metadata } from "next";
-import { PhaseCard } from "@/components/ui/PhaseCard";
+import { RequireSignIn } from "@/components/identity/RequireSignIn";
+import { OrdersList } from "@/components/orders/OrdersList";
 
 export const metadata: Metadata = { title: "Orders" };
 
 export default function OrdersPage() {
   return (
-    <main className="flex-1 px-4 py-12 sm:px-8">
-      <PhaseCard eyebrow="Orders" title="Your pieces, from bay to doorstep" phase={1} links={[{ href: "/shop", label: "Browse the Shop", primary: true }, { href: "/", label: "Home" }]}>
-        Live stages, the printer bay, layer height and an ETA — plus a five-second time-lapse on WhatsApp mid-print.
-      </PhaseCard>
+    <main className="mx-auto flex w-full max-w-[980px] flex-1 flex-col px-4 pb-16 pt-4 sm:px-8 lg:px-11">
+      <div className="mb-6 grid gap-2">
+        <h1 className="font-display text-[40px] font-semibold leading-none">Orders</h1>
+        <p className="text-sm text-surface-muted">Your pieces, from bay to doorstep.</p>
+      </div>
+      <RequireSignIn next="/orders">
+        <OrdersList />
+      </RequireSignIn>
     </main>
   );
 }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { formatPaise } from "@aakar/design-tokens";
 import { isAvailable, type CatalogItem } from "@/lib/api/types";
+import { AddToCartButton } from "@/components/cart/AddToCartButton";
 
 export interface SkuCardProps {
   item: CatalogItem;
@@ -45,10 +46,8 @@ export function SkuCard({ item }: SkuCardProps) {
           <span className="font-display text-xl font-bold">{formatPaise(item.base_price_paise)}</span>
         </div>
         <p className="text-xs text-surface-muted">{item.specs_line}</p>
-        <div className="grid grid-cols-2 gap-2">
-          <button type="button" className="ak-btn ak-btn-primary min-h-10 text-xs" disabled title="Cart arrives in Phase 1">
-            Add to Cart
-          </button>
+        <div className="grid grid-cols-2 items-start gap-2">
+          <AddToCartButton item={item} />
           {available ? (
             <Link href={`/design/new?item=${encodeURIComponent(item.slug)}`} className="ak-btn ak-btn-secondary min-h-10 text-xs">
               Modify with AI

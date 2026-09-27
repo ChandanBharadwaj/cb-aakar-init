@@ -9,7 +9,9 @@ import { api, toProblem } from "@/lib/api/client";
 import { boundsMm, glbUrl, type DesignVersion, type Problem, type TemplateDescriptor } from "@/lib/api/types";
 import { formatGrams, formatMm, formatPrintTime } from "@/lib/format";
 import { environmentLabel } from "@/lib/viewer/environments";
+import { useCartStore } from "@/store/cart";
 import { selectActiveVersion, selectMaterial, useDesignStore } from "@/store/design";
+import { toast } from "@/store/toast";
 import { BloomLoader } from "@/components/brand/BloomLoader";
 import { MandalaSpinner } from "@/components/brand/MandalaSpinner";
 import { StageNav } from "@/components/nav/StageNav";
@@ -55,6 +57,9 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
   const [modelNotice, setModelNotice] = useState<string>();
   const [sculptProblem, setSculptProblem] = useState<Problem>();
   const [sculpting, setSculpting] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [addProblem, setAddProblem] = useState<Problem>();
+  const cartCount = useCartStore((s) => s.count);
 
   const reload = useCallback(async () => {
     const s = useDesignStore.getState();
@@ -185,6 +190,32 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
   }
 
   const price = store.price.status === "ready" ? store.price.price : store.price.status === "loading" || store.price.status === "error" ? store.price.previous : undefined;
+
+  // Add to Cart: the version on stage, in the selected finish. Disabled with a reason until it is ready and stable.
+  const addReason = !activeVersion || activeVersion.status !== "ready"
+    ? "Add to Cart once the piece is sculpted and checked."
+    : activeVersion.printability?.passed === false
+      ? "Fix the stability notes before adding this piece."
+      : busy
+        ? "Wait for the studio to finish this version."
+        : dirty
+          ? "Sculpt your changes first, or undo them, to add exactly what you see."
+          : undefined;
+
+  async function addToCart() {
+    if (!activeVersion || !material || addReason) return;
+    setAdding(true);
+    setAddProblem(undefined);
+    try {
+      await useCartStore.getState().add(activeVersion.id, material.id, 1);
+      toast({ message: `${design?.title ?? "Your piece"} in ${material.name} is in your cart.`, action: { href: "/cart", label: "View cart" }, tone: "success" });
+    } catch (err) {
+      setAddProblem(toProblem(err));
+    } finally {
+      setAdding(false);
+    }
+  }
+
   const bounds = boundsMm(activeVersion);
   const model = glbUrl(activeVersion);
   const environment = template?.environment;
@@ -380,9 +411,22 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
 
           <PriceBreakdown price={price} loading={store.price.status === "loading"} error={store.price.status === "error" ? store.price.detail : undefined} />
 
-          <button type="button" className="ak-btn ak-btn-primary" disabled title="Checkout arrives in Phase 1">
-            Continue{price ? ` · ${formatPaise(price.total_paise)}` : ""}
-          </button>
+          <div className="grid gap-2">
+            <button type="button" className="ak-btn ak-btn-primary" onClick={addToCart} disabled={Boolean(addReason) || adding || !material} title={addReason} aria-busy={adding}>
+              {adding ? "Adding…" : `Add to Cart${price ? ` · ${formatPaise(price.subtotal_paise)}` : ""}`}
+            </button>
+            {addReason && <p className="text-[11px] leading-snug text-surface-muted">{addReason}</p>}
+            {addProblem && (
+              <p role="alert" className="text-xs text-danger">
+                {addProblem.code === "not_printable" ? "The studio says this version isn't printable yet." : (addProblem.detail ?? addProblem.title)}
+              </p>
+            )}
+            {cartCount > 0 && (
+              <Link href="/cart" className="ak-btn ak-btn-secondary min-h-9 text-xs">
+                Go to cart · {cartCount}
+              </Link>
+            )}
+          </div>
         </aside>
       </div>
     </StageShell>

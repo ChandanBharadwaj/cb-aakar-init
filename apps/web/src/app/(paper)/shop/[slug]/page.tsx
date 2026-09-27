@@ -5,6 +5,7 @@ import { formatPaise, materialById } from "@aakar/design-tokens";
 import { api, isApiError, toProblem } from "@/lib/api/client";
 import { isAvailable, type CatalogItem, type Problem } from "@/lib/api/types";
 import { categoryLabel } from "@/lib/catalog";
+import { AddToCartButton } from "@/components/cart/AddToCartButton";
 import { StartWithPiece } from "@/components/shop/StartWithPiece";
 import { ProblemCard } from "@/components/ui/ProblemCard";
 
@@ -98,14 +99,13 @@ export default async function ItemPage({ params }: ItemPageProps) {
               </>
             )}
           </dl>
-          <div className="grid gap-3 sm:grid-cols-[auto_auto]">
+          <div className="grid gap-3 sm:grid-cols-[auto_auto] sm:items-start">
             <StartWithPiece slug={item.slug} disabled={!available} />
-            <button type="button" className="ak-btn ak-btn-secondary ak-btn-pill" disabled title="Cart arrives in Phase 1">
-              Add to Cart
-            </button>
+            <AddToCartButton item={item} className="[&>button]:ak-btn-pill [&>button]:min-h-11 [&>button]:px-6 [&>button]:text-sm" />
           </div>
           <p className="text-xs text-surface-muted">
-            Starting a piece opens it in the studio, where you can change its size, pick a finish and see the price live. Nothing is printed until you say so.
+            Starting a piece opens it in the studio, where you can change its size, pick a finish and see the price live. “Add to Cart” sculpts it as shown, in{" "}
+            {finish?.name ?? "the default finish"}. Nothing is printed until you pay.
           </p>
         </div>
       </div>

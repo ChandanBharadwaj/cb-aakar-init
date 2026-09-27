@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BloomMark } from "@/components/brand/BloomMark";
+import { CartLink, NavIdentity } from "./NavIdentity";
 
 const LINKS = [
   { href: "/shop", label: "Shop" },
@@ -14,7 +15,7 @@ export interface SiteNavProps {
   className?: string;
 }
 
-/** Paper-surface header: Bloom + "Aakar" · Shop · Create · Remix · Orders · Cart · 0. */
+/** Paper-surface header: Bloom + "Aakar" · Shop · Create · Remix · Orders · Cart · n · Sign in / account. */
 export function SiteNav({ section, className }: SiteNavProps) {
   return (
     <header className={["relative z-10 flex items-center justify-between gap-6 px-4 py-4 sm:px-8 lg:px-11", className].filter(Boolean).join(" ")}>
@@ -33,10 +34,8 @@ export function SiteNav({ section, className }: SiteNavProps) {
         </nav>
       </div>
       <div className="flex items-center gap-3.5">
-        <span className="text-xs text-surface-muted" title="Cart arrives in Phase 1">
-          Cart · 0
-        </span>
-        <span className="block h-8 w-8 rounded-full bg-indigo" aria-hidden="true" />
+        <CartLink />
+        <NavIdentity />
         <MobileMenu />
       </div>
     </header>
@@ -55,6 +54,9 @@ function MobileMenu() {
             {l.label}
           </Link>
         ))}
+        <Link href="/cart" className="rounded-control px-3 py-2 hover:bg-surface-bg">
+          Cart
+        </Link>
       </nav>
     </details>
   );
