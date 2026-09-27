@@ -236,6 +236,139 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/experiences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Experiences (Duniya) on the Shop, in display order
+         * @description The Shop's second persona, "Duniya · Experiences": themes that tie a stage backdrop, a default style and a motif
+         *     pack to a set of Avatars and curated Shop items. Only `available` experiences are listed, by `sort_order`.
+         *     `avatars` are the experience's families that can be ordered today (available and backed by a live template), in
+         *     the experience's order and in the shape of `GET /api/families`; `items` are its curated Shop items in order
+         *     (unavailable ones keep their Coming soon state). `price_from_paise` is the lowest floor among those avatars.
+         *     Needs the geometry service for readiness, like `GET /api/families` (503 `geometry_unavailable`).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Experiences */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Experience"][];
+                    };
+                };
+                /** @description geometry_unavailable */
+                503: components["responses"]["Problem"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/experiences/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Experience by URL slug
+         * @description Any experience, available or not (`available` says whether the Shop lists it), so a deep link such as
+         *     `/duniya/katha` can say "coming soon"; 404 `unknown_experience` otherwise.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    slug: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Experience */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Experience"];
+                    };
+                };
+                /** @description unknown_experience */
+                404: components["responses"]["Problem"];
+                /** @description geometry_unavailable */
+                503: components["responses"]["Problem"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/environments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Viewer backdrops (Mahaul) in display order
+         * @description The reference data behind every `environment` field (experiences, families, template descriptors, Shop items).
+         *     `preset_key` names the storefront viewer preset that renders the backdrop; presets are code, which backdrop a
+         *     piece uses is data.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Environments */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Environment"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/templates": {
         parameters: {
             query?: never;
@@ -426,6 +559,8 @@ export interface paths {
          *     text, motif, a photo relief or the customer's own form referencing an upload).
          *     Swaroop path: `source: upload`, `family_id: raw_print`, one `hero_mesh` feature.
          *     Create path: `prompt` alone → 422 until Phase 2.
+         *     Any path may name the Duniya experience the customer came from (`experience_id`, 422 `unknown_experience`
+         *     otherwise); the design keeps it so the karigar's note and packaging card can name the theme.
          *     Returns 202 with the design and the first generation job. Follow `/api/jobs/{id}/events`.
          */
         post: {
@@ -1977,6 +2112,7 @@ export interface components {
             base_price_paise: number;
             /** @description e.g. 'Fits phones to 6.9″ · 92 × 78 × 120 mm · 64 g' */
             specs_line: string;
+            /** @description Viewer backdrop, an environment id from GET /api/environments */
             environment?: string;
             media?: {
                 kind?: string;
@@ -2030,6 +2166,7 @@ export interface components {
             shelf: string;
             demand_rank?: number;
             default_template_id: string;
+            /** @description Default viewer backdrop, an environment id from GET /api/environments */
             environment?: string;
             size_envelope_mm?: {
                 min_longest_mm?: number;
@@ -2055,6 +2192,85 @@ export interface components {
             ready: boolean;
             templates: components["schemas"]["template-descriptor.v1"][];
             /** @description A floor: the family's minimum from the active pricing policy, when one is set */
+            price_from_paise?: number | null;
+        };
+        /** @description A viewer backdrop (Mahaul). Same fields as schemas/experience.v1.json#/$defs/environment. */
+        Environment: {
+            id: string;
+            /** @description Plain name, e.g. Chettinad teak · candlelight */
+            label: string;
+            /**
+             * @description The surface the backdrop sits on
+             * @enum {string}
+             */
+            surface: "stage" | "paper";
+            /** @description The storefront viewer preset that renders it (src/lib/viewer/environments.ts) */
+            preset_key: string;
+            /** @description Swatches (sRGB hex) for thumbnails and theme previews, the backdrop colour first */
+            palette?: string[];
+            sort_order: number;
+        };
+        /** @description Page theming of an experience. The cream paper stays; the accent and the hero change. */
+        ExperienceSurface: {
+            /** @description sRGB hex from the brand palette */
+            accent: string;
+            /** @description A light tint over the cream paper; null keeps plain cream */
+            paper_tint?: string | null;
+            /** @description URL or site path of the hero image or loop; null until one is shot */
+            hero_media?: string | null;
+        };
+        /** @description A sub-collection, e.g. a licensed universe; none until a licence exists */
+        ExperienceCollection: {
+            id: string;
+            title: string;
+            /** @description The licence agreement that allows it; null for original work */
+            licence_ref?: string | null;
+        };
+        /** @description When an experience is in season. Both ends are dates (starts_on ≤ ends_on) or both are month-days that recur every year and may wrap the new year. */
+        SeasonWindow: {
+            /** @description A date (2026-10-20) or an ISO month-day (--10-01) */
+            starts_on: string;
+            /** @description A date (2026-11-10) or an ISO month-day (--11-30) */
+            ends_on: string;
+            /** @description Badge text, e.g. Diwali */
+            label: string;
+        };
+        /**
+         * @description An experience (Duniya): a theme on the Shop. The row fields are those of schemas/experience.v1.json#/$defs/experience;
+         *     here `avatars` are expanded to the families that can be ordered today (the shape of GET /api/families, in the
+         *     experience's order) and `items` to the curated Shop items.
+         */
+        Experience: {
+            /** @description snake_case id, e.g. festive; what CreateDesignRequest.experience_id names */
+            id: string;
+            /** @description Brand name shown to customers, e.g. Utsav */
+            codename: string;
+            /** @description URL slug of the experience page, e.g. utsav */
+            slug: string;
+            /** @description Plain descriptor always shown with the codename, e.g. Festive & gifting */
+            title: string;
+            tagline?: string;
+            description?: string;
+            /** @description The backdrop (an environment id) for the page's stage strip and the studio preset */
+            environment: string;
+            surface: components["schemas"]["ExperienceSurface"];
+            /**
+             * @description Default style variant the studio presets
+             * @enum {string}
+             */
+            style: "none" | "jaipur_heritage" | "modern_zen" | "cyber_desi" | "warli_line" | "comic_pop";
+            /** @description Motif ids (or a pack id) offered first in the Chhaap panel's Buti tab */
+            motif_pack: string[];
+            /** @description The experience's orderable families, in its order */
+            avatars: components["schemas"]["Family"][];
+            /** @description Curated Shop items, in order */
+            items: components["schemas"]["CatalogItem"][];
+            collections: components["schemas"]["ExperienceCollection"][];
+            season: components["schemas"]["SeasonWindow"][];
+            /** @description Whether the Shop lists it */
+            available: boolean;
+            sort_order: number;
+            /** @description The lowest price_from_paise among the avatars (a floor for 'from ₹249'); null when none sets one */
             price_from_paise?: number | null;
         };
         Upload: {
@@ -2091,6 +2307,8 @@ export interface components {
             }[];
             prompt?: string;
             title?: string;
+            /** @description The Duniya experience the customer started from (an id from GET /api/experiences, e.g. festive); 422 unknown_experience otherwise */
+            experience_id?: string;
         };
         DesignAccepted: {
             /** Format: uuid */
@@ -2107,6 +2325,8 @@ export interface components {
             source: "shop" | "create" | "remix" | "upload";
             catalog_item_slug?: string | null;
             family_id?: string | null;
+            /** @description The Duniya experience the design started from, when it named one */
+            experience_id?: string | null;
             title: string;
             /** @enum {string} */
             status: "generating" | "ready" | "failed";
@@ -2247,10 +2467,10 @@ export interface components {
             name: string;
             description?: string;
             /**
+             * @description Viewer backdrop: an environment id from the reference data (experience.v1.json environments, packages/design-tokens/experiences.json; GET /api/environments).
              * @default studio
-             * @enum {string}
              */
-            environment: "studio" | "teak_table_candlelight" | "desk_oak" | "dashboard" | "kitchen_marble" | "balcony_daylight";
+            environment: string;
             params: {
                 [key: string]: components["schemas"]["param"];
             };
@@ -2262,7 +2482,7 @@ export interface components {
             };
             materials: string[];
             /** @default [] */
-            style_variants: ("jaipur_heritage" | "modern_zen" | "cyber_desi" | "warli_line")[];
+            style_variants: ("jaipur_heritage" | "modern_zen" | "cyber_desi" | "warli_line" | "comic_pop")[];
             /** @default [] */
             features_supported: ("emboss_text" | "motif" | "relief_image" | "hero_mesh")[];
             /**
@@ -2462,10 +2682,11 @@ export interface components {
             /** @default [] */
             features: components["schemas"]["feature"][];
             /**
+             * @description Style variant of the piece; an experience (experience.v1.json style) may preset it. comic_pop is Katha's comic-book look.
              * @default none
              * @enum {string}
              */
-            style: "none" | "jaipur_heritage" | "modern_zen" | "cyber_desi" | "warli_line";
+            style: "none" | "jaipur_heritage" | "modern_zen" | "cyber_desi" | "warli_line" | "comic_pop";
             /** @description Digital material id, e.g. terracotta_silk. Affects rendering and price, never geometry. */
             material?: string;
             constraints?: components["schemas"]["constraints"];
@@ -2726,7 +2947,7 @@ export interface components {
                     status?: number;
                     detail?: string;
                     instance?: string;
-                    /** @description Stable machine code, e.g. not_found, not_yet_available, param_out_of_range, version_not_ready, unauthenticated, otp_invalid, otp_expired, otp_rate_limited, not_printable, cart_empty, not_serviceable, payment_final */
+                    /** @description Stable machine code, e.g. not_found, not_yet_available, param_out_of_range, version_not_ready, unauthenticated, otp_invalid, otp_expired, otp_rate_limited, not_printable, cart_empty, not_serviceable, payment_final, unknown_family, unknown_experience */
                     code?: string;
                 };
             };

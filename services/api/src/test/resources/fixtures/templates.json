@@ -30,7 +30,7 @@
     "version": 1,
     "family": "keychain",
     "name": "Saathi keychain tag",
-    "description": "A palm-sized tag with a loop for a steel split ring. Your photo sits in relief on the face, and another can go on the back.",
+    "description": "A palm-sized tag with a loop for a steel split ring. Your photo, name or motif sits in relief on the face, and a name or another photo can go on the back.",
     "environment": "studio",
     "params": {
       "shape": {
@@ -94,7 +94,9 @@
         ],
         "bleed_mm": 1.0,
         "accepts": [
-          "relief_image"
+          "relief_image",
+          "emboss_text",
+          "motif"
         ],
         "max_relief_mm": 1.5
       },
@@ -109,7 +111,8 @@
         ],
         "bleed_mm": 1.0,
         "accepts": [
-          "relief_image"
+          "relief_image",
+          "emboss_text"
         ],
         "max_relief_mm": 1.5
       }
@@ -133,7 +136,9 @@
     ],
     "style_variants": [],
     "features_supported": [
-      "relief_image"
+      "relief_image",
+      "emboss_text",
+      "motif"
     ],
     "hardware": [
       {
@@ -148,7 +153,7 @@
     "version": 1,
     "family": "fridge_magnet",
     "name": "Chumbak fridge magnet",
-    "description": "A flat plate with hidden pockets for strong 10 × 3 mm magnets in the back. Your photo sits in relief on the face.",
+    "description": "A flat plate with hidden pockets for strong 10 × 3 mm magnets in the back. Your photo, name or motif sits in relief on the face.",
     "environment": "kitchen_marble",
     "params": {
       "shape": {
@@ -211,7 +216,9 @@
         ],
         "bleed_mm": 1.0,
         "accepts": [
-          "relief_image"
+          "relief_image",
+          "emboss_text",
+          "motif"
         ],
         "max_relief_mm": 1.5
       }
@@ -235,7 +242,9 @@
     ],
     "style_variants": [],
     "features_supported": [
-      "relief_image"
+      "relief_image",
+      "emboss_text",
+      "motif"
     ],
     "hardware": [
       {
@@ -250,7 +259,7 @@
     "version": 1,
     "family": "ornament",
     "name": "Jhoomar hanging ornament",
-    "description": "A two-sided disc, star or bauble with a hanging hole and a raised border. A photo can sit in relief on the front and another on the back.",
+    "description": "A two-sided disc, star or bauble with a hanging hole and a raised border. A photo, a name or a motif can sit in relief on the front, and another on the back.",
     "environment": "teak_table_candlelight",
     "params": {
       "silhouette": {
@@ -313,7 +322,9 @@
         ],
         "bleed_mm": 1.0,
         "accepts": [
-          "relief_image"
+          "relief_image",
+          "emboss_text",
+          "motif"
         ],
         "max_relief_mm": 1.5
       },
@@ -328,7 +339,9 @@
         ],
         "bleed_mm": 1.0,
         "accepts": [
-          "relief_image"
+          "relief_image",
+          "emboss_text",
+          "motif"
         ],
         "max_relief_mm": 1.5
       }
@@ -352,7 +365,9 @@
     ],
     "style_variants": [],
     "features_supported": [
-      "relief_image"
+      "relief_image",
+      "emboss_text",
+      "motif"
     ],
     "hardware": [
       {
@@ -367,7 +382,7 @@
     "version": 1,
     "family": "nameplate",
     "name": "Pehchaan desk nameplate",
-    "description": "A nameplate that leans back on a flat foot, like a desk sign. Your photo or motif sits in relief on the face; names arrive with lettering.",
+    "description": "A nameplate that leans back on a flat foot, like a desk sign. Your name stands in relief on the face, with a motif beside it or a photo instead, and a line of text can run along the foot.",
     "environment": "studio",
     "params": {
       "width_mm": {
@@ -441,6 +456,8 @@
         ],
         "bleed_mm": 1.0,
         "accepts": [
+          "emboss_text",
+          "motif",
           "relief_image"
         ],
         "max_relief_mm": 1.5
@@ -457,6 +474,7 @@
         ],
         "bleed_mm": 0.5,
         "accepts": [
+          "emboss_text",
           "relief_image"
         ],
         "max_relief_mm": 1.5
@@ -481,6 +499,8 @@
     ],
     "style_variants": [],
     "features_supported": [
+      "emboss_text",
+      "motif",
       "relief_image"
     ],
     "hardware": [

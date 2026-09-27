@@ -1,5 +1,6 @@
-// Validates every JSON Schema compiles, every example validates against its schema,
-// and every OpenAPI document parses. Run with `pnpm --filter @aakar/contracts validate`.
+// Validates every JSON Schema compiles, every example validates against its schema, the experiences seed names
+// environments, presets and families that exist, and every OpenAPI document parses.
+// Run with `pnpm --filter @aakar/contracts validate`.
 import { readFileSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -28,6 +29,8 @@ const examples = [
   ["examples/design.completed.example.json", "https://aakar.studio/schemas/events/design.completed.v1.json"],
   // The families seed in design-tokens is a contract instance too (Flyway V9 seeds from it; a drift test guards both).
   ["../design-tokens/families.json", "https://aakar.studio/schemas/template-family.v1.json"],
+  // So are the experiences (Duniya) and viewer environments (Mahaul): Flyway V11, ExperiencesSeedTest.
+  ["../design-tokens/experiences.json", "https://aakar.studio/schemas/experience.v1.json"],
 ];
 let failed = 0;
 for (const [file, id] of examples) {
@@ -52,6 +55,71 @@ for (const [file, id] of examples) {
     }
   }
   console.log(`✓ examples/template-descriptors.json: ${descriptors.length} descriptors valid`);
+}
+
+// Experiences name environments, families and styles that live elsewhere: check the references a schema cannot.
+{
+  // Backdrops whose storefront preset has not landed yet. PR 12 (Katha) adds comic_rooftop_night to tokens.json
+  // environments and the viewer; delete it from this list then (the check below says when).
+  const PENDING_PRESETS = new Set(["comic_rooftop_night"]);
+  const { environments, experiences } = read("../design-tokens/experiences.json");
+  const tokens = read("../design-tokens/tokens.json");
+  const familyIds = new Set(read("../design-tokens/families.json").families.map((f) => f.id));
+  const presets = Object.keys(tokens.environments);
+  const problems = [];
+  const duplicates = (values) => values.filter((v, i) => values.indexOf(v) !== i);
+  const colour = (value) => value.replace(/^\{color\.([a-z_]+)\}$/, (_, name) => tokens.color[name] ?? value);
+
+  for (const [what, values] of [
+    ["environment id", environments.map((e) => e.id)],
+    ["experience id", experiences.map((x) => x.id)],
+    ["experience slug", experiences.map((x) => x.slug)],
+  ]) {
+    for (const d of new Set(duplicates(values))) problems.push(`${what} '${d}' appears more than once`);
+  }
+  for (const e of environments) {
+    if (!presets.includes(e.preset_key) && !PENDING_PRESETS.has(e.preset_key)) {
+      problems.push(`environment ${e.id}: preset_key '${e.preset_key}' is neither a tokens.json environment (${presets.join(", ")}) nor pending`);
+    }
+    const preset = tokens.environments[e.preset_key];
+    if (preset && e.id === e.preset_key) {
+      // While tokens.json still describes the six storefront backdrops, the reference data must not drift from it.
+      if (e.label !== preset.label) problems.push(`environment ${e.id}: label '${e.label}' differs from tokens.json '${preset.label}'`);
+      if (e.palette && e.palette[0].toUpperCase() !== colour(preset.bg).toUpperCase()) {
+        problems.push(`environment ${e.id}: palette starts with ${e.palette[0]}, but its tokens.json backdrop is ${colour(preset.bg)}`);
+      }
+    }
+  }
+  for (const key of PENDING_PRESETS) {
+    if (presets.includes(key)) problems.push(`preset '${key}' is a tokens.json environment now: remove it from PENDING_PRESETS in validate.mjs`);
+  }
+  const environmentIds = new Set(environments.map((e) => e.id));
+  const brandColours = new Set(Object.values(tokens.color).map((c) => c.toUpperCase()));
+  for (const x of experiences) {
+    if (!environmentIds.has(x.environment)) problems.push(`experience ${x.id}: environment '${x.environment}' is not in environments`);
+    for (const a of x.avatars) if (!familyIds.has(a)) problems.push(`experience ${x.id}: avatar '${a}' is not a family in families.json`);
+    if (!brandColours.has(x.surface.accent.toUpperCase())) problems.push(`experience ${x.id}: accent ${x.surface.accent} is not a tokens.json brand colour`);
+    for (const w of x.season ?? []) {
+      // Calendar-date windows run forwards; month-day windows recur and may wrap the new year.
+      const dates = !w.starts_on.startsWith("--") && !w.ends_on.startsWith("--");
+      if (dates && w.starts_on > w.ends_on) problems.push(`experience ${x.id}: season '${w.label}' ends before it starts`);
+    }
+  }
+  // An experience's default style is a design-spec style value.
+  const specStyles = ajv.getSchema("https://aakar.studio/schemas/design-spec.v1.json").schema.properties.style.enum;
+  const experienceStyles = ajv.getSchema("https://aakar.studio/schemas/experience.v1.json").schema.$defs.experience.properties.style.enum;
+  if (JSON.stringify(specStyles) !== JSON.stringify(experienceStyles)) {
+    problems.push(`experience.v1.json style values (${experienceStyles}) differ from design-spec.v1.json (${specStyles})`);
+  }
+
+  if (problems.length) {
+    failed++;
+    for (const p of problems) console.error(`✗ experiences.json: ${p}`);
+  } else {
+    const pending = environments.filter((e) => PENDING_PRESETS.has(e.preset_key)).map((e) => e.id);
+    console.log(`✓ experiences.json: ${experiences.length} experiences name known environments and families; `
+      + `${environments.length} environments (preset pending: ${pending.join(", ") || "none"})`);
+  }
 }
 
 for (const f of readdirSync(join(root, "openapi")).filter((f) => f.endsWith(".yaml"))) {

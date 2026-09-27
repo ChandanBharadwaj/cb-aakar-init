@@ -6,7 +6,7 @@ info:
     Staff-only API behind the management portal (`apps/admin`, ADR-0012). Served by `services/api`
     under `/admin/api/*` with its own staff authentication (email + password, seeded account in the
     local profile; never customer tokens). Owns operational configuration (pricing policies, materials,
-    catalog, live templates) and fulfilment operations (orders queue, stage advancement, QC, print pack,
+    catalog, live templates, Avatars, hardware, Duniya experiences) and fulfilment operations (orders queue, stage advancement, QC, print pack,
     messages log). Every write is recorded in the audit log.
 
     Roles: `owner` (everything), `studio` (fulfilment and read-only configuration).
@@ -319,6 +319,55 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '422': { $ref: '#/components/responses/Problem' }
+  /admin/api/experiences:
+    get:
+      summary: Every experience (Duniya), available or not, in display order
+      description: "Rows as stored, for the portal's Duniya page: `avatars` are family ids and `items` Shop item slugs, in order."
+      tags: [experiences]
+      responses:
+        '200': { description: Experiences, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AdminExperience' } } } } }
+    post:
+      summary: Create an experience (owner only, audited as experience.create)
+      description: |
+        409 `experience_exists` for a taken id, 409 `slug_exists` for a taken slug. 422 `validation_failed` for a schema
+        violation, an environment that is not in GET /admin/api/environments (the detail names the known ones), an unknown
+        Shop item slug, a repeated avatar, item or motif, or a season window whose ends are not both dates (in order) or both
+        month-days; 422 `unknown_family` for an avatar that is not a family.
+      tags: [experiences]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminExperienceInput' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/AdminExperience' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { description: experience_exists or slug_exists, $ref: '#/components/responses/Problem' }
+        '422': { description: validation_failed or unknown_family, $ref: '#/components/responses/Problem' }
+  /admin/api/experiences/{experienceId}:
+    put:
+      summary: Update an experience's copy, slug, backdrop, style, motif pack, avatars, items, collections, seasons or availability (owner only, audited as experience.update)
+      description: The id in the path wins over the body. 404 `unknown_experience`; 409 `slug_exists` when another experience has the slug; 422 as on create.
+      tags: [experiences]
+      parameters: [{ name: experienceId, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminExperienceInput' }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/AdminExperience' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { description: unknown_experience, $ref: '#/components/responses/Problem' }
+        '409': { description: slug_exists, $ref: '#/components/responses/Problem' }
+        '422': { description: validation_failed or unknown_family, $ref: '#/components/responses/Problem' }
+  /admin/api/environments:
+    get:
+      summary: Viewer backdrops (Mahaul) in display order, read-only reference data
+      description: The valid `environment` values for experiences, families and Shop items. New backdrops need a storefront preset first (engineering).
+      tags: [experiences]
+      responses:
+        '200': { description: Environments, content: { application/json: { schema: { type: array, items: { $ref: 'aakar-api.v1.yaml#/components/schemas/Environment' } } } } }
   /admin/api/uploads:
     get:
       summary: Customer uploads, newest first (filter by status for the review queue)
@@ -561,7 +610,7 @@ components:
         default_material: { type: string }
         base_price_paise: { type: integer, minimum: 0 }
         specs_line: { type: string, maxLength: 120 }
-        environment: { type: string }
+        environment: { type: [string, 'null'], description: An environment id from GET /admin/api/environments; 422 validation_failed otherwise }
         available: { type: boolean }
         media: { type: array, items: { type: object, properties: { kind: { type: string }, url: { type: string } } } }
     AdminFamilyInput:
@@ -580,7 +629,7 @@ components:
         shelf: { type: string }
         demand_rank: { type: integer, minimum: 1 }
         default_template_id: { type: string, pattern: '^[a-z][a-z0-9_]*$' }
-        environment: { type: string }
+        environment: { type: string, description: "An environment id from GET /admin/api/environments (studio when absent); 422 validation_failed otherwise" }
         size_envelope_mm:
           type: object
           required: [min_longest_mm, max_longest_mm]
@@ -633,6 +682,35 @@ components:
         - type: object
           properties:
             updated_at: { type: string, format: date-time }
+    AdminExperienceInput:
+      type: object
+      description: Same fields as schemas/experience.v1.json#/$defs/experience. On PUT the id in the path wins.
+      additionalProperties: false
+      required: [id, codename, slug, title, environment, surface, avatars, available]
+      properties:
+        id: { type: string, pattern: '^[a-z][a-z0-9_]*$', maxLength: 40, description: "snake_case English, never renamed (festive, desk_gaming, …)" }
+        codename: { type: string, maxLength: 40, description: "Brand name, e.g. Utsav" }
+        slug: { type: string, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$', minLength: 2, maxLength: 60, description: URL slug (/duniya/<slug>), unique }
+        title: { type: string, maxLength: 80, description: "Plain descriptor, e.g. Festive & gifting" }
+        tagline: { type: string, maxLength: 120 }
+        description: { type: string, maxLength: 500 }
+        environment: { type: string, description: An environment id from GET /admin/api/environments }
+        surface: { $ref: 'aakar-api.v1.yaml#/components/schemas/ExperienceSurface' }
+        style: { type: string, enum: [none, jaipur_heritage, modern_zen, cyber_desi, warli_line, comic_pop], default: none }
+        motif_pack: { type: array, maxItems: 24, items: { type: string, pattern: '^[a-z][a-z0-9_]*$' }, description: "Motif ids (or a pack id) offered first, in order" }
+        avatars: { type: array, maxItems: 24, items: { type: string }, description: Family ids in display order }
+        items: { type: array, maxItems: 24, items: { type: string }, description: Shop item slugs in display order }
+        collections: { type: array, maxItems: 24, items: { $ref: 'aakar-api.v1.yaml#/components/schemas/ExperienceCollection' } }
+        season: { type: array, maxItems: 12, items: { $ref: 'aakar-api.v1.yaml#/components/schemas/SeasonWindow' } }
+        available: { type: boolean }
+        sort_order: { type: integer, default: 100 }
+    AdminExperience:
+      allOf:
+        - $ref: '#/components/schemas/AdminExperienceInput'
+        - type: object
+          required: [style, motif_pack, items, collections, season, sort_order]
+          properties:
+            updated_at: { type: string, format: date-time }
     AdminUpload:
       allOf:
         - $ref: 'aakar-api.v1.yaml#/components/schemas/Upload'
@@ -670,7 +748,7 @@ components:
         id: { type: integer }
         at: { type: string, format: date-time }
         staff_email: { type: string }
-        action: { type: string, description: order.advance, pricing.publish, material.update, catalog.update, template.live, family.create, family.update, hardware.create, hardware.update, review.decide }
-        target: { type: string, description: Order number, policy version, material id, slug, template id, family id, hardware sku or review id }
+        action: { type: string, description: "order.advance, pricing.publish, material.update, catalog.update, template.live, family.create, family.update, hardware.create, hardware.update, experience.create, experience.update, review.decide" }
+        target: { type: string, description: "Order number, policy version, material id, slug, template id, family id, hardware sku, experience id or review id" }
         before: { type: [object, 'null'], additionalProperties: true }
         after: { type: [object, 'null'], additionalProperties: true }

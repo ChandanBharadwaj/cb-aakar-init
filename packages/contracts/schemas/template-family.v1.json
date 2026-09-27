@@ -103,9 +103,10 @@
         "default_template_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "Template used when a request names only the family." },
         "environment": {
           "type": "string",
-          "enum": ["studio", "teak_table_candlelight", "desk_oak", "dashboard", "kitchen_marble", "balcony_daylight"],
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "maxLength": 40,
           "default": "studio",
-          "description": "Default viewer backdrop before a template is chosen."
+          "description": "Default viewer backdrop before a template is chosen: an environment id from the reference data (experience.v1.json environments; the API checks it against the environments table)."
         },
         "size_envelope_mm": { "$ref": "#/$defs/size_envelope" },
         "hardware": { "type": "array", "items": { "$ref": "#/$defs/hardware_ref" }, "default": [], "description": "Bought-in parts packed with every piece; a template descriptor's hardware overrides this default." },

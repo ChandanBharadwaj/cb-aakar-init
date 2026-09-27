@@ -14,8 +14,10 @@
     "description": { "type": "string" },
     "environment": {
       "type": "string",
-      "enum": ["studio", "teak_table_candlelight", "desk_oak", "dashboard", "kitchen_marble", "balcony_daylight"],
-      "default": "studio"
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "maxLength": 40,
+      "default": "studio",
+      "description": "Viewer backdrop: an environment id from the reference data (experience.v1.json environments, packages/design-tokens/experiences.json; GET /api/environments)."
     },
     "params": {
       "type": "object",
@@ -35,7 +37,7 @@
     "materials": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
     "style_variants": {
       "type": "array",
-      "items": { "type": "string", "enum": ["jaipur_heritage", "modern_zen", "cyber_desi", "warli_line"] },
+      "items": { "type": "string", "enum": ["jaipur_heritage", "modern_zen", "cyber_desi", "warli_line", "comic_pop"] },
       "default": []
     },
     "features_supported": {

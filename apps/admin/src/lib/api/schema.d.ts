@@ -1021,6 +1021,171 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/api/experiences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every experience (Duniya), available or not, in display order
+         * @description Rows as stored, for the portal's Duniya page: `avatars` are family ids and `items` Shop item slugs, in order.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Experiences */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminExperience"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Create an experience (owner only, audited as experience.create)
+         * @description 409 `experience_exists` for a taken id, 409 `slug_exists` for a taken slug. 422 `validation_failed` for a schema
+         *     violation, an environment that is not in GET /admin/api/environments (the detail names the known ones), an unknown
+         *     Shop item slug, a repeated avatar, item or motif, or a season window whose ends are not both dates (in order) or both
+         *     month-days; 422 `unknown_family` for an avatar that is not a family.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AdminExperienceInput"];
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminExperience"];
+                    };
+                };
+                403: components["responses"]["Problem"];
+                /** @description experience_exists or slug_exists */
+                409: components["responses"]["Problem"];
+                /** @description validation_failed or unknown_family */
+                422: components["responses"]["Problem"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/api/experiences/{experienceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update an experience's copy, slug, backdrop, style, motif pack, avatars, items, collections, seasons or availability (owner only, audited as experience.update)
+         * @description The id in the path wins over the body. 404 `unknown_experience`; 409 `slug_exists` when another experience has the slug; 422 as on create.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    experienceId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AdminExperienceInput"];
+                };
+            };
+            responses: {
+                /** @description Updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminExperience"];
+                    };
+                };
+                403: components["responses"]["Problem"];
+                /** @description unknown_experience */
+                404: components["responses"]["Problem"];
+                /** @description slug_exists */
+                409: components["responses"]["Problem"];
+                /** @description validation_failed or unknown_family */
+                422: components["responses"]["Problem"];
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/api/environments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Viewer backdrops (Mahaul) in display order, read-only reference data
+         * @description The valid `environment` values for experiences, families and Shop items. New backdrops need a storefront preset first (engineering).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Environments */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Environment"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/api/uploads": {
         parameters: {
             query?: never;
@@ -1413,7 +1578,8 @@ export interface components {
             default_material: string;
             base_price_paise: number;
             specs_line: string;
-            environment?: string;
+            /** @description An environment id from GET /admin/api/environments; 422 validation_failed otherwise */
+            environment?: string | null;
             available: boolean;
             media?: {
                 kind?: string;
@@ -1434,6 +1600,7 @@ export interface components {
             shelf: string;
             demand_rank?: number;
             default_template_id: string;
+            /** @description An environment id from GET /admin/api/environments (studio when absent); 422 validation_failed otherwise */
             environment?: string;
             size_envelope_mm?: {
                 min_longest_mm: number;
@@ -1479,6 +1646,42 @@ export interface components {
             available: boolean;
         };
         AdminHardware: components["schemas"]["AdminHardwareInput"] & {
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        /** @description Same fields as schemas/experience.v1.json#/$defs/experience. On PUT the id in the path wins. */
+        AdminExperienceInput: {
+            /** @description snake_case English, never renamed (festive, desk_gaming, …) */
+            id: string;
+            /** @description Brand name, e.g. Utsav */
+            codename: string;
+            /** @description URL slug (/duniya/<slug>) */
+            slug: string;
+            /** @description Plain descriptor, e.g. Festive & gifting */
+            title: string;
+            tagline?: string;
+            description?: string;
+            /** @description An environment id from GET /admin/api/environments */
+            environment: string;
+            surface: components["schemas"]["ExperienceSurface"];
+            /**
+             * @default none
+             * @enum {string}
+             */
+            style: "none" | "jaipur_heritage" | "modern_zen" | "cyber_desi" | "warli_line" | "comic_pop";
+            /** @description Motif ids (or a pack id) offered first, in order */
+            motif_pack?: string[];
+            /** @description Family ids in display order */
+            avatars: string[];
+            /** @description Shop item slugs in display order */
+            items?: string[];
+            collections?: components["schemas"]["ExperienceCollection"][];
+            season?: components["schemas"]["SeasonWindow"][];
+            available: boolean;
+            /** @default 100 */
+            sort_order: number;
+        };
+        AdminExperience: components["schemas"]["AdminExperienceInput"] & {
             /** Format: date-time */
             updated_at?: string;
         };
@@ -1538,9 +1741,9 @@ export interface components {
             /** Format: date-time */
             at: string;
             staff_email: string;
-            /** @description order.advance */
+            /** @description order.advance, pricing.publish, material.update, catalog.update, template.live, family.create, family.update, hardware.create, hardware.update, experience.create, experience.update, review.decide */
             action: string;
-            /** @description Order number */
+            /** @description Order number, policy version, material id, slug, template id, family id, hardware sku, experience id or review id */
             target: string;
             before?: {
                 [key: string]: unknown;
@@ -1735,6 +1938,7 @@ export interface components {
             base_price_paise: number;
             /** @description e.g. 'Fits phones to 6.9″ · 92 × 78 × 120 mm · 64 g' */
             specs_line: string;
+            /** @description Viewer backdrop, an environment id from GET /api/environments */
             environment?: string;
             media?: {
                 kind?: string;
@@ -1744,6 +1948,47 @@ export interface components {
         Shelf: {
             id: string;
             label: string;
+            sort_order: number;
+        };
+        /** @description Page theming of an experience. The cream paper stays; the accent and the hero change. */
+        ExperienceSurface: {
+            /** @description sRGB hex from the brand palette */
+            accent: string;
+            /** @description A light tint over the cream paper; null keeps plain cream */
+            paper_tint?: string | null;
+            /** @description URL or site path of the hero image or loop; null until one is shot */
+            hero_media?: string | null;
+        };
+        /** @description A sub-collection, e.g. a licensed universe; none until a licence exists */
+        ExperienceCollection: {
+            id: string;
+            title: string;
+            /** @description The licence agreement that allows it; null for original work */
+            licence_ref?: string | null;
+        };
+        /** @description When an experience is in season. Both ends are dates (starts_on ≤ ends_on) or both are month-days that recur every year and may wrap the new year. */
+        SeasonWindow: {
+            /** @description A date (2026-10-20) or an ISO month-day (--10-01) */
+            starts_on: string;
+            /** @description A date (2026-11-10) or an ISO month-day (--11-30) */
+            ends_on: string;
+            /** @description Badge text, e.g. Diwali */
+            label: string;
+        };
+        /** @description A viewer backdrop (Mahaul). Same fields as schemas/experience.v1.json#/$defs/environment. */
+        Environment: {
+            id: string;
+            /** @description Plain name, e.g. Chettinad teak · candlelight */
+            label: string;
+            /**
+             * @description The surface the backdrop sits on
+             * @enum {string}
+             */
+            surface: "stage" | "paper";
+            /** @description The storefront viewer preset that renders it (src/lib/viewer/environments.ts) */
+            preset_key: string;
+            /** @description Swatches (sRGB hex) for thumbnails and theme previews, the backdrop colour first */
+            palette?: string[];
             sort_order: number;
         };
         Upload: {

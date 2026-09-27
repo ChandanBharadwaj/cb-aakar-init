@@ -253,8 +253,12 @@ class CarrierDesignFlowIntegrationTest extends AbstractIntegrationTest {
                 "{\"type\": \"hero_mesh\", \"source\": {\"upload_id\": \"" + model + "\"}, \"anchor\": \"face\"}"), guest), HttpStatus.UNPROCESSABLE_ENTITY,
                 "unsupported_feature");
         assertThat(form.get("detail").asText()).isEqualTo("Saathi keychain tag can't carry your own 3D form (Roop) yet");
-        assertProblem(post("/api/designs", create.formatted("keychain", "{\"type\": \"emboss_text\", \"text\": \"Asha\", \"anchor\": \"back\"}"), guest),
-                HttpStatus.UNPROCESSABLE_ENTITY, "unsupported_feature"); // lettering arrives with PR 3b
+        // since lettering and motifs landed (PR 3b) the back takes a name as well as a photo, but still no motif
+        ResponseEntity<String> named = post("/api/designs", create.formatted("keychain", "{\"type\": \"emboss_text\", \"text\": \"Asha\", \"anchor\": \"back\"}"), guest);
+        assertThat(named.getStatusCode()).as(named.getBody()).isEqualTo(HttpStatus.ACCEPTED);
+        JsonNode motifOnBack = assertProblem(post("/api/designs", create.formatted("keychain",
+                "{\"type\": \"motif\", \"motif_id\": \"lotus\", \"anchor\": \"back\"}"), guest), HttpStatus.UNPROCESSABLE_ENTITY, "unsupported_feature");
+        assertThat(motifOnBack.get("detail").asText()).isEqualTo("The Back of Saathi keychain tag does not take motif (Buti)");
         JsonNode deep = assertProblem(post("/api/designs", create.formatted("keychain",
                 "{\"type\": \"relief_image\", \"source\": {\"upload_id\": \"" + photo + "\"}, \"anchor\": \"face\", \"relief_mm\": 1.6}"), guest),
                 HttpStatus.UNPROCESSABLE_ENTITY, "param_out_of_range");

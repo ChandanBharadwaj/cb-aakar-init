@@ -115,8 +115,8 @@ class CatalogFamiliesIntegrationTest extends AbstractIntegrationTest {
         JsonNode template = keychain.get("templates").get(0);
         assertThat(template.get("id").asText()).isEqualTo("keychain_tag");
         assertThat(template.get("family").asText()).isEqualTo("keychain");
-        // photos only until lettering and motifs land (PR 3b)
-        assertThat(template.get("features_supported")).extracting(JsonNode::asText).containsExactly("relief_image");
+        // photos, and since lettering and motifs landed (PR 3b) text (Naam) and motifs (Buti) too
+        assertThat(template.get("features_supported")).extracting(JsonNode::asText).containsExactly("relief_image", "emboss_text", "motif");
         assertThat(template.get("hardware").get(0).get("sku").asText()).isEqualTo("split_ring_25");
         assertThat(template.get("hardware").get(0).get("qty").asInt()).isEqualTo(1);
         assertThat(template.get("min_feature_mm").asDouble()).isEqualTo(0.8);
@@ -125,10 +125,12 @@ class CatalogFamiliesIntegrationTest extends AbstractIntegrationTest {
         assertThat(face.get("kind").asText()).isEqualTo("surface");
         assertThat(face.get("size_mm")).extracting(JsonNode::asDouble).containsExactly(32.0, 23.5);
         assertThat(face.get("bleed_mm").asDouble()).isEqualTo(1.0);
-        assertThat(face.get("accepts")).extracting(JsonNode::asText).containsExactly("relief_image");
+        assertThat(face.get("accepts")).extracting(JsonNode::asText).containsExactly("relief_image", "emboss_text", "motif");
         assertThat(face.get("max_relief_mm").asDouble()).isEqualTo(1.5);
         assertThat(face.has("max_text_height_mm")).isFalse();
         assertThat(face.has("bounds_mm")).isFalse();
+        // the back takes a second photo or a name, not a motif
+        assertThat(template.get("anchors").get(1).get("accepts")).extracting(JsonNode::asText).containsExactly("relief_image", "emboss_text");
         validateAgainst("schemas/template-descriptor.v1.json", template);
 
         // the raw family (Swaroop) carries a volume anchor

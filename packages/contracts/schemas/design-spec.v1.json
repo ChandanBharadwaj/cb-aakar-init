@@ -30,8 +30,9 @@
     },
     "style": {
       "type": "string",
-      "enum": ["none", "jaipur_heritage", "modern_zen", "cyber_desi", "warli_line"],
-      "default": "none"
+      "enum": ["none", "jaipur_heritage", "modern_zen", "cyber_desi", "warli_line", "comic_pop"],
+      "default": "none",
+      "description": "Style variant of the piece; an experience (experience.v1.json style) may preset it. comic_pop is Katha's comic-book look."
     },
     "material": {
       "type": "string",
