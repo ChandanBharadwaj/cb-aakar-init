@@ -94,7 +94,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["type", "source", "anchor"],
-      "description": "Roop: the customer's own 3D form (uploaded or generated), repaired, scaled into a volume anchor and fused onto the carrier body. The raw_print family carries exactly one hero_mesh and no body.",
+      "description": "Roop: the customer's own 3D form (uploaded or generated), repaired, scaled into a volume anchor and fused onto the carrier body. The raw_print family carries exactly one hero_mesh and no body; it has no template params, so its size (fit longest with longest_mm inside the family envelope) and orientation live on this feature.",
       "properties": {
         "type": { "const": "hero_mesh" },
         "source": { "$ref": "#/$defs/content_source" },

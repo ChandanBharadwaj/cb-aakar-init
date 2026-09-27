@@ -2,10 +2,7 @@
   "spec_version": "1.0",
   "family": "raw_print",
   "template": "raw_print@1",
-  "params": {
-    "longest_mm": 80,
-    "orientation": "as_uploaded"
-  },
+  "params": {},
   "features": [
     {
       "type": "hero_mesh",
@@ -24,5 +21,13 @@
   ],
   "style": "none",
   "material": "basic_white",
-  "constraints": { "min_wall_mm": 1.2, "max_overhang_deg": 55, "bed_mm": [250, 250, 250] }
+  "constraints": {
+    "min_wall_mm": 1.2,
+    "max_overhang_deg": 55,
+    "bed_mm": [
+      250,
+      250,
+      250
+    ]
+  }
 }

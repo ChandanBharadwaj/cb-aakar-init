@@ -1756,6 +1756,8 @@ export interface components {
             status: "ready" | "pending_review" | "rejected";
             /** @description Browser-fetchable URL when ready */
             url?: string | null;
+            /** @description Customer-facing note, e.g. the reviewer's reason when status is rejected */
+            message?: string | null;
             /** Format: date-time */
             created_at: string;
         };

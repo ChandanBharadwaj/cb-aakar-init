@@ -2059,6 +2059,8 @@ export interface components {
             status: "ready" | "pending_review" | "rejected";
             /** @description Browser-fetchable URL when ready */
             url?: string | null;
+            /** @description Customer-facing note, e.g. the reviewer's reason when status is rejected */
+            message?: string | null;
             /** Format: date-time */
             created_at: string;
         };
@@ -2221,7 +2223,7 @@ export interface components {
             bounds_mm?: number[];
             /** @description Feature types allowed on this anchor; defaults to the template's features_supported. */
             accepts?: ("emboss_text" | "motif" | "relief_image" | "hero_mesh")[];
-            /** @description Cap for relief_image.relief_mm and emboss depth on this anchor. */
+            /** @description At least 0.4 mm, the shallowest text depth, so every accepted feature can fit. Cap for relief_image.relief_mm (emboss and deboss) and emboss depth on this anchor. relief_image in lithophane mode is exempt: the plate itself is the relief and the template's lithophane hook owns its thickness range. */
             max_relief_mm?: number;
         };
         /**
@@ -2307,7 +2309,7 @@ export interface components {
                     bounds_mm?: number[];
                     /** @description Feature types allowed on this anchor; defaults to the template's features_supported. */
                     accepts?: ("emboss_text" | "motif" | "relief_image" | "hero_mesh")[];
-                    /** @description Cap for relief_image.relief_mm and emboss depth on this anchor. */
+                    /** @description At least 0.4 mm, the shallowest text depth, so every accepted feature can fit. Cap for relief_image.relief_mm (emboss and deboss) and emboss depth on this anchor. relief_image in lithophane mode is exempt: the plate itself is the relief and the template's lithophane hook owns its thickness range. */
                     max_relief_mm?: number;
                 };
             };
@@ -2395,7 +2397,7 @@ export interface components {
              */
             cutout: "none" | "silhouette";
         };
-        /** @description Roop: the customer's own 3D form (uploaded or generated), repaired, scaled into a volume anchor and fused onto the carrier body. The raw_print family carries exactly one hero_mesh and no body. */
+        /** @description Roop: the customer's own 3D form (uploaded or generated), repaired, scaled into a volume anchor and fused onto the carrier body. The raw_print family carries exactly one hero_mesh and no body; it has no template params, so its size (fit longest with longest_mm inside the family envelope) and orientation live on this feature. */
         hero_mesh: {
             /** @constant */
             type: "hero_mesh";
@@ -2515,7 +2517,7 @@ export interface components {
                      */
                     cutout: "none" | "silhouette";
                 };
-                /** @description Roop: the customer's own 3D form (uploaded or generated), repaired, scaled into a volume anchor and fused onto the carrier body. The raw_print family carries exactly one hero_mesh and no body. */
+                /** @description Roop: the customer's own 3D form (uploaded or generated), repaired, scaled into a volume anchor and fused onto the carrier body. The raw_print family carries exactly one hero_mesh and no body; it has no template params, so its size (fit longest with longest_mm inside the family envelope) and orientation live on this feature. */
                 hero_mesh: {
                     /** @constant */
                     type: "hero_mesh";

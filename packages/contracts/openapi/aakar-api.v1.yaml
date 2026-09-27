@@ -876,6 +876,7 @@ components:
         sha256: { type: string }
         status: { type: string, enum: [ready, pending_review, rejected] }
         url: { type: [string, 'null'], description: Browser-fetchable URL when ready }
+        message: { type: [string, 'null'], description: "Customer-facing note, e.g. the reviewer's reason when status is rejected" }
         created_at: { type: string, format: date-time }
     CreateDesignRequest:
       type: object
