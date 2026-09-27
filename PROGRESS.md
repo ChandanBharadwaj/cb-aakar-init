@@ -117,16 +117,16 @@ Grouped by workstream (PLAN §15). Tick items as they merge.
 
 ## Outcome categories (Avatars) — in progress
 
-Plan: [`docs/research/outcome-categories/implementation-plan.md`](docs/research/outcome-categories/implementation-plan.md) (research in the same folder). Every phase ends with a commit on `claude/3d-print-categories-ypc6xw`; a new session resumes from the table below and the plan's phase table.
+Plan: [`docs/research/outcome-categories/implementation-plan.md`](docs/research/outcome-categories/implementation-plan.md) (research in the same folder). Every step ends with a commit on `claude/3d-print-categories-ypc6xw`; a new session resumes from this table and the plan's "Resume state" and phase tables. Rules that survived a session-limit stop: checkpoint partial work as `wip(...)` commits first, run at most two agents at a time, commit after every green step.
 
 | Phase | Scope | Status | Evidence / resume pointer |
 |---|---|---|---|
-| 0 | Research report, notes, plan committed | ✅ Done | `docs/research/outcome-categories/` |
-| 1 | PR 1 contracts · PR 2 seed + `V9` + catalog module (families, shelves, hardware, policy fields) | 🟨 PR 1 done (`5235c50`); PR 2 in progress | `packages/contracts/schemas/template-family.v1.json`, `packages/design-tokens/families.json` |
-| 2 | PR 3a geometry features framework · PR 3b text + motif | 🟨 3a in progress | `services/geometry/aakar_geometry/features/` |
-| 3 | PR 4 carriers `keychain_tag`, `fridge_magnet`, `hanging_ornament`, `desk_nameplate`, `raw_print` | ⬜ | after 3a |
-| 4 | PR 5 API uploads, features, family resolution, hardware/setup pricing, print pack, ADR-0014 | 🟨 ADR-0014 written (`0ab8f09`); code after PR 2 | `docs/adr/0014-raw-print-path.md` |
-| 5 | PR 6 storefront · PR 7 portal | 🟨 in progress against the mock APIs | `apps/web/src/app/(stage)/create/`, `apps/admin/src/app/(portal)/avatars/` |
+| 0 | Research report, notes, plan | ✅ Done | `docs/research/outcome-categories/` |
+| 1 | PR 1 contracts · PR 2 seed + `V9` + catalog module (families, shelves, hardware, policy fields) | ✅ Done | `5235c50`; `6f46202` + `d384b25` + `5920cbc` (review follow-ups); API 136 tests green |
+| 2 | PR 3a geometry features framework · PR 3b text + motif | 🟨 3a done (`d0e2814` + `010635c`; geometry 130, inspect 21); 3b not started | next: `features/emboss_text.py`, `features/motif.py` (PLAN §7.5) |
+| 3 | PR 4 carriers `keychain_tag`, `fridge_magnet`, `hanging_ornament`, `desk_nameplate`, `raw_print` (no params: size and orientation live on the form) | 🟨 in progress | `services/geometry/aakar_geometry/templates/`; afterwards sync `services/api/src/test/resources/fixtures/templates.json` and the web/admin mock descriptors from the real descriptors |
+| 4 | PR 5 API uploads + content review, features on create/edit, family resolution, hardware/setup pricing, print pack | ⬜ next | ADR-0014 written (`0ab8f09`); DesignSource has no `upload` yet; entities do not map `family_id`/`hardware`; `price_from_paise` null |
+| 5 | PR 6 storefront · PR 7 portal | 🟨 PR 7 done (`31d9c8e`, `65ae76e`); PR 6 compiles (`e22c99e` + `e0f6e85`), review polish in progress | `apps/web/src/components/design/` |
 | 6 | PR 8 lithophane, plinth, pet tag, photo frame, keycap | ⬜ | |
 | 7 | PRs 9–12 Duniya experiences + Katha | ⬜ | |
 
@@ -153,8 +153,8 @@ Plan: [`docs/research/outcome-categories/implementation-plan.md`](docs/research/
 | Suite | Count | Last run |
 |---|---|---|
 | `services/inspect` pytest | 21 passed | 2026-09-26 |
-| `services/geometry` pytest | 57 passed | 2026-09-26 |
-| `services/api` Gradle test | 127 passed | 2026-09-27 |
+| `services/geometry` pytest | 130 passed | 2026-09-27 |
+| `services/api` Gradle test | 136 passed | 2026-09-27 |
 | `apps/web` typecheck · lint · build | clean | 2026-09-27 |
 | `apps/admin` typecheck · lint · build | clean | 2026-09-27 |
 | End-to-end slice (live services) | passed | 2026-09-26 |
