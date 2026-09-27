@@ -229,8 +229,9 @@ class CartService implements Carts {
                 ProblemCodes.UNKNOWN_MATERIAL, "Unknown material", "Material '" + materialId + "' is not offered"));
     }
 
+    /** The unit price with the piece's family rules and packed hardware ({@code Designs.priceContext}). */
     private PriceBreakdown price(DesignVersionResponse version, MaterialDto material, PricingPolicy policy) {
-        return calculator.price(CartPricing.estimate(version).orElseThrow(), CartPricing.inputs(material), policy);
+        return calculator.price(CartPricing.estimate(version).orElseThrow(), CartPricing.inputs(material), policy, designs.priceContext(version));
     }
 
     private Map<String, Object> toMap(PriceBreakdown price) {

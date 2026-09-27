@@ -24,6 +24,8 @@ import studio.aakar.api.catalog.HardwareRef;
 import studio.aakar.api.catalog.MaterialDto;
 import studio.aakar.api.catalog.MaterialInput;
 import studio.aakar.api.catalog.ShelfDto;
+import studio.aakar.api.pricing.PriceCalculator;
+import studio.aakar.api.pricing.PricingPolicy;
 import studio.aakar.api.shared.ApiProblemException;
 import studio.aakar.api.shared.ProblemCodes;
 import studio.aakar.api.templates.TemplateDescriptor;
@@ -41,17 +43,19 @@ class CatalogService implements Catalog {
     private final TemplateFamilyRepository families;
     private final HardwareItemRepository hardware;
     private final Templates templates;
+    private final PriceCalculator pricing;
     private final FamilyJson familyJson;
     private final Clock clock;
 
     CatalogService(CatalogItemRepository items, MaterialRepository materials, ShelfRepository shelves, TemplateFamilyRepository families,
-            HardwareItemRepository hardware, Templates templates, FamilyJson familyJson, Clock clock) {
+            HardwareItemRepository hardware, Templates templates, PriceCalculator pricing, FamilyJson familyJson, Clock clock) {
         this.items = items;
         this.materials = materials;
         this.shelves = shelves;
         this.families = families;
         this.hardware = hardware;
         this.templates = templates;
+        this.pricing = pricing;
         this.familyJson = familyJson;
         this.clock = clock;
     }
@@ -190,6 +194,21 @@ class CatalogService implements Catalog {
     }
 
     @Override
+    public List<HardwareRef> familyHardware(String id) {
+        if (id == null || id.isBlank()) {
+            return List.of();
+        }
+        return families.findById(id.trim()).map(family -> {
+            Map<String, String> names = new LinkedHashMap<>();
+            hardware.findAll().forEach(h -> names.put(h.sku(), h.name()));
+            return family.hardware().stream()
+                    .map(ref -> familyJson.from(ref, HardwareRef.class))
+                    .map(ref -> ref.named(names.get(ref.sku())))
+                    .toList();
+        }).orElse(List.of());
+    }
+
+    @Override
     public List<FamilyDto> allFamilies() {
         return families(null, true);
     }
@@ -244,28 +263,32 @@ class CatalogService implements Catalog {
         }
     }
 
-    /** Hardware names and the live descriptors grouped by family, read once per request. */
+    /** Hardware names, the live descriptors grouped by family and the active pricing policy, read once per request. */
     private FamilyContext familyContext() {
         Map<String, String> names = new LinkedHashMap<>();
         hardware.findAll().forEach(h -> names.put(h.sku(), h.name()));
         Map<String, List<TemplateDescriptor>> byFamily = templates.all().stream()
                 .filter(d -> d.family() != null)
                 .collect(Collectors.groupingBy(TemplateDescriptor::family, LinkedHashMap::new, Collectors.toList()));
-        return new FamilyContext(names, byFamily);
+        return new FamilyContext(names, byFamily, pricing.policy());
     }
 
     private final class FamilyContext {
 
         private final Map<String, String> hardwareNames;
         private final Map<String, List<TemplateDescriptor>> templatesByFamily;
+        private final PricingPolicy policy;
 
-        FamilyContext(Map<String, String> hardwareNames, Map<String, List<TemplateDescriptor>> templatesByFamily) {
+        FamilyContext(Map<String, String> hardwareNames, Map<String, List<TemplateDescriptor>> templatesByFamily, PricingPolicy policy) {
             this.hardwareNames = hardwareNames;
             this.templatesByFamily = templatesByFamily;
+            this.policy = policy;
         }
 
         FamilyDto toDto(TemplateFamilyEntity family) {
-            return familyJson.toDto(family, hardwareNames, templatesByFamily.getOrDefault(family.id(), List.of()));
+            // price_from_paise is the family minimum (a floor), until prices are computed per live template and finish
+            Long priceFrom = PriceCalculator.minimumSubtotal(policy, family.id()).orElse(null);
+            return familyJson.toDto(family, hardwareNames, templatesByFamily.getOrDefault(family.id(), List.of()), priceFrom);
         }
     }
 

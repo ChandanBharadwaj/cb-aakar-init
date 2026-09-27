@@ -38,17 +38,19 @@ class FamilyJson {
         return document == null ? null : json.convertValue(document, type);
     }
 
-    /** The row plus its readiness: {@code templates} are the live descriptors whose {@code family} is this id. */
-    FamilyDto toDto(TemplateFamilyEntity f, Map<String, String> hardwareNames, List<TemplateDescriptor> templates) {
+    /**
+     * The row plus its readiness: {@code templates} are the live descriptors whose {@code family} is this id;
+     * {@code priceFromPaise} is the family's minimum subtotal under the active policy (a floor), or null.
+     */
+    FamilyDto toDto(TemplateFamilyEntity f, Map<String, String> hardwareNames, List<TemplateDescriptor> templates, Long priceFromPaise) {
         List<HardwareRef> hardware = f.hardware().stream()
                 .map(ref -> from(ref, HardwareRef.class))
                 .map(ref -> ref.named(hardwareNames.get(ref.sku())))
                 .toList();
-        // TODO(PR 5): price_from_paise = the lowest computed price across live templates and materials.
         return new FamilyDto(f.id(), f.codename(), f.name(), f.tagline(), f.description(), f.kind(), f.tier(), f.shelf(), f.demandRank(),
                 f.defaultTemplateId(), f.environment(), from(f.sizeEnvelope(), FamilyDto.SizeEnvelope.class), hardware,
                 from(f.materialRules(), FamilyDto.MaterialRules.class), f.shapeTolerance(), from(f.contentSlot(), FamilyDto.ContentSlot.class),
                 f.available(), f.sortOrder(), !templates.isEmpty(), templates, templates.stream().map(TemplateDescriptor::id).toList(),
-                null, f.updatedAt());
+                priceFromPaise, f.updatedAt());
     }
 }

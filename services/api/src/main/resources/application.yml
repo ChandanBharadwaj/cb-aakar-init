@@ -31,9 +31,10 @@ spring:
       enabled: false
   servlet:
     multipart:
-      # QC photos are capped at 10 MB by the admin module (413 payload_too_large); the container limit sits above it.
-      max-file-size: 12MB
-      max-request-size: 13MB
+      # The services cap every file themselves (413 payload_too_large): customer photos 15 MB and model files 50 MB
+      # (aakar.uploads.*), QC photos 10 MB (admin module). The container limit sits just above the largest.
+      max-file-size: 52MB
+      max-request-size: 52MB
 
 server:
   port: 8080
@@ -91,8 +92,19 @@ aakar:
   messaging:
     sender: ${AAKAR_MESSAGING_SENDER:log}         # log | whatsapp (later)
   media:
-    # Local asset directory for staff uploads (QC photos), served at {api.public-url}/media/{key}; S3 later.
+    # Local asset directory for staff uploads (QC photos) and customer uploads, served at {api.public-url}/media/{key}; S3 later.
     dir: ${AAKAR_MEDIA_DIR:./.aakar-media}
+    # The API origin the geometry service fetches customer uploads from (content_source.url in design specs), e.g.
+    # http://api:8080 in Compose while api.public-url is the browser's http://localhost:8080. Blank = api.public-url.
+    internal-base-url: ${AAKAR_MEDIA_INTERNAL_BASE_URL:}
+  uploads:
+    # Customer uploads (POST /api/uploads, plan §4): photos for a relief, model files for a hero form or Swaroop.
+    # `terms` flags a file whose name mentions one of flag-terms (comma-separated; case, spaces and punctuation ignored)
+    # into the review queue; `noop` flags nothing and is refused when aakar.profile=production.
+    scanner: ${AAKAR_UPLOADS_SCANNER:terms}
+    flag-terms: ${AAKAR_UPLOADS_FLAG_TERMS:}
+    max-image-bytes: 15MB
+    max-model-bytes: 50MB
   admin:
     # Management API (ADR-0012). The seed owner studio@aakar.local is created on first start with this password;
     # the production guard refuses the default. Staff tokens are HS256 with the identity secret and typ=staff.

@@ -14,8 +14,10 @@ import studio.aakar.api.templates.TemplateDescriptor;
  * An outcome family (Avatar): {@code Family} in the storefront contract and {@code AdminFamily} in the management
  * contract, i.e. the {@code template-family.v1.json} row plus read-only state. {@code ready} is true when at least
  * one live template of the family exists in the geometry service; {@code templates} are those descriptors (the
- * storefront picker) and {@code templateIds} their ids (the portal). Brand copy ({@code codename}, {@code name},
- * {@code tagline}) is data; the ids never change. Nulls are left out so the JSON validates against the schemas.
+ * storefront picker) and {@code templateIds} their ids (the portal). {@code priceFromPaise} is the family's minimum
+ * subtotal under the active pricing policy when it sets one: a floor for "from ₹249" copy, not a quote. Brand copy
+ * ({@code codename}, {@code name}, {@code tagline}) is data; the ids never change. Nulls are left out so the JSON
+ * validates against the schemas.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record FamilyDto(

@@ -8,6 +8,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -100,7 +101,7 @@ class UploadService implements Uploads {
         }
 
         UUID id = UUID.randomUUID();
-        Instant now = clock.instant();
+        Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS); // what PostgreSQL keeps, so the 201 equals every later read
         StoredMedia stored = store.storeAs(UPLOADS_FOLDER + "/" + ownerFolder(owner), id.toString(), format.id(), bytes, format.contentType());
         UploadStatus status = scan.isFlagged() ? UploadStatus.pending_review : UploadStatus.ready;
         UploadEntity upload = uploads.save(new UploadEntity(id, owner, kind, format.id(), stored.key(), stored.url(), format.contentType(),
@@ -167,7 +168,7 @@ class UploadService implements Uploads {
         UploadEntity upload = uploads.findById(review.uploadId())
                 .orElseThrow(() -> new IllegalStateException("Content review " + reviewId + " refers to missing upload " + review.uploadId()));
         String cleanNote = note == null || note.isBlank() ? null : truncate(note.trim(), REASON_MAX);
-        review.decide(approve, cleanNote, reviewerEmail, clock.instant());
+        review.decide(approve, cleanNote, reviewerEmail, clock.instant().truncatedTo(ChronoUnit.MICROS));
         upload.markStatus(approve ? UploadStatus.ready : UploadStatus.rejected);
         log.info("Content review {} of upload {}: {} by {}", reviewId, upload.id(), review.status(), reviewerEmail);
         return staff(upload, review);
@@ -211,7 +212,8 @@ class UploadService implements Uploads {
     private static ApiProblemException tooLarge(UploadKind kind, long bytes, long limit) {
         String what = kind == UploadKind.image ? "Photos" : "Model files";
         return new ApiProblemException(HttpStatus.PAYLOAD_TOO_LARGE, ProblemCodes.PAYLOAD_TOO_LARGE, "File too large",
-                what + " can be up to " + megabytes(limit) + "; this one is " + megabytes(bytes) + ".", Map.of("max_bytes", limit, "bytes", bytes));
+                what + " can be up to " + megabytes(limit, RoundingMode.HALF_UP) + "; this one is " + megabytes(bytes, RoundingMode.CEILING) + ".",
+                Map.of("max_bytes", limit, "bytes", bytes));
     }
 
     private static byte[] read(MultipartFile file) {
@@ -222,9 +224,12 @@ class UploadService implements Uploads {
         }
     }
 
-    /** {@code 15728640} → {@code "15 MB"}, {@code 16252928} → {@code "15.5 MB"} (binary megabytes, like the browser). */
-    static String megabytes(long bytes) {
-        return BigDecimal.valueOf(bytes).divide(BigDecimal.valueOf(1024L * 1024L), 1, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString() + " MB";
+    /**
+     * {@code 15728640} → {@code "15 MB"}, {@code 16252928} → {@code "15.5 MB"} (binary megabytes, like the browser); a file's
+     * size is rounded up so one byte over the limit never reads as the limit itself.
+     */
+    static String megabytes(long bytes, RoundingMode rounding) {
+        return BigDecimal.valueOf(bytes).divide(BigDecimal.valueOf(1024L * 1024L), 1, rounding).stripTrailingZeros().toPlainString() + " MB";
     }
 
     /** A stable, non-reversible folder per owning identity: the first 32 hex digits of SHA-256 over kind and id. */

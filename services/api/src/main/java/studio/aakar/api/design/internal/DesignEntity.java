@@ -29,6 +29,8 @@ class DesignEntity {
     private DesignSource source;
     @Column(name = "catalog_item_slug")
     private String catalogItemSlug;
+    @Column(name = "family_id")
+    private String familyId;
     @Column(nullable = false)
     private String title;
     @Column(name = "created_at", nullable = false)
@@ -39,11 +41,13 @@ class DesignEntity {
     protected DesignEntity() {
     }
 
-    DesignEntity(DesignSource source, String catalogItemSlug, String title, Identity owner, Instant now) {
+    /** @param familyId the outcome family (a {@code template_families} id), or null when the catalog does not know it */
+    DesignEntity(DesignSource source, String catalogItemSlug, String familyId, String title, Identity owner, Instant now) {
         this.source = source;
         this.ownerId = owner.isUser() ? owner.id() : null;
         this.guestId = owner.isGuest() ? owner.id() : null;
         this.catalogItemSlug = catalogItemSlug;
+        this.familyId = familyId;
         this.title = title;
         this.createdAt = now;
         this.updatedAt = now;
@@ -67,6 +71,10 @@ class DesignEntity {
 
     String catalogItemSlug() {
         return catalogItemSlug;
+    }
+
+    String familyId() {
+        return familyId;
     }
 
     String title() {

@@ -45,6 +45,8 @@ public interface Catalog {
     /**
      * Outcome families (Avatars) in display order. With {@code includeUnavailable} false only families that are
      * {@code available} and {@code ready} (at least one live template) are returned: the Create picker's list.
+     * {@code price_from_paise} is the family's minimum subtotal under the active pricing policy, when it sets one: a
+     * floor ("from ₹249"), not a quote.
      *
      * @param kind optional filter: {@code carrier}, {@code object} or {@code raw}
      */
@@ -55,6 +57,12 @@ public interface Catalog {
 
     /** Whether a family id is in the catalog; a database check only (never calls the geometry service). */
     boolean familyExists(String id);
+
+    /**
+     * The family's default hardware ({@code [{sku, qty}]}) with customer-facing names; empty for an unknown family. A
+     * database read only (never calls the geometry service), for pricing previews.
+     */
+    List<HardwareRef> familyHardware(String id);
 
     /** Every family, available or not (management API). */
     List<FamilyDto> allFamilies();

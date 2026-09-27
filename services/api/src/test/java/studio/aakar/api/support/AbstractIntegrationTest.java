@@ -15,6 +15,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -23,6 +26,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 
 /**
@@ -119,6 +124,41 @@ public abstract class AbstractIntegrationTest {
             request = request.header(headers[i], headers[i + 1]);
         }
         return request.retrieve().toEntity(byte[].class);
+    }
+
+    /** {@code POST /api/uploads} as multipart {@code file} + {@code kind}, never throwing on 4xx/5xx. */
+    protected ResponseEntity<String> upload(String[] identity, String filename, String kind, byte[] bytes) {
+        MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
+        HttpHeaders fileHeaders = new HttpHeaders();
+        fileHeaders.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+        form.add("file", new HttpEntity<>(new ByteArrayResource(bytes) {
+            @Override
+            public String getFilename() {
+                return filename;
+            }
+        }, fileHeaders));
+        if (kind != null) {
+            form.add("kind", kind);
+        }
+        RestClient.RequestBodySpec request = api().post().uri("/api/uploads");
+        for (int i = 0; i + 1 < identity.length; i += 2) {
+            request = request.header(identity[i], identity[i + 1]);
+        }
+        return request.contentType(MediaType.MULTIPART_FORM_DATA).body(form).retrieve().toEntity(String.class);
+    }
+
+    /** Uploads a file that must be accepted (201) and returns the {@code Upload}. */
+    protected JsonNode uploaded(String[] identity, String filename, String kind, byte[] bytes) {
+        ResponseEntity<String> response = upload(identity, filename, kind, bytes);
+        assertThat(response.getStatusCode()).as(response.getBody()).isEqualTo(HttpStatus.CREATED);
+        return body(response);
+    }
+
+    /** The seeded owner's staff bearer header. */
+    protected String[] staffOwner() {
+        ResponseEntity<String> login = post("/admin/api/auth/login", "{\"email\": \"studio@aakar.local\", \"password\": \"aakar-studio\"}");
+        assertThat(login.getStatusCode()).as(login.getBody()).isEqualTo(HttpStatus.OK);
+        return bearer(body(login).get("access_token").asText());
     }
 
     protected JsonNode body(ResponseEntity<String> response) {

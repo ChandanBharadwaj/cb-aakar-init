@@ -156,11 +156,29 @@ class AdminFamiliesIntegrationTest extends AbstractIntegrationTest {
             assertThat(body(get("/api/families/" + familyId)).get("tagline").asText()).isEqualTo("Now switched on");
             assertProblem(put("/admin/api/families/nope_family", familyBody.formatted("nope_family", sku), owner), HttpStatus.NOT_FOUND, "unknown_family");
 
-            // pricing: the preview accepts a seeded family (its lines arrive with PR 5) and refuses an unknown one; a policy
-            // may only carry rules for seeded families; the seeded policy exposes the new fields without zero noise
+            // pricing: the preview prices a piece of a seeded family (its default hardware at the draft's markup, setup fee and
+            // minimum) and refuses an unknown one; a policy may only carry rules for seeded families; the seeded policy exposes the
+            // new fields without zero noise
             String preview = "{\"policy\": " + POLICY + ", \"material\": \"terracotta_silk\", \"extruded_volume_cm3\": 51.6, \"print_seconds\": 13200, \"family_id\": \"%s\"}";
             JsonNode priced = body(post("/admin/api/pricing/preview", preview.formatted("keychain"), owner));
-            assertThat(priced.get("total_paise").asLong()).isEqualTo(114_900);
+            // The contracts example (₹296 material + ₹733 print time + ₹120 finishing = ₹1,149) now also carries the keychain's split
+            // ring: ₹3 × 1.30 markup = ₹3.90 → ₹4, so ₹1,153 → ₹1,159. The keychain minimum (₹249) is below that and does not lift it;
+            // keychains have no setup fee. Before PR 5 the family was only checked for existence and the total was ₹1,149.
+            assertThat(priced.get("total_paise").asLong()).isEqualTo(115_900);
+            assertThat(priced.get("family_id").asText()).isEqualTo("keychain");
+            assertThat(priced.get("lines").findValuesAsText("code")).containsExactly("material", "machine_time", "finishing", "hardware");
+            assertThat(priced.get("lines").get(3).get("label").asText()).isEqualTo("Steel split ring 25 mm · 1");
+            assertThat(priced.get("lines").get(3).get("amount_paise").asLong()).isEqualTo(400);
+            assertThat(priced.has("minimum_subtotal_paise")).isFalse();
+            // a small piece is lifted to the family minimum, and the raw family adds its setup line
+            JsonNode small = body(post("/admin/api/pricing/preview", ("{\"policy\": " + POLICY + ", \"material\": \"basic_white\", "
+                    + "\"extruded_volume_cm3\": 10, \"print_seconds\": 1800, \"family_id\": \"keychain\"}"), owner));
+            assertThat(small.get("subtotal_paise").asLong()).isEqualTo(24_900); // ₹47 + ₹100 + ₹80 + ₹4 = ₹231 → ₹239 → minimum ₹249
+            assertThat(small.get("minimum_subtotal_paise").asLong()).isEqualTo(24_900);
+            JsonNode raw = body(post("/admin/api/pricing/preview", ("{\"policy\": " + POLICY.replace("\"keychain\": {", "\"raw_print\": {\"setup_fee_paise\": 9900}, \"keychain\": {")
+                    + ", \"material\": \"basic_white\", \"extruded_volume_cm3\": 20, \"print_seconds\": 5400, \"family_id\": \"raw_print\"}"), owner));
+            assertThat(raw.get("lines").findValuesAsText("code")).containsExactly("material", "machine_time", "finishing", "setup");
+            assertThat(raw.get("subtotal_paise").asLong()).isEqualTo(57_900); // ₹94 + ₹300 + ₹80 + ₹99 setup = ₹573 → ₹579
             assertThat(priced.get("policy_version").asText()).isEqualTo("preview");
             assertProblem(post("/admin/api/pricing/preview", preview.formatted("nope"), owner), HttpStatus.UNPROCESSABLE_ENTITY, "unknown_family");
             assertProblem(post("/admin/api/pricing/policies",
