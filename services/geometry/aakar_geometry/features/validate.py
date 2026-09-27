@@ -39,9 +39,19 @@ DEFAULTS: dict[str, dict[str, Any]] = {
 DEPTH_KEY = {"relief_image": "relief_mm", "emboss_text": "depth_mm", "motif": "depth_mm"}
 
 
+def _customer_label(ftype: str) -> str:
+    """Customer-safe name for a feature type: "your own 3D form (Roop)", never the code word."""
+    label = LABELS.get(ftype, "this kind of content")
+    return label[:1].lower() + label[1:]
+
+
 def text_length(text: str) -> int:
-    """Characters as a reader counts them: combining marks (Indic matras, accents) do not add."""
-    return sum(1 for ch in str(text) if not unicodedata.combining(ch))
+    """Characters as a reader counts them: marks (Indic matras and viramas, accents) and joiners do not add.
+
+    ``unicodedata.combining`` is not enough: most Indic vowel signs have combining class 0, so the
+    general category decides (Mn, Mc, Me are marks; Cf covers ZWJ/ZWNJ). "नमस्ते" counts 4.
+    """
+    return sum(1 for ch in str(text) if unicodedata.category(ch) not in ("Mn", "Mc", "Me", "Cf"))
 
 
 def normalise_feature(feature: Mapping[str, Any]) -> dict[str, Any]:
@@ -87,8 +97,9 @@ def check_features(template: Any, features: Iterable[Mapping[str, Any]] | None) 
     supported = tuple(template.features_supported)
     unsupported = sorted({f["type"] for f in normalised if f["type"] not in supported})
     if unsupported:
+        wanted = ", ".join(_customer_label(t) for t in unsupported)
         raise UnsupportedFeature(
-            f"{template.name} does not support {', '.join(unsupported)} yet",
+            f"{template.name} can't carry {wanted} yet",
             {"unsupported": unsupported, "features_supported": list(supported)},
         )
 
@@ -148,7 +159,10 @@ def check_features(template: Any, features: Iterable[Mapping[str, Any]] | None) 
                 {"cutout": f.get("cutout"), "feature": index},
             )
         depth_key = DEPTH_KEY.get(ftype)
-        if depth_key and anchor.max_relief_mm is not None:
+        # lithophane mode is the plate itself (0.8–3 mm of light), not a relief on the skin: the template's
+        # lithophane hook owns that range, so the surface cap does not apply
+        is_lithophane = ftype == "relief_image" and f.get("mode") == "lithophane"
+        if depth_key and anchor.max_relief_mm is not None and not is_lithophane:
             depth = float(f.get(depth_key, DEFAULTS[ftype][depth_key]))
             if depth > float(anchor.max_relief_mm) + 1e-9:
                 raise ParamOutOfRange(

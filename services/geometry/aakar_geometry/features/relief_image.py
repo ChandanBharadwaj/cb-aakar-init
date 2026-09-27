@@ -159,7 +159,9 @@ def relief_heightmap(
         arr = 1.0 - arr
     h_px, w_px = arr.shape
     nx, ny, cell = grid_for(avail_w, avail_h, w_px / h_px, fit, px_per_mm, max_px)
-    grid = _resample(arr, nx, ny, fit)
+    # Lanczos rings past hard edges (e.g. a transparent border): clip back to the source's 0..1 so an
+    # undershoot cannot become the minimum and lift every truly dark or transparent pixel off the floor
+    grid = np.clip(_resample(arr, nx, ny, fit), 0.0, 1.0)
     grid = _smooth(grid, SMOOTH_SIGMA_PX)
     lo, hi = float(grid.min()), float(grid.max())
     if hi - lo < MIN_CONTRAST:

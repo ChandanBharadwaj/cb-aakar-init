@@ -54,7 +54,7 @@ def _content(fetcher: ContentFetcher, feature: Mapping[str, Any], index: int) ->
     kind = content_kind(fmt)
     if kind is None:
         raise ContentUnusable(
-            "We couldn't tell what kind of file this is; use PNG or JPEG for photos and STL, OBJ or 3MF for models",
+            "We couldn't tell what kind of file this is; use a PNG or JPEG photo, or a model file from your 3D program (.stl, .obj or .3mf)",
             {"format": fmt, "url": source.get("url"), "feature": index},
         )
     if kind != needs:

@@ -107,7 +107,9 @@ def test_relief_heightmap_fits_the_printable_area():
     assert isinstance(relief, ReliefMap)
     ny, nx = relief.shape
     assert nx <= 400 and ny <= 400
-    assert relief.width_mm == pytest.approx(36, abs=relief.cell_mm) and relief.height_mm <= 26 + relief.cell_mm
+    # 36 × 26 mm is wider than the 4:3 photo, so contain is height-bound: 26 mm tall, 26 · 4/3 ≈ 34.7 mm wide
+    assert relief.height_mm == pytest.approx(26, abs=relief.cell_mm)
+    assert relief.width_mm == pytest.approx(26 * 64 / 48, abs=relief.cell_mm) and relief.width_mm <= 36
     assert relief.cell_mm == pytest.approx(1 / 5, rel=0.05)  # ~5 px/mm
     assert relief.heights.min() == pytest.approx(relief_image.FLOOR_MM) and relief.heights.max() == pytest.approx(0.6)
     # +y is up in the picture and the ramp runs left -> right: the right edge is higher than the left
@@ -163,8 +165,8 @@ def test_emboss_adds_volume_and_deboss_removes_it():
 
 def test_relief_on_a_tilted_frame_stays_watertight():
     body = box_on_bed(40, 30, 20)
-    # the +x face, looking out along +x: u = -y is the viewer's right, v = +z is up
-    frame = AnchorFrame([20, 0, 10], [0, -1, 0], [0, 0, 1], [1, 0, 0], size_mm=(24, 16))
+    # the +x face seen from outside (looking along -x): +y is the viewer's right, +z is up, u × v = +x
+    frame = AnchorFrame([20, 0, 10], [0, 1, 0], [0, 0, 1], [1, 0, 0], size_mm=(24, 16))
     emb = relief_image.apply(body, frame, {"mode": "emboss", "relief_mm": 1.0}, gradient_png(), bleed_mm=1)
     assert emb.is_watertight and emb.volume > body.volume
     assert emb.bounds[1][0] == pytest.approx(21.0, abs=1e-3)
@@ -232,7 +234,9 @@ def test_hero_decimates_dense_models():
     reduced = hero_mesh.decimate(dense, 20_000)
     assert len(reduced.faces) <= 20_000 and reduced.is_watertight and reduced.volume == pytest.approx(dense.volume, rel=0.02)
     hero = hero_mesh.prepare(dense.export(file_type="stl"), "stl", {"fit": "contain"}, top_frame(0, bounds=(30, 30, 30)), max_faces=20_000)
-    assert len(hero.faces) <= 20_000 and hero.extents == pytest.approx([30, 30, 30], abs=1e-6)
+    # contain puts the longest side exactly on the bound; a decimated sphere is a hair out of round elsewhere
+    assert len(hero.faces) <= 20_000 and max(hero.extents) == pytest.approx(30, abs=1e-6)
+    assert hero.extents == pytest.approx([30, 30, 30], abs=0.05)
 
 
 # --------------------------------------------------------------------------- fetchers
@@ -336,7 +340,7 @@ def text(anchor="face", value="Asha", **extra):
     "features, error, needle",
     [
         ([relief(anchor="nowhere")], InvalidSpec, "no anchor"),
-        ([{"type": "motif", "motif_id": "warli_dancers_01", "anchor": "face"}], UnsupportedFeature, "does not support motif"),
+        ([{"type": "motif", "motif_id": "warli_dancers_01", "anchor": "face"}], UnsupportedFeature, "can't carry motif (Buti)"),
         ([relief(anchor="back")], UnsupportedFeature, "does not take"),
         ([hero(anchor="face")], UnsupportedFeature, "surface"),
         ([relief(anchor="top")], UnsupportedFeature, "flat surface"),
