@@ -95,16 +95,14 @@ export function ContentSlotPanel({ template, family, features, onChange, motifPa
   const takesMotifs = anchors.some((a) => anchorAccepts(a, template).includes("motif"));
   const library = useMotifs(takesMotifs);
   if (anchors.length === 0) return null;
-  const words = addWords(templateTakes(template));
+  const takes = templateTakes(template);
+  const words = addWords(takes);
   const shares = anchors.some((a) => {
     const accepts = anchorAccepts(a, template);
     return accepts.includes("emboss_text") && accepts.includes("motif");
   });
-  const intro = raw
-    ? "Your model file, checked, repaired and printed as it is."
-    : words.length > 0
-      ? `${capitalise(joinList(words, "or"))}, set into the piece.${shares ? " A name and a motif can share a spot; a photo takes one to itself." : ""}`
-      : undefined;
+  const sharing = shares ? ` A name and a motif can share a spot${takes.includes("relief_image") ? "; a photo takes one to itself" : ""}.` : "";
+  const intro = raw ? "Your model file, checked, repaired and printed as it is." : words.length > 0 ? `${capitalise(joinList(words, "or"))}, set into the piece.${sharing}` : undefined;
   const thin = isThinPiece(template, family);
   return (
     <section className={["grid gap-3", className].filter(Boolean).join(" ")} aria-labelledby={headingId}>

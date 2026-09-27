@@ -950,17 +950,21 @@ const FEATURE_WORDS = { emboss_text: "text (Naam)", motif: "a motif (Buti)", rel
 const capitalise = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 /** Types that hold a spot alone (a photo relief, a customer's form); a name and a motif may share one. */
 const SOLO_TYPES = ["relief_image", "hero_mesh"];
-const SPOT_NOUN = { emboss_text: "name", motif: "motif" };
+const MARK_LABELS = { emboss_text: "text (Naam)", motif: "motif (Buti)" };
 /**
- * What one spot may hold, as the geometry service rules it: at most one photo or form, at most one name and at most one
- * motif; a name and a motif sit side by side, but a photo never shares its spot with either (refused as crowded).
+ * What one spot may hold, as the geometry service and the API rule it: at most one photo or form, at most one text and at
+ * most one motif; a text and a motif sit side by side, but a photo never shares its spot with either (refused as
+ * crowded, whichever came first). Codes and wording follow the API's FeatureValidator.
  */
 function checkSpot(held, type, anchor) {
   const spot = anchor.label.toLowerCase();
   if (SOLO_TYPES.includes(type) && held.some((t) => SOLO_TYPES.includes(t))) throw fail(422, "validation_failed", `Only one photo or 3D form can go on the ${spot}.`);
-  if (!SOLO_TYPES.includes(type) && held.includes(type)) throw fail(422, "validation_failed", `Only one ${SPOT_NOUN[type]} can go on the ${spot}; put the other ${SPOT_NOUN[type]} on another spot.`);
-  const crowding = type === "relief_image" ? held.find((t) => t in SPOT_NOUN) : type in SPOT_NOUN && held.includes("relief_image") ? type : undefined;
-  if (crowding) throw fail(422, "validation_failed", `The ${spot} is too crowded for a photo and a ${SPOT_NOUN[crowding]} together; put the ${SPOT_NOUN[crowding]} on another spot.`);
+  if (!SOLO_TYPES.includes(type) && held.includes(type)) throw fail(422, "validation_failed", `Only one ${MARK_LABELS[type]} can go on the ${spot}; put the other one on another spot.`);
+  const crowding = type === "relief_image" ? held.find((t) => t in MARK_LABELS) : type in MARK_LABELS && held.includes("relief_image") ? type : undefined;
+  if (crowding) {
+    const other = MARK_LABELS[crowding];
+    throw fail(422, "validation_failed", `The ${spot} is too crowded for a photo relief (Chhavi) and ${crowding === "motif" ? "a " : ""}${other} together; put the ${other} on another spot.`);
+  }
 }
 /**
  * Type ∈ features_supported, anchor exists and accepts it (a hero form only on a volume anchor, everything else on a
@@ -992,12 +996,15 @@ function resolveFeatures(list, template, who) {
       out.script ??= detectScript(f.text); out.depth_mm ??= Math.min(1.2, anchor.max_relief_mm ?? 1.2); out.projection ??= "planar"; out.mode ??= "emboss";
       if (anchor.max_relief_mm && out.depth_mm > anchor.max_relief_mm) throw fail(422, "param_out_of_range", `Letters on the ${anchor.label.toLowerCase()} can be at most ${anchor.max_relief_mm} mm deep.`);
     } else if (f.type === "motif") {
-      if (typeof f.motif_id !== "string" || !f.motif_id) throw fail(422, "validation_failed", "Choose a motif (Buti) first.");
+      if (typeof f.motif_id !== "string" || !f.motif_id) throw fail(422, "validation_failed", "Choose a motif (Buti).");
       const motif = motifById(f.motif_id);
-      if (!motif) throw fail(422, "validation_failed", `That motif (Buti) isn't in the library; choose one of ${motifLibrary.motifs.map((x) => x.label).join(", ")}.`);
+      if (!motif) throw fail(422, "validation_failed", `We don't have a motif (Buti) called “${f.motif_id}”; choose one from the motif library.`);
       out.scale ??= 1; out.depth_mm ??= Math.min(1, anchor.max_relief_mm ?? 1); out.mode ??= "deboss";
-      if (typeof out.scale !== "number" || out.scale < motif.min_scale - 1e-9 || out.scale > 1 + 1e-9) {
-        throw fail(422, "param_out_of_range", `The ${motif.label} motif (Buti) can be ${percent(motif.min_scale)}–100% of the spot; ${typeof out.scale === "number" ? percent(out.scale) : "that"} was asked.`);
+      if (typeof out.scale !== "number" || out.scale < 0.2 - 1e-9 || out.scale > 1 + 1e-9) {
+        throw fail(422, "param_out_of_range", `The scale of the motif (Buti) can be 0.2–1; ${typeof out.scale === "number" ? out.scale : "that"} was asked.`);
+      }
+      if (out.scale < motif.min_scale - 1e-9) {
+        throw fail(422, "param_out_of_range", `The ${motif.label} motif (Buti) can't be printed smaller than scale ${motif.min_scale} (${percent(motif.min_scale)} of the spot); choose a larger scale.`);
       }
       if (typeof out.depth_mm !== "number" || out.depth_mm < 0.4 || out.depth_mm > 3) throw fail(422, "param_out_of_range", "A motif (Buti) can be 0.4 to 3 mm deep.");
       if (anchor.max_relief_mm && out.depth_mm > anchor.max_relief_mm + 1e-9) throw fail(422, "param_out_of_range", `A motif (Buti) on the ${anchor.label.toLowerCase()} can be at most ${anchor.max_relief_mm} mm deep.`);
