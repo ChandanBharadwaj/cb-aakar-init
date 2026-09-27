@@ -95,7 +95,7 @@ class AdminPricingController {
     }
 
     private void requireFamilyKnown(String familyId) {
-        if (catalog.family(familyId).isEmpty()) {
+        if (!catalog.familyExists(familyId)) { // existence only: publishing a policy must not depend on the geometry service
             throw ApiProblemException.unprocessable(ProblemCodes.UNKNOWN_FAMILY, "Unknown family",
                     "Family '" + familyId + "' is not in the catalog (see GET /admin/api/families)");
         }

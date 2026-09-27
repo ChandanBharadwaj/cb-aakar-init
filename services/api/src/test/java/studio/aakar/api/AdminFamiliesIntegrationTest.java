@@ -92,12 +92,17 @@ class AdminFamiliesIntegrationTest extends AbstractIntegrationTest {
             JsonNode keychain = find(all, "id", "keychain");
             assertThat(keychain.get("ready").asBoolean()).isTrue();
             assertThat(keychain.get("template_ids")).extracting(JsonNode::asText).containsExactly("keychain_tag");
+            assertThat(keychain.get("templates")).as("the portal list names templates, it does not embed descriptors").isEmpty();
             assertThat(keychain.get("updated_at").asText()).endsWith("Z");
             JsonNode lithophane = find(all, "id", "lithophane");
             assertThat(lithophane.get("available").asBoolean()).isFalse();
             assertThat(lithophane.get("ready").asBoolean()).isFalse();
             assertThat(lithophane.get("template_ids")).isEmpty();
             assertThat(find(all, "id", "raw_print").get("ready").asBoolean()).isTrue();
+
+            // the viewer backdrop must be one the storefront can render
+            assertProblem(post("/admin/api/families", familyBody.formatted(familyId, sku).replace("\"environment\": \"studio\"", "\"environment\": \"moon_base\""), owner),
+                    HttpStatus.UNPROCESSABLE_ENTITY, "validation_failed");
 
             // create: referenced hardware is named back, the family is listed in the portal but not on the storefront
             ResponseEntity<String> createdFamily = post("/admin/api/families", familyBody.formatted(familyId, sku), owner);

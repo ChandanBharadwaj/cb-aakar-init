@@ -384,8 +384,12 @@ class AdminLoopIntegrationTest extends AbstractIntegrationTest {
             assertThat(jharokhaRow.get("family").asText()).isEqualTo("phone_stand");
             assertThat(jharokhaRow.get("live").asBoolean()).isTrue();
             assertThat(jharokhaRow.get("catalog_items")).extracting(JsonNode::asText).containsExactly("jharokha-phone-stand");
-            assertThat(templates.findParents("id").stream().filter(t -> t.get("id").asText().equals("keychain_tag")).findFirst().orElseThrow()
-                    .get("catalog_items")).isEmpty();
+            JsonNode keychainRow = templates.findParents("id").stream().filter(t -> t.get("id").asText().equals("keychain_tag")).findFirst().orElseThrow();
+            assertThat(keychainRow.get("catalog_items")).isEmpty();
+            // the portal shows each template's Chhaap types and bought-in hardware
+            assertThat(keychainRow.get("features_supported")).extracting(JsonNode::asText).contains("relief_image");
+            assertThat(keychainRow.get("hardware").get(0).get("sku").asText()).isEqualTo("split_ring_25");
+            assertThat(keychainRow.get("hardware").get(0).get("qty").asInt()).isEqualTo(1);
             JsonNode hidden = body(put("/admin/api/templates/jharokha_phone_stand", "{\"live\": false}", owner));
             assertThat(hidden.get("live").asBoolean()).isFalse();
             assertThat(body(get("/api/templates"))).extracting(d -> d.get("id").asText()).containsExactly("keychain_tag", "raw_print");

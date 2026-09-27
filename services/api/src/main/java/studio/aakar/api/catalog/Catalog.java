@@ -53,6 +53,9 @@ public interface Catalog {
     /** Any family by id, available or not, with its readiness and live templates. */
     Optional<FamilyDto> family(String id);
 
+    /** Whether a family id is in the catalog; a database check only (never calls the geometry service). */
+    boolean familyExists(String id);
+
     /** Every family, available or not (management API). */
     List<FamilyDto> allFamilies();
 

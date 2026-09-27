@@ -57,11 +57,13 @@ class AdminTemplatesController {
     }
 
     /** One row of {@code GET /admin/api/templates}. */
-    record AdminTemplateDto(String id, int version, String family, String name, boolean live, List<String> catalogItems) {
+    record AdminTemplateDto(String id, int version, String family, String name, boolean live, List<String> catalogItems,
+            List<String> featuresSupported, List<TemplateDescriptor.Hardware> hardware) {
 
         static AdminTemplateDto of(TemplateDescriptor d, boolean live, List<CatalogItemDto> items) {
             return new AdminTemplateDto(d.id(), d.version(), d.family(), d.name(), live,
-                    items.stream().filter(i -> d.id().equals(i.templateId())).map(CatalogItemDto::slug).toList());
+                    items.stream().filter(i -> d.id().equals(i.templateId())).map(CatalogItemDto::slug).toList(),
+                    d.featuresSupportedOrEmpty(), d.hardware() == null ? List.of() : d.hardware());
         }
     }
 }

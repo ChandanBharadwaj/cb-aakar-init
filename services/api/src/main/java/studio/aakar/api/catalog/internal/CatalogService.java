@@ -185,6 +185,11 @@ class CatalogService implements Catalog {
     }
 
     @Override
+    public boolean familyExists(String id) {
+        return id != null && !id.isBlank() && families.existsById(id.trim());
+    }
+
+    @Override
     public List<FamilyDto> allFamilies() {
         return families(null, true);
     }

@@ -1,6 +1,7 @@
 package studio.aakar.api.pricing;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.Collections;
@@ -101,6 +102,7 @@ public record PricingPolicy(
             }
         }
 
+        @JsonIgnore // a helper, not a property: otherwise an all-zero rule is stored as {"empty": true}
         public boolean isEmpty() {
             return minimumSubtotalPaise == 0 && setupFeePaise == 0 && qtyBreaks.isEmpty();
         }

@@ -28,7 +28,8 @@ public record FamilyInput(
         @NotBlank(message = "default_template_id is required")
         @Pattern(regexp = "^[a-z][a-z0-9_]*$", message = "default_template_id must be snake_case starting with a letter")
         @Size(max = 80, message = "default_template_id must be at most 80 characters") String defaultTemplateId,
-        @Pattern(regexp = "^[a-z][a-z0-9_]*$", message = "environment must be snake_case starting with a letter")
+        @Pattern(regexp = "^(studio|teak_table_candlelight|desk_oak|dashboard|kitchen_marble|balcony_daylight)$",
+                message = "environment must be one of studio, teak_table_candlelight, desk_oak, dashboard, kitchen_marble, balcony_daylight")
         @Size(max = 40, message = "environment must be at most 40 characters") String environment,
         @Valid FamilyDto.SizeEnvelope sizeEnvelopeMm,
         List<@Valid HardwareRef> hardware,

@@ -39,7 +39,7 @@ class AdminFamiliesController {
     @Operation(summary = "Every outcome family (Avatar), available or not, with readiness",
             description = "`ready` is true when at least one live template of the family exists in the geometry service; `template_ids` names them.")
     List<FamilyDto> all(StaffPrincipal staff) {
-        return catalog.allFamilies();
+        return catalog.allFamilies().stream().map(FamilyDto::withoutTemplates).toList();
     }
 
     @PostMapping
