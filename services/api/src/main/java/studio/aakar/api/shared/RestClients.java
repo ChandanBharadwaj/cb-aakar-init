@@ -29,16 +29,24 @@ public class RestClients {
     }
 
     public RestClient json(String baseUrl, Duration connectTimeout, Duration readTimeout) {
+        return builder.clone()
+                .baseUrl(baseUrl)
+                .requestFactory(factory(connectTimeout, readTimeout))
+                .defaultHeader("Accept", MediaType.APPLICATION_JSON_VALUE)
+                .build();
+    }
+
+    /** A client for absolute URLs and binary bodies (model files for the print pack); no base URL, no Accept header. */
+    public RestClient raw(Duration readTimeout) {
+        return builder.clone().requestFactory(factory(DEFAULT_CONNECT_TIMEOUT, readTimeout)).build();
+    }
+
+    private static ClientHttpRequestFactory factory(Duration connectTimeout, Duration readTimeout) {
         // HTTP/1.1 only: the geometry service (uvicorn) speaks 1.1 and h2c upgrades confuse some stubs/proxies.
-        ClientHttpRequestFactory factory = ClientHttpRequestFactoryBuilder.jdk()
+        return ClientHttpRequestFactoryBuilder.jdk()
                 .withHttpClientCustomizer(http -> http.version(HttpClient.Version.HTTP_1_1))
                 .build(ClientHttpRequestFactorySettings.defaults()
                         .withConnectTimeout(connectTimeout)
                         .withReadTimeout(readTimeout));
-        return builder.clone()
-                .baseUrl(baseUrl)
-                .requestFactory(factory)
-                .defaultHeader("Accept", MediaType.APPLICATION_JSON_VALUE)
-                .build();
     }
 }

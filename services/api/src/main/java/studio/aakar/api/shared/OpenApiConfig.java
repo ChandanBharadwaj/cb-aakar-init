@@ -23,8 +23,11 @@ public class OpenApiConfig {
     @Bean
     OpenAPI aakarOpenApi() {
         return new OpenAPI()
-                .components(new Components().addSecuritySchemes("bearer",
-                        new SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("bearer").bearerFormat("JWT")))
+                .components(new Components()
+                        .addSecuritySchemes("bearer", new SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("bearer").bearerFormat("JWT")
+                                .description("Customer token from POST /api/auth/otp/verify"))
+                        .addSecuritySchemes("staffBearer", new SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("bearer").bearerFormat("JWT")
+                                .description("Staff token from POST /admin/api/auth/login; distinct from customer tokens")))
                 .info(new Info()
                         .title("Aakar API")
                         .version("1.0.0-phase1")
@@ -35,7 +38,8 @@ public class OpenApiConfig {
                                 (`X-Aakar-Guest`), cart, addresses, checkout, orders with an SSE tracking stream, payments, shipping. \
                                 Payments, shipping, messaging and OTP are adapters with mock defaults (ADR-0013). Money is integer \
                                 paise. Errors are RFC 9457 Problem Details with a stable `code`. \
-                                The hand-written contract lives in `packages/contracts/openapi/aakar-api.v1.yaml`.""")
+                                The management API for the portal lives under `/admin/api/*` with its own staff tokens (ADR-0012). \
+                                The hand-written contracts live in `packages/contracts/openapi/aakar-api.v1.yaml` and `aakar-admin.v1.yaml`.""")
                         .license(new License().name("Proprietary")));
     }
 

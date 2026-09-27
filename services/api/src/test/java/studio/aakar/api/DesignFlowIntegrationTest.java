@@ -324,11 +324,6 @@ class DesignFlowIntegrationTest extends AbstractIntegrationTest {
         assertThat(body(get("/api/designs/" + designId)).get("status").asText()).isEqualTo("ready");
     }
 
-    private void awaitJob(String jobId, String status) {
-        await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofMillis(150))
-                .untilAsserted(() -> assertThat(body(get("/api/jobs/" + jobId)).get("status").asText()).isEqualTo(status));
-    }
-
     private HttpResponse<String> sse(String jobId, String lastEventId) {
         try {
             HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(baseUrl() + "/api/jobs/" + jobId + "/events"))
@@ -381,18 +376,6 @@ class DesignFlowIntegrationTest extends AbstractIntegrationTest {
                     case "sculpting" -> "Weaving your design";
                     default -> "Checking physics";
                 }, percent);
-    }
-
-    private JsonNode assertProblem(ResponseEntity<String> response, HttpStatus status, String code) {
-        assertThat(response.getStatusCode()).as("status for %s", response.getBody()).isEqualTo(status);
-        assertThat(response.getHeaders().getContentType()).isNotNull();
-        assertThat(response.getHeaders().getContentType().isCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)).isTrue();
-        JsonNode problem = body(response);
-        assertThat(problem.get("code").asText()).isEqualTo(code);
-        assertThat(problem.get("status").asInt()).isEqualTo(status.value());
-        assertThat(problem.get("title").asText()).isNotBlank();
-        assertThat(problem.get("detail").asText()).isNotBlank();
-        return problem;
     }
 
     private static void validateAgainst(String schema, JsonNode document) {

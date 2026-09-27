@@ -6,4 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 interface MaterialRepository extends JpaRepository<MaterialEntity, String> {
 
     List<MaterialEntity> findAllByOrderBySortOrderAscIdAsc();
+
+    List<MaterialEntity> findByAvailableTrueOrderBySortOrderAscIdAsc();
 }

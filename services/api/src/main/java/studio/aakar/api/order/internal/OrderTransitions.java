@@ -16,6 +16,7 @@ import static studio.aakar.api.order.OrderStatus.slicing;
 
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import studio.aakar.api.order.OrderStatus;
@@ -31,6 +32,9 @@ import studio.aakar.api.order.OrderStatus;
 final class OrderTransitions {
 
     private static final Map<OrderStatus, Set<OrderStatus>> ALLOWED = new EnumMap<>(OrderStatus.class);
+    /** How the portal lists the moves: the production step first, then reprint, hold and cancel. */
+    private static final List<OrderStatus> DISPLAY_ORDER = List.of(confirmed, queued, slicing, printing, finishing, qc, packed, shipped,
+            delivered, reprint, on_hold, cancelled);
 
     static {
         ALLOWED.put(pending_payment, EnumSet.of(confirmed, cancelled));
@@ -57,6 +61,12 @@ final class OrderTransitions {
 
     static Set<OrderStatus> next(OrderStatus from) {
         return Set.copyOf(ALLOWED.getOrDefault(from, Set.of()));
+    }
+
+    /** {@link #next(OrderStatus)} as the portal shows it, e.g. {@code queued → [slicing, on_hold, cancelled]}. */
+    static List<OrderStatus> nextOrdered(OrderStatus from) {
+        Set<OrderStatus> allowed = next(from);
+        return DISPLAY_ORDER.stream().filter(allowed::contains).toList();
     }
 
     /** Default tracking-board line for a status. */

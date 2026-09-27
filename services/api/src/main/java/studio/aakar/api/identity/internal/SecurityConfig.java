@@ -3,6 +3,7 @@ package studio.aakar.api.identity.internal;
 import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -14,23 +15,28 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import studio.aakar.api.shared.ProblemCodes;
+import studio.aakar.api.shared.ProblemResponses;
 
 /**
  * Stateless resource-server style chain. Public: catalog, templates, designs (unguessable ids), versions,
  * jobs, cart (guest or user), auth, shipping serviceability, the geometry callback, actuator and docs.
  * Signed-in only: profile, addresses, checkout, orders, payments. Unauthenticated calls to those answer
  * 401 {@code unauthenticated} as Problem Details. Unknown routes stay public so they 404 like before.
+ * {@code /admin/api/**} never reaches this chain: the admin module registers its own, earlier-ordered chain
+ * for staff tokens.
  */
 @Configuration
 @EnableWebSecurity
 class SecurityConfig {
 
+    /** After the admin module's staff chain (order 10), which matches {@code /admin/api/**} only. */
+    static final int CUSTOMER_CHAIN_ORDER = 100;
     static final String[] AUTHENTICATED = {
         "/api/auth/me", "/api/auth/logout", "/api/me/**", "/api/checkout", "/api/orders/**", "/api/payments/**"
     };
     static final String[] PUBLIC = {
         "/api/catalog/**", "/api/templates/**", "/api/designs/**", "/api/versions/**", "/api/jobs/**", "/api/cart/**",
-        "/api/auth/**", "/api/shipping/**", "/internal/**", "/actuator/**", "/swagger-ui/**", "/swagger-ui.html",
+        "/api/auth/**", "/api/shipping/**", "/internal/**", "/media/**", "/actuator/**", "/swagger-ui/**", "/swagger-ui.html",
         "/v3/api-docs/**", "/error"
     };
 
@@ -46,6 +52,7 @@ class SecurityConfig {
     }
 
     @Bean
+    @Order(CUSTOMER_CHAIN_ORDER)
     SecurityFilterChain apiSecurity(HttpSecurity http, SessionService sessions, ProblemResponses problems,
             UrlBasedCorsConfigurationSource cors) throws Exception {
         http.csrf(AbstractHttpConfigurer::disable)

@@ -2,7 +2,12 @@ package studio.aakar.api.identity.internal;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,6 +85,24 @@ class AuthService implements Users {
     @Transactional(readOnly = true)
     public Optional<UserDto> find(UUID userId) {
         return users.findById(userId).map(UserEntity::toDto);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<UUID, UserDto> findAll(Collection<UUID> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return Map.of();
+        }
+        return users.findAllById(userIds).stream().map(UserEntity::toDto).collect(Collectors.toMap(UserDto::id, Function.identity()));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UUID> findIdsByPhoneContaining(String digits) {
+        if (digits == null || digits.isBlank()) {
+            return List.of();
+        }
+        return users.findIdsByPhoneContaining(digits.trim());
     }
 
     private UserEntity requireUser(UUID userId) {

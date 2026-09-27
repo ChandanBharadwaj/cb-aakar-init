@@ -27,6 +27,7 @@ class PricingPolicyEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb", nullable = false)
     private Map<String, Object> policy;
+    private String note;
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
     @Column(name = "created_by", nullable = false)
@@ -36,9 +37,14 @@ class PricingPolicyEntity {
     }
 
     PricingPolicyEntity(String version, boolean active, Map<String, Object> policy, Instant createdAt, String createdBy) {
+        this(version, active, policy, null, createdAt, createdBy);
+    }
+
+    PricingPolicyEntity(String version, boolean active, Map<String, Object> policy, String note, Instant createdAt, String createdBy) {
         this.version = version;
         this.active = active;
         this.policy = policy;
+        this.note = note;
         this.createdAt = createdAt;
         this.createdBy = createdBy;
     }
@@ -53,6 +59,10 @@ class PricingPolicyEntity {
 
     Map<String, Object> policy() {
         return policy;
+    }
+
+    String note() {
+        return note;
     }
 
     Instant createdAt() {

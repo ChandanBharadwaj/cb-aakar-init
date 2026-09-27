@@ -10,14 +10,15 @@ import org.springframework.stereotype.Component;
 /**
  * ADR-0013: mock adapters and the OTP dev code must never run in production. When {@code aakar.profile}
  * is {@code production} and any external provider is still the mock (or messaging only logs, or the OTP
- * code is exposed, or the JWT secret is the dev default), the context fails to start with a message
- * naming every offending property.
+ * code is exposed, or the JWT secret or the staff seed password is the dev default), the context fails to
+ * start with a message naming every offending property.
  */
 @Component
 public class ProductionGuard implements SmartInitializingSingleton {
 
     public static final String PROFILE = "aakar.profile";
     public static final String DEV_JWT_SECRET = "aakar-local-dev-secret-do-not-use-in-production-0123456789";
+    public static final String DEFAULT_ADMIN_SEED_PASSWORD = "aakar-studio";
 
     /** Property → the value that is not allowed in production. */
     static final Map<String, String> FORBIDDEN_IN_PRODUCTION = Map.of(
@@ -26,7 +27,8 @@ public class ProductionGuard implements SmartInitializingSingleton {
             "aakar.payments.gateway", "mock",
             "aakar.shipping.carrier", "mock",
             "aakar.messaging.sender", "log",
-            "aakar.identity.jwt-secret", DEV_JWT_SECRET);
+            "aakar.identity.jwt-secret", DEV_JWT_SECRET,
+            "aakar.admin.seed-password", DEFAULT_ADMIN_SEED_PASSWORD);
 
     private final Environment environment;
 
@@ -65,6 +67,7 @@ public class ProductionGuard implements SmartInitializingSingleton {
     private static String defaultOf(String property) {
         return switch (property) {
             case "aakar.identity.jwt-secret" -> DEV_JWT_SECRET;
+            case "aakar.admin.seed-password" -> DEFAULT_ADMIN_SEED_PASSWORD;
             default -> FORBIDDEN_IN_PRODUCTION.get(property);
         };
     }

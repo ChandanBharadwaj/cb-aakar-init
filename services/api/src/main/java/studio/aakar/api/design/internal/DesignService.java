@@ -59,6 +59,10 @@ class DesignService implements Designs {
             throw ApiProblemException.unprocessable(ProblemCodes.NOT_YET_AVAILABLE, "Not yet available", NOT_YET_AVAILABLE_DETAIL);
         }
         Draft draft = request.source() == DesignSource.shop ? fromShop(request) : fromTemplate(request);
+        if (!templates.isLive(draft.descriptor().id())) {
+            throw ApiProblemException.unprocessable(ProblemCodes.TEMPLATE_NOT_AVAILABLE, "Template not available",
+                    "Template " + draft.descriptor().id() + " is paused by the studio; new designs from it are not accepted right now");
+        }
         templates.validateParams(draft.descriptor(), draft.params());
         requireMaterial(draft.descriptor(), draft.material(), HttpStatus.UNPROCESSABLE_ENTITY);
 

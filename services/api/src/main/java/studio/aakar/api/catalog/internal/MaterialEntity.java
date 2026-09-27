@@ -4,10 +4,12 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import java.util.Map;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import studio.aakar.api.catalog.MaterialDto;
+import studio.aakar.api.catalog.MaterialInput;
 
 @Entity
 @Table(name = "materials")
@@ -30,12 +32,37 @@ class MaterialEntity {
     private Map<String, Object> pbr;
     @Column(name = "sort_order")
     private int sortOrder;
+    private boolean available;
+    @Column(name = "updated_at")
+    private Instant updatedAt;
 
     protected MaterialEntity() {
     }
 
+    MaterialEntity(MaterialInput input, Instant now) {
+        this.id = input.id();
+        apply(input, now);
+    }
+
+    String id() {
+        return id;
+    }
+
+    void apply(MaterialInput input, Instant now) {
+        this.name = input.name().trim();
+        this.filament = input.filament().trim();
+        this.densityGCm3 = input.densityGCm3();
+        this.finishClass = input.finishClass();
+        this.ratePerGPaise = input.ratePerGPaise();
+        this.heatSafe = input.heatSafeOrDefault();
+        this.pbr = input.pbr();
+        this.sortOrder = input.sortOrderOrDefault();
+        this.available = input.availableOrDefault();
+        this.updatedAt = now;
+    }
+
     MaterialDto toDto() {
         return new MaterialDto(id, name, filament, densityGCm3, finishClass, ratePerGPaise, heatSafe,
-                pbr == null ? Map.of() : pbr);
+                pbr == null ? Map.of() : pbr, available, sortOrder, updatedAt);
     }
 }

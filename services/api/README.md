@@ -1,15 +1,16 @@
 # aakar-api
 
-Storefront API for Aakar (PLAN §6, §10, §12; ADR-0008, ADR-0013): a Spring Boot **modulith** that serves the
+Storefront API for Aakar (PLAN §6, §10, §12; ADR-0008, ADR-0012, ADR-0013): a Spring Boot **modulith** that serves the
 catalog, starts designs from templates, hands generation jobs to the geometry service, streams progress over
 SSE, prices every version per material, and — since Phase 1 — signs customers in by phone OTP, keeps guest and
 user carts, takes checkout, records payments, tracks orders through the studio stages over SSE, books shipments
-and logs customer messages. Java 21 · Spring Boot 3.5.16 · Spring Modulith 1.4.13 · Spring Security 6.5 ·
-springdoc 2.8.17 · jjwt 0.12.6 · PostgreSQL 16 · Flyway.
+and logs customer messages. It also serves the **management API** behind the portal (`apps/admin`) under
+`/admin/api/*` with its own staff accounts. Java 21 · Spring Boot 3.5.16 · Spring Modulith 1.4.13 · Spring Security 6.5 ·
+springdoc 2.8.17 · jjwt 0.12.6 · PDFBox 3.0.8 · zxing 3.5.4 · PostgreSQL 16 · Flyway.
 
 The contracts in [`packages/contracts`](../../packages/contracts) are the law: request/response shapes
-follow `openapi/aakar-api.v1.yaml`, JSONB documents are the `schemas/*.json` shapes stored and served
-verbatim, and geometry messages are `schemas/events/*.json`. Money is integer paise.
+follow `openapi/aakar-api.v1.yaml` (storefront) and `openapi/aakar-admin.v1.yaml` (management API), JSONB documents
+are the `schemas/*.json` shapes stored and served verbatim, and geometry messages are `schemas/events/*.json`. Money is integer paise.
 
 ## Run
 
@@ -59,8 +60,32 @@ curl -s -X POST $API/api/auth/logout -H "$AUTH"                                 
 ```
 
 `{"outcome":"failure"}` leaves the order `pending_payment` with a "Payment failed" event; `POST /api/orders/{id}/payments`
-starts a fresh attempt. Studio stage changes have no public endpoint yet (the admin module adds staff endpoints);
+starts a fresh attempt. Studio stage changes are staff operations on the management API (below);
 `Orders.advance(orderId, status, message, detail)` is the domain entry point.
+
+### The studio side with curl (management API, ADR-0012)
+
+```sh
+API=http://localhost:8080
+# 1. staff sign-in: the seed owner (password from aakar.admin.seed-password, default aakar-studio)
+curl -s -X POST $API/admin/api/auth/login -H 'Content-Type: application/json' \
+     -d '{"email":"studio@aakar.local","password":"aakar-studio"}'              # → access_token (typ=staff, 12 h), staff {role: owner}
+STAFF="Authorization: Bearer <access_token>"
+curl -s $API/admin/api/auth/me -H "$STAFF"
+curl -s $API/admin/api/dashboard -H "$STAFF"                                    # orders_by_status, orders_today, revenue_*_paise, awaiting_action
+# 2. the queue: comma-separated statuses, q = order-number prefix or phone digits; page object
+curl -s "$API/admin/api/orders?status=queued,on_hold&q=AK-0000&page=0&size=25" -H "$STAFF"   # items[].next_actions e.g. [slicing, on_hold, cancelled]
+curl -s $API/admin/api/orders/<order_id> -H "$STAFF"                            # AdminOrder: Order + customer, next_actions, qc_photos, notifications
+# 3. advance through the studio; message defaults per status, detail lands on the event
+curl -s -X POST $API/admin/api/orders/<order_id>/advance -H "$STAFF" -H 'Content-Type: application/json' \
+     -d '{"status":"slicing","detail":{"printer_bay":"B2","layer_height_mm":0.2,"layers_total":480}}'
+curl -s -X POST $API/admin/api/orders/<order_id>/advance -H "$STAFF" -H 'Content-Type: application/json' -d '{"status":"printing"}'
+# 4. hand the job to the outsourced printer
+curl -s -OJ $API/admin/api/orders/<order_id>/print-pack -H "$STAFF"             # AK-000001-print-pack.zip: item-1/print-sheet.txt, model.3mf, model.stl
+# … finishing → qc → packed (books the shipment) → the packaging card → shipped → delivered
+curl -s -X POST $API/admin/api/orders/<order_id>/qc-photos -H "$STAFF" -F file=@front.jpg -F note='Arch edges checked'   # 201 MediaAsset
+curl -s -OJ $API/admin/api/orders/<order_id>/packaging-card.pdf -H "$STAFF"     # 409 order_not_packed before packed
+```
 
 ## Test
 
@@ -94,6 +119,9 @@ when those files are missing; `-Daakar.repo.root=…` overrides the monorepo loc
 | `studio/internal/EnvelopeMapperTest` | `design.generate` envelope, payload parsing, Rabbit topology (no broker) |
 | `DesignFlowIntegrationTest` | Shop → job → ready version (assets, printability, price, spec valid), params edit (422 / new version), prompt → `not_yet_available`, failed build, live SSE + idempotent callbacks, Problem Details codes |
 | `CustomerLoopIntegrationTest` | The whole loop above end to end, failed payment + retry, unserviceable / empty / unprintable checkout, cart rules and re-pricing on a policy change, 401 / owner-only 404s, addresses, OTP validation and rate limit, OpenAPI paths |
+| `AdminLoopIntegrationTest` | Management API (ADR-0012): seeded owner sign-in, staff vs customer tokens (401 both ways), dashboard, queue filters and `next_actions`, queued → delivered with events, messages (`printing_timelapse`, `shipped`, `delivered`) and audit, print pack zip (WireMock serves the model files), QC photo upload (+ 413), packaging card 409 → `%PDF` and the share code, pricing publish (409 / 422) and preview, materials (hidden from the storefront), catalog, template live switch (422 `template_not_available`), messages and audit pages, `studio` role 403 on configuration |
+| `admin/internal/StaffTokensTest` · `identity/internal/JwtTokensTest` | Staff tokens are `typ: staff`; the customer parser refuses them and the staff parser refuses customer tokens |
+| `admin/internal/StaffPrincipalTest` · `DashboardServiceTest` · `PrintSheetTest` · `PrintPackTest` · `ShareCodesTest` · `PackagingCardTest` | Owner-only gating (403), studio-day windows and `awaiting_action`, print-sheet text, zip contents and missing-file notes, 8-char base32 codes with collision retry, PDF bytes start with `%PDF` |
 | `MaterialsSeedTest` | `V3__seed_materials.sql`, `aakar.pricing` and the `V4` policy row match `packages/design-tokens/materials.json` |
 
 ## Identity
@@ -119,6 +147,69 @@ Public routes: `/api/catalog/**`, `/api/templates/**`, `/api/designs/**` (design
 `/api/checkout`, `/api/orders/**`, `/api/payments/**` (401 Problem `unauthenticated`; other people's orders and payments 404).
 CORS allows `http://localhost:3000` with the `Authorization` and `X-Aakar-Guest` request headers (`aakar.cors.allowed-origins`).
 
+## Management API (ADR-0012)
+
+The portal (`apps/admin`, port 3100) talks to `/admin/api/*`. Contract: `packages/contracts/openapi/aakar-admin.v1.yaml`;
+module `admin` (`studio.aakar.api.admin`), which drives the other modules through their public APIs only.
+
+**Staff auth.** `staff_accounts` (email, name, role, bcrypt hash). On the first start with an empty table the module
+seeds the owner **`studio@aakar.local`** with `aakar.admin.seed-password` (default `aakar-studio`; the production guard
+refuses the default). `POST /admin/api/auth/login {email, password}` → `StaffSession` with a **staff token**: HS256 with
+the identity secret but claim `typ: staff` (`sub` = account id, `email`, `role`), `aakar.admin.token-ttl` = 12 h.
+Customer tokens are `typ: customer`; each parser refuses the other type, so a customer token on `/admin/api/**` and a
+staff token on `/api/**` both answer 401 `unauthenticated`. `/admin/api/**` has its own Spring Security chain (order 10,
+before the customer chain); `GET /admin/api/auth/me` returns the account. Further accounts: `StaffAccounts.create(...)`
+(no endpoint yet).
+
+**Roles.** `owner` may do everything; `studio` runs fulfilment (orders, advance, print pack, QC photos, packaging card,
+preview) and reads configuration — writes to pricing, materials, catalog and templates answer 403 `forbidden`.
+
+**Endpoints.**
+
+| Method | Path | Notes |
+|---|---|---|
+| POST | `/admin/api/auth/login` | 200 `StaffSession`; 401 `unauthenticated` |
+| GET | `/admin/api/auth/me` | `Staff` |
+| GET | `/admin/api/dashboard` | `orders_by_status` (every status), `orders_today`, `revenue_today_paise`, `revenue_month_paise` (non-cancelled orders with a succeeded payment, Asia/Kolkata days), `awaiting_action` = queued + finishing + qc |
+| GET | `/admin/api/orders?status&q&page&size` | Newest first; `status` comma-separated; `q` = number prefix (`AK-0001`, `000012`) or phone digits; `{items, page, size, total}`, `size` ≤ 100; items carry `customer`, `materials`, `next_actions` |
+| GET | `/admin/api/orders/{orderId}` | `AdminOrder`: the customer `Order` + `customer`, `next_actions` (transition table), `qc_photos`, `notifications` |
+| POST | `/admin/api/orders/{orderId}/advance` | `{status, message?, detail?}` → `AdminOrder`; defaults "Slicing your piece", "Printing", "Hand sanding & sealing", "Quality check", "Packed", "Shipped", "Delivered"; 409 `invalid_transition`; records `printing_timelapse` / `shipped` / `delivered` messages; audit `order.advance` |
+| GET | `/admin/api/orders/{orderId}/print-pack` | `application/zip`, `Content-Disposition: attachment; filename="AK-000001-print-pack.zip"`; per item `item-<n>/print-sheet.txt` + `model.3mf` + `model.stl` |
+| POST | `/admin/api/orders/{orderId}/qc-photos` | multipart `file` (≤ 10 MB, else 413 `payload_too_large`) + `note` → 201 `MediaAsset`; audit `order.qc_photo` |
+| GET | `/admin/api/orders/{orderId}/packaging-card.pdf` | One-page A6 PDF; 409 `order_not_packed` before `packed` |
+| GET · POST | `/admin/api/pricing/policies` | History (newest first, with policy body and note); publish `{version, policy, note?}` → 201 (owner; 409 `policy_version_exists`, 422 `validation_failed`); audit `pricing.publish` (before = previous active) |
+| GET | `/admin/api/pricing/policies/active` | The active version |
+| POST | `/admin/api/pricing/preview` | `{policy, material, extruded_volume_cm3, print_seconds}` → `PriceBreakdown` with `policy_version: preview` |
+| GET · POST | `/admin/api/materials` | All incl. unavailable; create (owner; 409 `material_exists`) |
+| PUT | `/admin/api/materials/{materialId}` | Replace (owner; 404); `available: false` hides it from `GET /api/catalog/materials` (existing carts and orders keep pricing) |
+| GET · POST | `/admin/api/catalog/items` | All items; create (owner; 409 `slug_exists`, 422 `unknown_material`) |
+| PUT | `/admin/api/catalog/items/{slug}` | Replace (owner; 404) |
+| GET | `/admin/api/templates` | Geometry descriptors merged with `template_flags` (`live` default true) and the slugs using each |
+| PUT | `/admin/api/templates/{templateId}` | `{live}` (owner; 404); `live: false` hides it from `GET /api/templates` and makes `POST /api/designs` answer 422 `template_not_available` |
+| GET | `/admin/api/notifications?order_id&page&size` | Messages log (`NotificationRecord` with `order_id`, `rendered_text`), newest first, `size` ≤ 200 |
+| GET | `/admin/api/audit?page&size` | `AuditEntry` rows (`staff_email`, `action`, `target`, `before`, `after`), newest first |
+
+Schema violations on admin bodies answer **422** `validation_failed` (the storefront API uses 400). Every write records an
+`audit_log` row (`order.advance`, `order.qc_photo`, `pricing.publish`, `material.create|update`, `catalog.create|update`, `template.live`).
+
+**Print pack.** Built in memory: for each order item a `print-sheet.txt` (order number, piece and version, template `id@version`
+and params from the version spec, material and filament, finish class, quantity, bounds, mass and estimated time from the
+snapshot, specs line, notes, and the list of files) plus `model.3mf` and `model.stl` downloaded from the version's `assets`
+URLs; a file that cannot be fetched is skipped and noted on the sheet. Printing is outsourced (ADR-0004).
+
+**Packaging card.** PDFBox + zxing: "Aakar", "Designed by You. Crafted by Aakar.", the piece, its finish, "Printed in
+Bengaluru · <date>", the order number and the reprint / remix link `{aakar.web.url}/k/<code>` as text and QR.
+
+**Share codes.** `share_codes` (8-character base32 code, order, design, version) — minted once per order at the first card
+request. The public storefront page for `/k/{code}` arrives later; the row already names what to open.
+
+**Media.** QC photos go through the `media` module's `MediaStore`: files under `aakar.media.dir` (default `./.aakar-media`)
+served publicly at `{aakar.api.public-url}/media/{key}`; `media_assets` keeps kind, order, key, URL, type, size and note.
+An S3 store is a drop-in implementation.
+
+CORS: `aakar.cors.origins` (default `http://localhost:3000,http://localhost:3100`) applies to `/api/**`, `/admin/api/**` and
+`/media/**`; `Content-Disposition` is exposed so the portal can name downloads.
+
 ## Mock adapters (ADR-0013) and how to swap them
 
 Every external provider sits behind an interface in its module's root package; the implementation is chosen by a property
@@ -133,8 +224,8 @@ and the default is the mock. A real adapter is a new `@Component` implementing t
 | Messaging | `notification.MessageSender` | `aakar.messaging.sender` (`log`) | Records the row in `notifications` with status `logged` instead of sending (template `order_confirmed` on payment success, channel `whatsapp` or `sms` per `notify_whatsapp`) |
 
 **Production guard.** `aakar.profile` is `local` by default. With `aakar.profile=production` the context refuses to start
-(`shared/ProductionGuard`) while any adapter above is `mock`/`log`, `expose-dev-code` is `true`, or the JWT secret is the
-dev default — the message names every offending property.
+(`shared/ProductionGuard`) while any adapter above is `mock`/`log`, `expose-dev-code` is `true`, the JWT secret is the
+dev default, or the staff seed password is the default `aakar-studio` — the message names every offending property.
 
 ## Pricing policies (ADR-0008)
 
@@ -192,12 +283,16 @@ are de-duplicated on `event_id`, terminal jobs ignore late messages.
 | `AAKAR_PAYMENTS_GATEWAY` | `aakar.payments.gateway` | `mock` | Payment adapter |
 | `AAKAR_SHIPPING_CARRIER` | `aakar.shipping.carrier` | `mock` | Carrier adapter |
 | `AAKAR_MESSAGING_SENDER` | `aakar.messaging.sender` | `log` | Messaging adapter |
+| `AAKAR_ADMIN_SEED_PASSWORD` | `aakar.admin.seed-password` | `aakar-studio` | Password of the seed owner `studio@aakar.local` (forced off the default in production) |
+| `AAKAR_ADMIN_TOKEN_TTL` | `aakar.admin.token-ttl` | `12h` | Staff-token lifetime |
+| `AAKAR_MEDIA_DIR` | `aakar.media.dir` | `./.aakar-media` | Local media store (QC photos), served at `/media/{key}` |
+| `AAKAR_CORS_ORIGINS` | `aakar.cors.origins` | `http://localhost:3000,http://localhost:3100` | Allowed browser origins (storefront, portal) |
 | `AAKAR_AMQP_URL` | `spring.rabbitmq.addresses` | `amqp://aakar:aakar@localhost:5672/` | RabbitMQ (`rabbit` profile only) |
 | `AAKAR_TEST_JDBC_URL` | | `jdbc:postgresql://127.0.0.1:5432/aakar_test` | Integration-test database (`AAKAR_TEST_DB_USER` / `AAKAR_TEST_DB_PASSWORD` optional) |
 | `SPRING_PROFILES_ACTIVE` | | `direct` | `direct` or `rabbit` |
 
 `aakar.pricing.*` in `application.yml` is the pricing-policy **seed** (copied from `packages/design-tokens/materials.json →
-pricing_policy`); CORS allows `http://localhost:3000` (`aakar.cors.allowed-origins`).
+pricing_policy`).
 
 ## Endpoints
 
@@ -205,8 +300,9 @@ pricing_policy`); CORS allows `http://localhost:3000` (`aakar.cors.allowed-origi
 |---|---|---|
 | GET | `/api/catalog/items?category&q` | Shop items (available first) |
 | GET | `/api/catalog/items/{slug}` | 404 `not_found` |
-| GET | `/api/catalog/materials` | Digital materials with PBR presets and rates |
-| GET | `/api/templates` · `/api/templates/{id}` | Descriptors cached from geometry for 60 s |
+| GET | `/api/catalog/materials` | Available digital materials with PBR presets and rates (materials paused in the portal are hidden) |
+| GET | `/api/templates` · `/api/templates/{id}` | Descriptors cached from geometry for 60 s; the list hides templates switched off in the portal |
+| GET | `/media/{key}` | A stored media file (QC photos) |
 | POST | `/api/designs` | 202 `DesignAccepted`; owned by the bearer's user or the `X-Aakar-Guest` id. `source=shop` + `catalog_item_slug`; `source=create|remix` + `template_id` (+ `params`, `material`); any `prompt` → 422 `not_yet_available` |
 | GET | `/api/designs/{id}` · `/api/designs/{id}/versions` | Design with latest version (status derived from it); history newest first |
 | GET | `/api/versions/{versionId}` | Version, with `price` for its own material once ready |
@@ -236,12 +332,13 @@ Errors are RFC 9457 Problem Details (`application/problem+json`) with a stable `
 `not_found`, `validation_failed`, `not_yet_available`, `param_out_of_range`, `template_not_available`,
 `version_not_ready`, `unknown_material`, `geometry_unavailable`, `unauthenticated`, `forbidden`, `otp_invalid`,
 `otp_expired`, `otp_rate_limited`, `not_printable`, `cart_empty`, `not_serviceable`, `payment_final`,
-`order_not_payable`, `invalid_transition`, `policy_version_exists`, `internal_error`.
+`order_not_payable`, `invalid_transition`, `policy_version_exists`, `order_not_packed`, `material_exists`, `slug_exists`,
+`payload_too_large`, `internal_error`.
 
 ## Modules (`studio.aakar.api.*`)
 
 `catalog` · `templates` · `design` · `studio` · `pricing` · `media` · `identity` · `cart` · `order` · `payment` ·
-`shipping` · `notification` · `shared` (open). Public API lives in each module's root package; everything under
+`shipping` · `notification` · `admin` · `shared` (open). Public API lives in each module's root package; everything under
 `internal` is private and enforced by `ModularityTests`. Cross-module calls go through public services
 (`Designs`, `Carts`, `Orders`, `Payments`, `Shipments`, `Notifications`, `Users`, `Addresses`, `PricingPolicyStore`,
 `ShippingCarrier`) or application events, and the graph is acyclic:
@@ -250,14 +347,16 @@ Errors are RFC 9457 Problem Details (`application/problem+json`) with a stable `
 - `identity → design, cart` for the sign-in hand-over (`Designs.attachGuest`, `Carts.mergeGuestCart`).
 - `cart → design, catalog, pricing`; it empties itself on `payment.PaymentSucceeded`.
 - `order → cart, identity, design, payment, shipping, notification`; it listens for `PaymentSucceeded` / `PaymentFailed` from `payment`, which depends on nothing above `shared`.
-- `shared` holds the per-request `Identity`, the generic `SseHub<E>` behind both the job and the order streams, Problem Details, CORS, the clock and the production guard.
+- `admin → order, design, payment, shipping, notification, pricing, catalog, templates, media, identity`; nothing depends on `admin`.
+- `shared` holds the per-request `Identity`, the generic `SseHub<E>` behind both the job and the order streams, Problem Details (and the filter-chain `ProblemResponses`), CORS, the clock and the production guard.
 
 ## Schema
 
 Flyway `V1` (catalog, materials, designs, versions, jobs, job events, outbox), `V2`/`V3` seeds, `V4` `pricing_policies`
 (+ seed row), `V5` `users`, `otp_requests`, `sessions`, `addresses`, `designs.guest_id`, `V6` `carts`, `cart_items`,
 `V7` `orders`, `order_items`, `order_events`, `payments`, `shipments`, `notifications` and the `order_number_seq` /
-`invoice_number_seq` sequences.
+`invoice_number_seq` sequences, `V8` `staff_accounts`, `audit_log`, `media_assets`, `template_flags`, `share_codes`,
+`materials.available` / `updated_at`, `notifications.order_id` / `rendered_text`, `pricing_policies.note`.
 
 ## Docker
 

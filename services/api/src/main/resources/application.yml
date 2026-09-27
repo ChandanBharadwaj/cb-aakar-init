@@ -29,6 +29,11 @@ spring:
   mvc:
     problemdetails:
       enabled: false
+  servlet:
+    multipart:
+      # QC photos are capped at 10 MB by the admin module (413 payload_too_large); the container limit sits above it.
+      max-file-size: 12MB
+      max-request-size: 13MB
 
 server:
   port: 8080
@@ -66,8 +71,8 @@ aakar:
     # The storefront; the mock gateway's pay_url points at {web.url}/checkout/pay/{paymentId}.
     url: ${AAKAR_WEB_URL:http://localhost:3000}
   cors:
-    allowed-origins:
-      - http://localhost:3000
+    # Storefront (3000) and management portal (3100); `aakar.cors.allowed-origins` is still read as an alias.
+    origins: ${AAKAR_CORS_ORIGINS:http://localhost:3000,http://localhost:3100}
   identity:
     # HS256 key, at least 32 characters. The default is a dev-only string.
     jwt-secret: ${AAKAR_JWT_SECRET:aakar-local-dev-secret-do-not-use-in-production-0123456789}
@@ -85,6 +90,14 @@ aakar:
     carrier: ${AAKAR_SHIPPING_CARRIER:mock}       # mock | delhivery (later)
   messaging:
     sender: ${AAKAR_MESSAGING_SENDER:log}         # log | whatsapp (later)
+  media:
+    # Local asset directory for staff uploads (QC photos), served at {api.public-url}/media/{key}; S3 later.
+    dir: ${AAKAR_MEDIA_DIR:./.aakar-media}
+  admin:
+    # Management API (ADR-0012). The seed owner studio@aakar.local is created on first start with this password;
+    # the production guard refuses the default. Staff tokens are HS256 with the identity secret and typ=staff.
+    seed-password: ${AAKAR_ADMIN_SEED_PASSWORD:aakar-studio}
+    token-ttl: ${AAKAR_ADMIN_TOKEN_TTL:12h}
   # PLAN §7.10 · the SEED pricing policy (ADR-0008): V4__pricing_policies.sql inserts the same values as the
   # first active row; from then on the active policy lives in the pricing_policies table.
   pricing:

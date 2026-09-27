@@ -10,6 +10,7 @@ import java.util.Map;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import studio.aakar.api.catalog.CatalogItemDto;
+import studio.aakar.api.catalog.CatalogItemInput;
 
 @Entity
 @Table(name = "catalog_items")
@@ -42,6 +43,35 @@ class CatalogItemEntity {
     private Instant updatedAt;
 
     protected CatalogItemEntity() {
+    }
+
+    CatalogItemEntity(CatalogItemInput input, Instant now) {
+        this.slug = input.slug();
+        this.createdAt = now;
+        apply(input, now);
+    }
+
+    String slug() {
+        return slug;
+    }
+
+    String templateId() {
+        return templateId;
+    }
+
+    void apply(CatalogItemInput input, Instant now) {
+        this.name = input.name().trim();
+        this.category = input.category();
+        this.description = input.description() == null || input.description().isBlank() ? null : input.description().trim();
+        this.templateId = input.templateId().trim();
+        this.defaultParams = input.defaultParams() == null ? Map.of() : input.defaultParams();
+        this.defaultMaterial = input.defaultMaterial().trim();
+        this.basePricePaise = input.basePricePaise();
+        this.specsLine = input.specsLine();
+        this.environment = input.environment() == null || input.environment().isBlank() ? null : input.environment().trim();
+        this.available = input.available();
+        this.media = input.media() == null ? List.of() : input.media();
+        this.updatedAt = now;
     }
 
     CatalogItemDto toDto() {

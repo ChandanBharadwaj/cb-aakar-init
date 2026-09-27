@@ -1,5 +1,6 @@
 package studio.aakar.api.pricing;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -14,7 +15,7 @@ public interface PricingPolicyStore {
 
     Optional<PricingPolicy> byVersion(String version);
 
-    /** Every published version, newest first. */
+    /** Every published version with its policy, newest first. */
     List<PricingPolicyInfo> history();
 
     /**
@@ -25,7 +26,19 @@ public interface PricingPolicyStore {
      */
     PricingPolicy publish(PricingPolicy policy, String createdBy);
 
-    /** Header of a stored policy version. */
-    record PricingPolicyInfo(String version, boolean active, java.time.Instant createdAt, String createdBy) {
+    /** {@link #publish(PricingPolicy, String)} with the staff note kept on the version (management API). */
+    default PricingPolicyInfo publish(PricingPolicy policy, String createdBy, String note) {
+        PricingPolicy published = publish(policy, createdBy);
+        return history().stream().filter(i -> i.version().equals(published.version())).findFirst()
+                .orElseGet(() -> new PricingPolicyInfo(published.version(), true, published, note, Instant.now(), createdBy));
+    }
+
+    /** The active version's header, when the table has one. */
+    default Optional<PricingPolicyInfo> activeInfo() {
+        return history().stream().filter(PricingPolicyInfo::active).findFirst();
+    }
+
+    /** A stored policy version: header plus the policy itself and the note the publisher left. */
+    record PricingPolicyInfo(String version, boolean active, PricingPolicy policy, String note, Instant createdAt, String createdBy) {
     }
 }

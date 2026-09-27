@@ -29,6 +29,12 @@ public final class ProblemCodes {
     public static final String INVALID_TRANSITION = "invalid_transition";
     public static final String POLICY_VERSION_EXISTS = "policy_version_exists";
 
+    // Phase 1 · management API (ADR-0012)
+    public static final String ORDER_NOT_PACKED = "order_not_packed";
+    public static final String MATERIAL_EXISTS = "material_exists";
+    public static final String SLUG_EXISTS = "slug_exists";
+    public static final String PAYLOAD_TOO_LARGE = "payload_too_large";
+
     private ProblemCodes() {
     }
 }

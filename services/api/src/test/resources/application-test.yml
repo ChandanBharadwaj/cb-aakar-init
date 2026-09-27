@@ -10,6 +10,8 @@ spring:
 aakar:
   api:
     public-url: http://localhost:8080
+  media:
+    dir: build/test-media
 logging:
   level:
     studio.aakar: DEBUG

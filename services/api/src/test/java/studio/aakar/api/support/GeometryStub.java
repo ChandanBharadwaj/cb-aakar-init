@@ -5,6 +5,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
@@ -18,7 +19,8 @@ import java.nio.file.Path;
 /**
  * WireMock stand-in for the geometry service: one descriptor ({@code fixtures/templates.json}) and a
  * {@code POST /v1/build} that answers with {@code packages/contracts/examples/design.completed.example.json},
- * with job_id / design_id / version_no rewritten from the request via response templating.
+ * with job_id / design_id / version_no rewritten from the request via response templating and the asset URLs
+ * pointed at this server, which serves placeholder {@code /assets/**} model files (for the print pack).
  */
 public final class GeometryStub {
 
@@ -31,6 +33,10 @@ public final class GeometryStub {
     public static final int FAILING_CUSPS = 7;
     /** Builds asking for this many cusps succeed but the printability report has {@code passed: false}. */
     public static final int UNSTABLE_CUSPS = 4;
+    /** Host of the asset URLs in the contracts example, replaced by this server's base URL. */
+    public static final String EXAMPLE_ASSET_HOST = "http://localhost:8081";
+    public static final String STUB_3MF = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><model unit=\"millimeter\" xml:lang=\"en-US\"><resources/><build/></model>";
+    public static final String STUB_STL = "solid aakar_stub\nendsolid aakar_stub\n";
 
     private GeometryStub() {
     }
@@ -47,7 +53,13 @@ public final class GeometryStub {
         server.stubFor(get(urlEqualTo("/v1/templates"))
                 .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json").withBody(resource("/fixtures/templates.json"))));
 
-        String completed = completedTemplate();
+        String completed = completedTemplate().replace(EXAMPLE_ASSET_HOST, server.baseUrl());
+        server.stubFor(get(urlMatching("/assets/.*\\.3mf"))
+                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "model/3mf").withBody(STUB_3MF)));
+        server.stubFor(get(urlMatching("/assets/.*\\.stl"))
+                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "model/stl").withBody(STUB_STL)));
+        server.stubFor(get(urlMatching("/assets/.*\\.glb"))
+                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "model/gltf-binary").withBody("glTF")));
         server.stubFor(post(urlEqualTo("/v1/build"))
                 .atPriority(5)
                 .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json").withBody(completed)));

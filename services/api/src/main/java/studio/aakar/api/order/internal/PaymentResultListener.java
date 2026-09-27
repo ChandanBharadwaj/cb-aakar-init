@@ -55,6 +55,6 @@ class PaymentResultListener {
             payload.put("eta", order.eta().toString());
         }
         String channel = order.notifyWhatsapp() ? OutboundMessage.WHATSAPP : OutboundMessage.SMS;
-        notifications.send(order.userId(), new OutboundMessage(channel, OutboundMessage.ORDER_CONFIRMED, phone, payload));
+        notifications.send(order.userId(), new OutboundMessage(channel, OutboundMessage.ORDER_CONFIRMED, phone, payload, order.id()));
     }
 }

@@ -15,6 +15,7 @@ import org.springframework.security.core.context.SecurityContextHolderStrategy;
 import org.springframework.web.filter.OncePerRequestFilter;
 import studio.aakar.api.shared.Identity;
 import studio.aakar.api.shared.ProblemCodes;
+import studio.aakar.api.shared.ProblemResponses;
 
 /**
  * Resolves the request's {@link Identity} once: a bearer token becomes {@code user} (and the Spring

@@ -23,6 +23,8 @@ val springdocVersion = "2.8.17"
 val wiremockVersion = "3.13.2"
 val jsonSchemaValidatorVersion = "1.5.9"
 val jjwtVersion = "0.12.6"
+val pdfboxVersion = "3.0.8"
+val zxingVersion = "3.5.4"
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
@@ -39,6 +41,10 @@ dependencies {
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
     implementation("com.github.ben-manes.caffeine:caffeine")
+    // Management API (ADR-0012): packaging card PDF and its QR code.
+    implementation("org.apache.pdfbox:pdfbox:$pdfboxVersion")
+    implementation("com.google.zxing:core:$zxingVersion")
+    implementation("com.google.zxing:javase:$zxingVersion")
     runtimeOnly("org.postgresql:postgresql")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")

@@ -122,7 +122,8 @@ public class ProblemDetailsAdvice extends ResponseEntityExceptionHandler {
             case NOT_FOUND -> ProblemCodes.NOT_FOUND;
             case UNAUTHORIZED -> ProblemCodes.UNAUTHENTICATED;
             case FORBIDDEN -> ProblemCodes.FORBIDDEN;
-            case BAD_REQUEST, UNSUPPORTED_MEDIA_TYPE, NOT_ACCEPTABLE, PAYLOAD_TOO_LARGE -> ProblemCodes.VALIDATION_FAILED;
+            case BAD_REQUEST, UNSUPPORTED_MEDIA_TYPE, NOT_ACCEPTABLE -> ProblemCodes.VALIDATION_FAILED;
+            case PAYLOAD_TOO_LARGE -> ProblemCodes.PAYLOAD_TOO_LARGE;
             case METHOD_NOT_ALLOWED -> "method_not_allowed";
             case UNPROCESSABLE_ENTITY -> ProblemCodes.VALIDATION_FAILED;
             case SERVICE_UNAVAILABLE -> "service_unavailable";
@@ -130,7 +131,8 @@ public class ProblemDetailsAdvice extends ResponseEntityExceptionHandler {
         };
     }
 
-    private static ResponseEntity<ProblemDetail> respond(ProblemDetail problem, String code) {
+    /** Renders {@code problem} as {@code application/problem+json} with the given stable {@code code}. */
+    public static ResponseEntity<ProblemDetail> respond(ProblemDetail problem, String code) {
         problem.setProperty("code", code);
         problem.setType(PROBLEM_TYPE_BASE.resolve(code));
         return ResponseEntity.status(problem.getStatus())

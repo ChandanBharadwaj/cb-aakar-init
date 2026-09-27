@@ -28,7 +28,8 @@ class ProductionGuardTest {
                     .contains("aakar.payments.gateway=mock")
                     .contains("aakar.shipping.carrier=mock")
                     .contains("aakar.messaging.sender=log")
-                    .contains("aakar.identity.jwt-secret=");
+                    .contains("aakar.identity.jwt-secret=")
+                    .contains("aakar.admin.seed-password=aakar-studio");
         });
     }
 
@@ -36,12 +37,14 @@ class ProductionGuardTest {
     void productionNamesOnlyTheOffendingProperties() {
         runner.withPropertyValues("aakar.profile=PRODUCTION",
                 "aakar.identity.otp.sender=msg91", "aakar.identity.otp.expose-dev-code=false", "aakar.payments.gateway=razorpay",
-                "aakar.shipping.carrier=mock", "aakar.messaging.sender=whatsapp", "aakar.identity.jwt-secret=" + "x".repeat(40))
+                "aakar.shipping.carrier=mock", "aakar.messaging.sender=whatsapp", "aakar.identity.jwt-secret=" + "x".repeat(40),
+                "aakar.admin.seed-password=a-real-staff-password")
                 .run(context -> {
                     assertThat(context).hasFailed();
                     String message = rootMessage(context.getStartupFailure());
                     assertThat(message).contains("aakar.shipping.carrier=mock")
-                            .doesNotContain("otp.sender").doesNotContain("payments.gateway").doesNotContain("messaging").doesNotContain("jwt");
+                            .doesNotContain("otp.sender").doesNotContain("payments.gateway").doesNotContain("messaging").doesNotContain("jwt")
+                            .doesNotContain("seed-password");
                 });
     }
 
@@ -49,7 +52,8 @@ class ProductionGuardTest {
     void productionWithRealAdaptersStarts() {
         runner.withPropertyValues("aakar.profile=production",
                 "aakar.identity.otp.sender=msg91", "aakar.identity.otp.expose-dev-code=false", "aakar.payments.gateway=razorpay",
-                "aakar.shipping.carrier=delhivery", "aakar.messaging.sender=whatsapp", "aakar.identity.jwt-secret=" + "s".repeat(48))
+                "aakar.shipping.carrier=delhivery", "aakar.messaging.sender=whatsapp", "aakar.identity.jwt-secret=" + "s".repeat(48),
+                "aakar.admin.seed-password=a-real-staff-password")
                 .run(context -> assertThat(context).hasNotFailed());
     }
 
@@ -58,6 +62,7 @@ class ProductionGuardTest {
         MockEnvironment env = new MockEnvironment().withProperty("aakar.profile", "production")
                 .withProperty("aakar.payments.gateway", "razorpay");
         assertThat(ProductionGuard.violations(env)).containsExactly(
+                "aakar.admin.seed-password=" + ProductionGuard.DEFAULT_ADMIN_SEED_PASSWORD,
                 "aakar.identity.jwt-secret=" + ProductionGuard.DEV_JWT_SECRET,
                 "aakar.identity.otp.expose-dev-code=true",
                 "aakar.identity.otp.sender=mock",

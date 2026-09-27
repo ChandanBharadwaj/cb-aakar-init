@@ -22,6 +22,8 @@ class NotificationEntity {
     private UUID id;
     @Column(name = "user_id")
     private UUID userId;
+    @Column(name = "order_id")
+    private UUID orderId;
     @Column(nullable = false)
     private String channel;
     @Column(nullable = false)
@@ -32,6 +34,8 @@ class NotificationEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb", nullable = false)
     private Map<String, Object> payload;
+    @Column(name = "rendered_text")
+    private String renderedText;
     @Column(nullable = false)
     private String status;
     @Column(name = "created_at", nullable = false)
@@ -40,18 +44,20 @@ class NotificationEntity {
     protected NotificationEntity() {
     }
 
-    NotificationEntity(UUID userId, String channel, String template, String recipient, Map<String, Object> payload, String status,
-            Instant now) {
+    NotificationEntity(UUID userId, UUID orderId, String channel, String template, String recipient, Map<String, Object> payload,
+            String renderedText, String status, Instant now) {
         this.userId = userId;
+        this.orderId = orderId;
         this.channel = channel;
         this.template = template;
         this.recipient = recipient;
         this.payload = payload;
+        this.renderedText = renderedText;
         this.status = status;
         this.createdAt = now;
     }
 
     NotificationDto toDto() {
-        return new NotificationDto(id, userId, channel, template, recipient, payload, status, createdAt);
+        return new NotificationDto(id, orderId, userId, channel, template, recipient, payload, renderedText, status, createdAt);
     }
 }

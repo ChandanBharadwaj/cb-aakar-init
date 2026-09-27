@@ -69,30 +69,39 @@ class DbPricingPolicyStore implements PricingPolicyStore {
 
     @Override
     public List<PricingPolicyInfo> history() {
-        return repository.findAllByOrderByCreatedAtDesc().stream()
-                .map(e -> new PricingPolicyInfo(e.version(), e.active(), e.createdAt(), e.createdBy()))
-                .toList();
+        return repository.findAllByOrderByCreatedAtDesc().stream().map(this::toInfo).toList();
+    }
+
+    @Override
+    public Optional<PricingPolicyInfo> activeInfo() {
+        return repository.findFirstByActiveTrueOrderByCreatedAtDesc().map(this::toInfo);
     }
 
     @Override
     @Transactional
     public PricingPolicy publish(PricingPolicy policy, String createdBy) {
-        PricingPolicy published = activateNew(policy, createdBy);
+        return publish(policy, createdBy, null).policy();
+    }
+
+    @Override
+    @Transactional
+    public PricingPolicyInfo publish(PricingPolicy policy, String createdBy, String note) {
+        PricingPolicyInfo published = activateNew(policy, createdBy, note);
         cache.invalidate(ACTIVE_KEY);
         return published;
     }
 
-    private PricingPolicy activateNew(PricingPolicy policy, String createdBy) {
+    private PricingPolicyInfo activateNew(PricingPolicy policy, String createdBy, String note) {
         if (repository.findByVersion(policy.version()).isPresent()) {
             throw ApiProblemException.conflict(ProblemCodes.POLICY_VERSION_EXISTS, "Policy version exists",
                     "Pricing policy version '" + policy.version() + "' already exists; publish under a new version");
         }
         repository.findByActiveTrue().forEach(PricingPolicyEntity::deactivate);
         repository.flush(); // the UPDATE must reach the partial unique index before the new active row is inserted
-        repository.saveAndFlush(new PricingPolicyEntity(policy.version(), true, json.convertValue(policy, MAP), Instant.now(),
-                createdBy == null || createdBy.isBlank() ? "unknown" : createdBy));
+        PricingPolicyEntity saved = repository.saveAndFlush(new PricingPolicyEntity(policy.version(), true, json.convertValue(policy, MAP),
+                note == null || note.isBlank() ? null : note.trim(), Instant.now(), createdBy == null || createdBy.isBlank() ? "unknown" : createdBy));
         log.info("Pricing policy {} published by {}", policy.version(), createdBy);
-        return policy;
+        return new PricingPolicyInfo(policy.version(), true, policy, saved.note(), saved.createdAt(), saved.createdBy());
     }
 
     private PricingPolicy loadActive() {
@@ -105,7 +114,7 @@ class DbPricingPolicyStore implements PricingPolicyStore {
         return transactions.execute(status -> {
             Optional<PricingPolicyEntity> existing = repository.findByVersion(policy.version());
             if (existing.isEmpty()) {
-                return activateNew(policy, SEED_AUTHOR); // inside the cache loader: the returned value is what gets cached
+                return activateNew(policy, SEED_AUTHOR, null).policy(); // inside the cache loader: the returned value is what gets cached
             }
             // The seed version exists but was deactivated by hand: re-activate it rather than duplicating it.
             repository.findByActiveTrue().forEach(PricingPolicyEntity::deactivate);
@@ -113,6 +122,10 @@ class DbPricingPolicyStore implements PricingPolicyStore {
             repository.flush();
             return toPolicy(existing.get());
         });
+    }
+
+    private PricingPolicyInfo toInfo(PricingPolicyEntity entity) {
+        return new PricingPolicyInfo(entity.version(), entity.active(), toPolicy(entity), entity.note(), entity.createdAt(), entity.createdBy());
     }
 
     private PricingPolicy toPolicy(PricingPolicyEntity entity) {

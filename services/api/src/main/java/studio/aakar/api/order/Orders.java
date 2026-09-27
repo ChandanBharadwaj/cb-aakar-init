@@ -1,10 +1,12 @@
 package studio.aakar.api.order;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import studio.aakar.api.payment.PaymentDto;
+import studio.aakar.api.shared.PageDto;
 
 /** Public API of the order module. */
 public interface Orders {
@@ -28,7 +30,7 @@ public interface Orders {
     PaymentDto retryPayment(UUID userId, UUID orderId);
 
     /**
-     * Moves an order to {@code status} (studio operations; staff endpoints arrive with the admin module).
+     * Moves an order to {@code status} (studio operations, driven by the management API).
      * Checks the transition table (409 {@code invalid_transition}), appends the event, books the shipment at
      * {@code packed} and adds a tracking event at {@code shipped} and {@code delivered}.
      *
@@ -36,4 +38,19 @@ public interface Orders {
      * @param detail extra data for the board (studio, printer bay, layer height)
      */
     OrderEventDto advance(UUID orderId, OrderStatus status, String message, Map<String, Object> detail);
+
+    // ---- staff (management API, ADR-0012) ------------------------------------------------------------------------
+
+    /** The studio queue across every customer, newest first, filtered by status and a number/phone query. */
+    PageDto<StaffOrderSummary> search(OrderSearch search, int page, int size);
+
+    /** Any order by id with the moves it may make next, regardless of owner. */
+    Optional<StaffOrder> findForStaff(UUID orderId);
+
+    /**
+     * Dashboard counts: orders per status, orders placed since {@code todayStart}, and revenue (sum of
+     * {@code total_paise} of non-cancelled orders with a succeeded payment) placed since {@code todayStart}
+     * and since {@code monthStart}.
+     */
+    OrderStats stats(Instant todayStart, Instant monthStart);
 }
