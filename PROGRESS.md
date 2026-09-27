@@ -123,12 +123,12 @@ Plan: [`docs/research/outcome-categories/implementation-plan.md`](docs/research/
 |---|---|---|---|
 | 0 | Research report, notes, plan | ✅ Done | `docs/research/outcome-categories/` |
 | 1 | PR 1 contracts · PR 2 seed + `V9` + catalog module (families, shelves, hardware, policy fields) | ✅ Done | `5235c50`; `6f46202` + `d384b25` + `5920cbc`; `V10` caps the nameplate envelope at 250 mm |
-| 2 | PR 3a geometry features framework · PR 3b text + motif | 🟨 3a done (`d0e2814` + `010635c`); 3b in progress (Naam in seven scripts, Buti motif library) | `services/geometry/aakar_geometry/features/emboss_text.py`, `motif.py`; `packages/design-tokens/motifs/` |
+| 2 | PR 3a geometry features framework · PR 3b text + motif | ✅ Done (3a `d0e2814` + `010635c`; 3b `58a6c7b` + `38b7610`; geometry 442) | Naam in seven scripts (Noto Sans Bold, OFL), Buti library in `packages/design-tokens/motifs/` |
 | 3 | PR 4 carriers `keychain_tag`, `fridge_magnet`, `hanging_ornament`, `desk_nameplate`, `raw_print` | ✅ Done (`debbefc` + `f7e7db5`; geometry 292) | descriptors exported to `packages/contracts/examples/template-descriptors.json` (`make descriptors`, drift-tested) |
 | 4 | PR 5 API uploads + review, content on designs, per-Avatar pricing, print pack | ✅ Done (`05599ea` + `046067f` + `2967d23`; API 175) | live smoke `make smoke-avatars` passed 27 Sep (`3a9763c`) |
 | 5 | PR 6 storefront · PR 7 portal | ✅ Done (web `e22c99e` + `e0f6e85` + `b929a04`; admin `31d9c8e` + `65ae76e`) | typecheck · lint · build clean |
-| 6 | PR 8 lithophane, plinth, pet tag, photo frame, keycap | ⬜ | |
-| 7 | PRs 9–12 Duniya experiences + Katha | ⬜ | |
+| 6 | PR 8 lithophane plate + night light, plinth, pet tag, photo frame, keycap | 🟨 in progress | `services/geometry/aakar_geometry/templates/`; afterwards flip `available` for lithophane, figurine_base, photo_frame, keycap (seed + migration) |
+| 7 | PRs 9–12 Duniya experiences + Katha | 🟨 PR 9 done (`dbf69a9` + `8f34734`; API 184); PRs 10–11 (storefront and portal Duniya, Buti live) and the API motif endpoints in progress; PR 12 Katha next | `packages/design-tokens/experiences.json`, `V11`; motif endpoints contract `81ff75a` |
 
 ## Decisions
 
@@ -153,8 +153,8 @@ Plan: [`docs/research/outcome-categories/implementation-plan.md`](docs/research/
 | Suite | Count | Last run |
 |---|---|---|
 | `services/inspect` pytest | 21 passed | 2026-09-26 |
-| `services/geometry` pytest | 292 passed | 2026-09-27 |
-| `services/api` Gradle test | 175 passed | 2026-09-27 |
+| `services/geometry` pytest | 442 passed | 2026-09-27 |
+| `services/api` Gradle test | 184 passed | 2026-09-27 |
 | Avatar order smoke, live (`make smoke-avatars`: photo keychain + Swaroop raw print → cart → OTP → checkout → mock pay → print pack) | passed | 2026-09-27 |
 | `apps/web` typecheck · lint · build | clean | 2026-09-27 |
 | `apps/admin` typecheck · lint · build | clean | 2026-09-27 |
