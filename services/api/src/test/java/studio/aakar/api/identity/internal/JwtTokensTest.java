@@ -6,6 +6,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -14,7 +15,9 @@ import org.junit.jupiter.api.Test;
 class JwtTokensTest {
 
     static final String SECRET = "unit-test-secret-that-is-long-enough-for-hs256-0123456789";
-    static final Instant NOW = Instant.parse("2026-09-27T10:00:00Z");
+    // The parser checks expiry against the real clock, so tokens are minted "now" (a fixed instant expired
+    // ten minutes after it was written and turned this suite red for everyone).
+    static final Instant NOW = Instant.now().truncatedTo(ChronoUnit.SECONDS);
 
     private final JwtTokens tokens = new JwtTokens(SECRET);
 

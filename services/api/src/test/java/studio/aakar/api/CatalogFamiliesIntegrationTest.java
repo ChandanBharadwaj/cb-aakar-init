@@ -174,7 +174,8 @@ class CatalogFamiliesIntegrationTest extends AbstractIntegrationTest {
         assertThat(stand.get("category").asText()).isEqualTo("desk_tech");
         assertThat(stand.get("family_id").asText()).isEqualTo("phone_stand");
         assertThat(body(get("/api/catalog/items"))).allSatisfy(i -> assertThat(i.get("family_id").isTextual()).as("%s family_id", i.get("slug")).isTrue());
-        assertThat(body(get("/api/catalog/items?q=phone_stand")).findValuesAsText("slug")).containsExactly("jharokha-phone-stand"); // the family id is searchable too
+        // the family id is searchable too: "headphone_stand" is in no slug, name or description, only in family_id
+        assertThat(body(get("/api/catalog/items?q=headphone_stand")).findValuesAsText("slug")).containsExactly("pillar-headphone-stand");
 
         String[] owner = owner();
         String slug = "test-shelf-" + UUID.randomUUID().toString().substring(0, 8);
