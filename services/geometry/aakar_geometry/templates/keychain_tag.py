@@ -1,4 +1,4 @@
-"""``keychain_tag@1`` - Saathi: a palm-sized tag with a ring loop; a photo sits in relief on its face or back.
+"""``keychain_tag@1`` - Saathi: a palm-sized tag with a ring loop; a photo, a name or a motif sits in relief on it.
 
 Coordinate frame (mm): the tag lies face up. X = across (the viewer's right), Y = up the picture (the
 ring loop is at +Y), Z = thickness: the back rests on the bed at Z = 0 and the face is at
@@ -14,12 +14,12 @@ Pieces
 
 Anchors (content lands on these, see ``anchor_frame``)
   face  the largest rectangle on the top face clear of the loop, ``ANCHOR_MARGIN_MM`` inside the edge
-        (normal +Z).
+        (normal +Z): a photo, or a name (Naam) and/or a motif (Buti).
   back  the same rectangle on the underside, seen with the tag turned over left to right, so the
-        loop stays at the top of the picture (normal −Z).
+        loop stays at the top of the picture (normal −Z): a name, or a second photo.
 The descriptor publishes the anchor sizes at the default parameters; ``anchor_frame`` gives the exact
-frame for any parameters. A cut-in (deboss) photo must leave ``MIN_SKIN_MM`` of plastic behind it; cut-ins
-on both faces add up (``validate_content``).
+frame for any parameters. A cut-in (deboss) photo, name or motif must leave ``MIN_SKIN_MM`` of plastic behind
+it; cut-ins on both faces add up (``validate_content``).
 """
 
 from __future__ import annotations
@@ -150,18 +150,24 @@ class KeychainTag(Template):
     family = "keychain"
     name = "Saathi keychain tag"
     description = (
-        "A palm-sized tag with a loop for a steel split ring. Your photo sits in relief on the face, "
-        "and another can go on the back."
+        "A palm-sized tag with a loop for a steel split ring. Your photo, name or motif sits in relief on "
+        "the face, and a name or another photo can go on the back."
     )
     environment = "studio"
     params = PARAMS
     anchors = (
-        Anchor("face", "Face", "planar", size_mm=_size("face"), bleed_mm=BLEED_MM, accepts=("relief_image",), max_relief_mm=MAX_RELIEF_MM),
-        Anchor("back", "Back", "planar", size_mm=_size("back"), bleed_mm=BLEED_MM, accepts=("relief_image",), max_relief_mm=MAX_RELIEF_MM),
+        Anchor(
+            "face", "Face", "planar", size_mm=_size("face"), bleed_mm=BLEED_MM,
+            accepts=("relief_image", "emboss_text", "motif"), max_relief_mm=MAX_RELIEF_MM,
+        ),
+        Anchor(
+            "back", "Back", "planar", size_mm=_size("back"), bleed_mm=BLEED_MM,
+            accepts=("relief_image", "emboss_text"), max_relief_mm=MAX_RELIEF_MM,
+        ),
     )
     constraints = TemplateConstraints(min_wall_mm=1.2, max_overhang_deg=55, bed_mm=(250, 250, 250))
     style_variants = ()
-    features_supported = ("relief_image",)  # text and motifs land with the text release (PR 3b)
+    features_supported = ("relief_image", "emboss_text", "motif")
     hardware = (HardwareRef("split_ring_25", 1),)
     min_feature_mm = 0.8
 

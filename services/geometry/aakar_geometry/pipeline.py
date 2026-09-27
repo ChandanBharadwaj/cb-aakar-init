@@ -2,10 +2,10 @@
 
 Steps (PLAN §7.11): validate request + spec → resolve template → check family / features / style /
 material → validate params → ``Template.validate_content`` (limits coupling params and content) →
-progress ``understanding`` → progress ``sculpting`` → CAD body + features (Chhaap: photo reliefs and
-hero forms fetched through the ``ContentFetcher``) → refuse an empty result → export + store →
-progress ``checking`` → inspect → assemble and validate the completed payload (with the template's
-``hardware_for(params)``). Every failure becomes a ``design.failed`` payload with the matching code;
+progress ``understanding`` → progress ``sculpting`` → CAD body + features (Chhaap: names and motifs
+shaped and set in, photo reliefs and hero forms fetched through the ``ContentFetcher``) → refuse an
+empty result → export + store → progress ``checking`` → inspect → assemble and validate the completed
+payload (with the template's ``hardware_for(params)`` and a karigar's note that names the lettering). Every failure becomes a ``design.failed`` payload with the matching code;
 nothing raises out of this function.
 """
 
@@ -240,7 +240,7 @@ def build_design(
             "assets": {kind: rec.to_dict() for kind, rec in assets.items()},
             "printability": report,
             "print_estimate": estimate,
-            "karigar_note": template.karigar_note(params),
+            "karigar_note": template.karigar_note_for(params, normalised["features"]),
             "build_ms": int(round((time.perf_counter() - started) * 1000)),
         }
         try:

@@ -315,3 +315,15 @@ class Template:
     @classmethod
     def karigar_note(cls, params: Mapping[str, Any]) -> str:
         raise NotImplementedError
+
+    @classmethod
+    def karigar_note_for(cls, params: Mapping[str, Any], features: Sequence[Mapping[str, Any]] = ()) -> str:
+        """The karigar's note for a finished piece: ``karigar_note(params)`` followed by a sentence naming the
+        names (Naam) and motifs (Buti) set into it, e.g. “Asha” stands 0.6 mm proud on the back."""
+        note = cls.karigar_note(params)
+        if not features:
+            return note
+        from ..features import content_note
+
+        extra = content_note(cls, features)
+        return f"{note} {extra}" if extra else note

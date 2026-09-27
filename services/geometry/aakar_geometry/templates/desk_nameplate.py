@@ -11,8 +11,9 @@ Pieces
 
 Anchors (content lands on these, see ``anchor_frame``)
   face        the plate's front, ``FACE_MARGIN_MM`` inside its edges (normal perpendicular to the
-              plate, up and towards the reader; v runs up the slope).
-  base_front  the foot's front edge, a strip ``BASE_HEIGHT_MM`` tall (normal −Y).
+              plate, up and towards the reader; v runs up the slope): the name (Naam) first, with a
+              motif (Buti) beside it, or a photo instead.
+  base_front  the foot's front edge, a strip ``BASE_HEIGHT_MM`` tall (normal −Y): a line of text.
 The piece must stand: the combined centre of gravity keeps at least ``MIN_TIPPING_MARGIN_MM`` (the
 inspect service's own threshold) plus ``TIP_SAFETY_MM`` inside the foot, or the combination is refused.
 Width is capped at the 250 mm bed (the Pehchaan family envelope reaches 300 mm).
@@ -120,24 +121,24 @@ class DeskNameplate(Template):
     family = "nameplate"
     name = "Pehchaan desk nameplate"
     description = (
-        "A nameplate that leans back on a flat foot, like a desk sign. Your photo or motif sits in relief "
-        "on the face; names arrive with lettering."
+        "A nameplate that leans back on a flat foot, like a desk sign. Your name stands in relief on the "
+        "face, with a motif beside it or a photo instead, and a line of text can run along the foot."
     )
     environment = "studio"
     params = PARAMS
     anchors = (
         Anchor(
             "face", "Face", "planar", max_text_height_mm=round(TEXT_HEIGHT_SHARE * _DEFAULTS["height_mm"], 1),
-            size_mm=_size("face"), bleed_mm=BLEED_MM, accepts=("relief_image",), max_relief_mm=MAX_RELIEF_MM,
+            size_mm=_size("face"), bleed_mm=BLEED_MM, accepts=("emboss_text", "motif", "relief_image"), max_relief_mm=MAX_RELIEF_MM,
         ),
         Anchor(
             "base_front", "Front of the foot", "planar", max_text_height_mm=_size("base_front")[1],
-            size_mm=_size("base_front"), bleed_mm=BASE_FRONT_BLEED_MM, accepts=("relief_image",), max_relief_mm=MAX_RELIEF_MM,
+            size_mm=_size("base_front"), bleed_mm=BASE_FRONT_BLEED_MM, accepts=("emboss_text", "relief_image"), max_relief_mm=MAX_RELIEF_MM,
         ),
     )
     constraints = TemplateConstraints(min_wall_mm=1.2, max_overhang_deg=55, bed_mm=(250, 250, 250))
     style_variants = ()
-    features_supported = ("relief_image",)  # names (emboss_text) and motifs land with the text release (PR 3b)
+    features_supported = ("emboss_text", "motif", "relief_image")
     hardware = (HardwareRef("adhesive_pads", 1),)
     min_feature_mm = 0.8
 

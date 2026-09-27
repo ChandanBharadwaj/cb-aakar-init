@@ -5,12 +5,25 @@ Checks (in this order, per feature):
   * the anchor exists (``InvalidSpec``) and its ``accepts`` allows the type (``UnsupportedFeature``),
   * ``hero_mesh`` only on ``kind == "volume"`` anchors, everything else only on surfaces
     (``UnsupportedFeature``),
-  * at most one ``relief_image``/``hero_mesh`` per anchor (``InvalidSpec``),
+  * what one anchor may hold (``InvalidSpec``): at most one photo or form (``relief_image``/``hero_mesh``),
+    at most one name (``emboss_text``) and at most one motif (``motif``); a name and a motif may share an
+    anchor (they sit side by side, ``features.placement``), but a photo never shares its anchor with a
+    name or a motif: that is refused as crowded,
+  * names and motifs only on ``planar`` anchors with ``planar`` projection (``UnsupportedFeature``: no
+    anchor is curved yet, so cylindrical and conformal lettering are not built),
   * ``relief_mm`` / ``depth_mm`` within the anchor's ``max_relief_mm`` (``ParamOutOfRange``),
-  * text no longer than the family's ``max_text_chars`` (``ParamOutOfRange``),
+  * text no longer than the family's ``max_text_chars`` (``ParamOutOfRange``), in one of the seven launch
+    scripts and matching ``script`` / ``font`` when given (``InvalidSpec`` / ``UnsupportedFeature``, see
+    ``features.emboss_text``), ``height_mm`` within the anchor's ``max_text_height_mm``
+    (``ParamOutOfRange``),
+  * ``motif_id`` in the motif library (``InvalidSpec``), ``scale`` between the motif's ``min_scale`` and
+    1 (``ParamOutOfRange``),
   * ``fit: longest`` carries ``longest_mm`` (``InvalidSpec``); ``cutout: silhouette`` is not built yet.
 
-``normalise_features`` fills the contract defaults so later stages and the completed payload see them.
+Whether a name or motif fits its anchor at a printable stroke depends on the parameters (the anchor's
+size), so that is checked when the features are applied (``features.prepare_marks``), still before any
+boolean runs. ``normalise_features`` fills the contract defaults (and a name's detected ``script``) so
+later stages and the completed payload see them.
 """
 
 from __future__ import annotations
@@ -19,7 +32,8 @@ import unicodedata
 from typing import Any, Iterable, Mapping
 
 from .. import families
-from ..errors import GeometryError, InvalidSpec, ParamOutOfRange, UnsupportedFeature
+from ..errors import BuildError, GeometryError, InvalidSpec, ParamOutOfRange, UnsupportedFeature
+from . import emboss_text, motif
 
 FEATURE_TYPES = families.FEATURE_TYPES
 SURFACE_TYPES = ("emboss_text", "motif", "relief_image")
@@ -37,6 +51,7 @@ DEFAULTS: dict[str, dict[str, Any]] = {
 }
 
 DEPTH_KEY = {"relief_image": "relief_mm", "emboss_text": "depth_mm", "motif": "depth_mm"}
+_NOUN = {"emboss_text": "name", "motif": "motif"}
 
 
 def _customer_label(ftype: str) -> str:
@@ -70,6 +85,11 @@ def normalise_feature(feature: Mapping[str, Any]) -> dict[str, Any]:
         source = dict(out["source"])
         source.setdefault("origin", "upload")
         out["source"] = source
+    if ftype == "emboss_text" and not out.get("script") and isinstance(out.get("text"), str):
+        try:  # "Detected or chosen script": echo the one the lettering is shaped in
+            out["script"] = emboss_text.detect_script(emboss_text.normalise_text(out["text"]))
+        except BuildError:
+            pass  # mixed or unsupported letters: check_features refuses them with the feature's key
     return out
 
 
@@ -134,14 +154,37 @@ def check_features(template: Any, features: Iterable[Mapping[str, Any]] | None) 
                 f"The {anchor.label} holds a 3D form; {LABELS[ftype].lower()} needs a flat surface",
                 {"anchor": anchor.id, "kind": kind, "type": ftype, "feature": index},
             )
-        if ftype in CONTENT_TYPES:
-            seen = content_on_anchor.setdefault(anchor.id, [])
-            if seen:
-                raise InvalidSpec(
-                    f"Only one photo or 3D form can go on the {anchor.label}",
-                    {"anchor": anchor.id, "types": seen + [ftype], "feature": index},
+        seen = content_on_anchor.setdefault(anchor.id, [])
+        if ftype in CONTENT_TYPES and any(t in CONTENT_TYPES for t in seen):
+            raise InvalidSpec(
+                f"Only one photo or 3D form can go on the {anchor.label}",
+                {"anchor": anchor.id, "types": seen + [ftype], "feature": index},
+            )
+        if ftype in TEXT_TYPES and ftype in seen:
+            noun = _NOUN[ftype]
+            raise InvalidSpec(
+                f"Only one {noun} can go on the {anchor.label}; put the other {noun} on another spot",
+                {"anchor": anchor.id, "types": seen + [ftype], "feature": index},
+            )
+        # a photo fills its anchor: a name or motif beside it is refused as crowded, whichever came first
+        if ftype == "relief_image":
+            crowding = next((t for t in seen if t in TEXT_TYPES), None)
+        else:
+            crowding = ftype if ftype in TEXT_TYPES and "relief_image" in seen else None
+        if crowding is not None:
+            noun = _NOUN[crowding]
+            raise InvalidSpec(
+                f"The {anchor.label} is too crowded for a photo and a {noun} together; put the {noun} on another spot",
+                {"anchor": anchor.id, "types": seen + [ftype], "feature": index},
+            )
+        seen.append(ftype)
+        if ftype in TEXT_TYPES:
+            projection = f.get("projection", "planar") if ftype == "emboss_text" else "planar"
+            if anchor.projection != "planar" or projection != "planar":
+                raise UnsupportedFeature(
+                    "Lettering and motifs that wrap around a curved surface are not available yet; every spot today is flat",
+                    {"anchor": anchor.id, "projection": projection, "anchor_projection": anchor.projection, "feature": index},
                 )
-            seen.append(ftype)
         if ftype == "hero_mesh":
             if anchor.bounds_mm is None:
                 raise GeometryError(
@@ -178,6 +221,19 @@ def check_features(template: Any, features: Iterable[Mapping[str, Any]] | None) 
                     f"Text on the {anchor.label} can be at most {int(max_chars)} characters; {length} were given",
                     {"anchor": anchor.id, "length": length, "max_text_chars": int(max_chars), "feature": index},
                 )
+        if ftype == "emboss_text":
+            emboss_text.resolve_script(emboss_text.normalise_text(f.get("text", "")), f.get("script"), f.get("font"), prefix)
+            height = f.get("height_mm")
+            tallest = anchor.max_text_height_mm
+            if height is not None and tallest is not None and float(height) > float(tallest) + 1e-9:
+                raise ParamOutOfRange(
+                    [f"{prefix}.height_mm"],
+                    f"Letters on the {anchor.label} can be at most {float(tallest):g} mm tall; {float(height):g} mm was asked",
+                    {"anchor": anchor.id, "height_mm": float(height), "max_text_height_mm": float(tallest), "feature": index},
+                )
+        if ftype == "motif":
+            found = motif.entry(str(f.get("motif_id")), f"{prefix}.motif_id")
+            motif.check_scale(found, float(f.get("scale", 1)), anchor_label=anchor.label, key=f"{prefix}.scale")
     return normalised
 
 

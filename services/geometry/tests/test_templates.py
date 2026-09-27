@@ -17,7 +17,8 @@ def test_descriptor_validates_and_matches_plan():
     assert [a["id"] for a in desc["anchors"]] == ["side_left", "side_right", "back"]
     assert all(a["projection"] == "planar" for a in desc["anchors"])
     assert desc["constraints"] == {"min_wall_mm": 1.2, "max_overhang_deg": 55, "bed_mm": [250, 250, 250]}
-    assert desc["features_supported"] == []
+    assert desc["features_supported"] == ["emboss_text", "motif"]
+    assert all(a["accepts"] == ["emboss_text", "motif"] for a in desc["anchors"])
     assert set(desc["materials"]) == {
         "basic_white", "terracotta_matte", "terracotta_silk", "polished_brass", "sandalwood_silk", "indigo_matte",
     }
@@ -173,9 +174,9 @@ def test_descriptor_publishes_default_anchor_sizes_and_no_hardware():
     by_id = {a["id"]: a for a in desc["anchors"]}
     defaults = JharokhaPhoneStand.validate({})
     for anchor_id, anchor in by_id.items():
-        assert anchor["kind"] == "surface" and anchor["max_relief_mm"] == 1.0 and anchor["bleed_mm"] == 0.0
+        assert anchor["kind"] == "surface" and anchor["max_relief_mm"] == 1.2 and anchor["bleed_mm"] == 0.0
         frame = JharokhaPhoneStand.anchor_frame(anchor_id, defaults)
         assert anchor["size_mm"] == pytest.approx(list(frame.size_mm), abs=0.06)
     assert by_id["back"]["size_mm"][0] == pytest.approx(92 - 2 * 8 - 2 * 1.0, abs=0.06)  # width minus frame margins
-    assert desc["hardware"] == [] and "min_feature_mm" not in desc
+    assert desc["hardware"] == [] and desc["min_feature_mm"] == 0.8
     assert JharokhaPhoneStand.hardware_for(defaults) == []

@@ -1,4 +1,4 @@
-"""``fridge_magnet@1`` - Chumbak: a flat plate with hidden magnet pockets; a photo sits in relief on the face.
+"""``fridge_magnet@1`` - Chumbak: a flat plate with hidden magnet pockets; a photo, name or motif sits in relief on the face.
 
 Coordinate frame (mm): the magnet lies face up. X = across (the viewer's right), Y = up the picture,
 Z = thickness: the back rests on the bed at Z = 0 and the face is at Z = ``thickness_mm``. The part
@@ -12,7 +12,8 @@ Pieces
            the face, and more when the photo on the face is cut in (``validate_content``).
 
 Anchor
-  face  the largest rectangle on the top face, ``ANCHOR_MARGIN_MM`` inside the edge (normal +Z).
+  face  the largest rectangle on the top face, ``ANCHOR_MARGIN_MM`` inside the edge (normal +Z): a photo,
+        or a name (Naam) and/or a motif (Buti).
 """
 
 from __future__ import annotations
@@ -120,17 +121,20 @@ class FridgeMagnet(Template):
     family = "fridge_magnet"
     name = "Chumbak fridge magnet"
     description = (
-        "A flat plate with hidden pockets for strong 10 × 3 mm magnets in the back. Your photo sits in "
-        "relief on the face."
+        "A flat plate with hidden pockets for strong 10 × 3 mm magnets in the back. Your photo, name or "
+        "motif sits in relief on the face."
     )
     environment = "kitchen_marble"
     params = PARAMS
     anchors = (
-        Anchor("face", "Face", "planar", size_mm=_size("face"), bleed_mm=BLEED_MM, accepts=("relief_image",), max_relief_mm=MAX_RELIEF_MM),
+        Anchor(
+            "face", "Face", "planar", size_mm=_size("face"), bleed_mm=BLEED_MM,
+            accepts=("relief_image", "emboss_text", "motif"), max_relief_mm=MAX_RELIEF_MM,
+        ),
     )
     constraints = TemplateConstraints(min_wall_mm=1.2, max_overhang_deg=55, bed_mm=(250, 250, 250))
     style_variants = ()
-    features_supported = ("relief_image",)  # text and motifs land with the text release (PR 3b)
+    features_supported = ("relief_image", "emboss_text", "motif")
     hardware = (HardwareRef(MAGNET_SKU, 1),)  # the default build; hardware_for counts the pockets
     min_feature_mm = 0.8
 

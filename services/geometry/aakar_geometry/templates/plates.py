@@ -10,7 +10,8 @@ Profiles are shapely polygons in mm on the XY plane, seen from above with the pi
 * ``symmetric_rect``: the rectangle centred on x = 0 inside a profile that holds the largest 4:3
   picture, i.e. the printable area of a face (a template subtracts its holes and margins first);
 * ``cut_in_depth`` / ``check_skin``: the skin rule. A cut-in (deboss) photo, name or motif must leave
-  ``MIN_SKIN_MM`` of plastic behind it; raised (emboss) content adds plastic and never counts.
+  ``MIN_SKIN_MM`` of plastic behind it; raised (emboss) content adds plastic and never counts. Cut-ins on
+  opposite faces add up; a name and a motif side by side on one face count once (the deeper).
 """
 
 from __future__ import annotations
@@ -179,24 +180,49 @@ def symmetric_rect(
     return None
 
 
+_CUT_NOUN = {"relief_image": "photo", "emboss_text": "name", "motif": "motif"}
+
+
 def cut_in_depth(features: Sequence[Mapping[str, Any]], anchors: Iterable[str]) -> tuple[float, list[str]]:
     """Total depth of cut-in (deboss) content on ``anchors`` and the feature keys that carry it.
 
-    Depths on opposite faces of one plate add up (conservative: the two pictures may overlap).
+    Depths on opposite faces of one plate add up (conservative: the two pictures may overlap). A name and
+    a motif side by side on one face do not overlap, so only the deeper of them counts for that face.
     """
     wanted = set(anchors)
-    total = 0.0
+    per_anchor: dict[str, float] = {}
+    marks: dict[str, float] = {}
     keys: list[str] = []
     for index, feature in enumerate(features or []):
         ftype = feature.get("type")
-        if ftype not in _DEPTH or feature.get("anchor") not in wanted:
+        anchor = feature.get("anchor")
+        if ftype not in _DEPTH or anchor not in wanted:
             continue
         if feature.get("mode", _DEFAULT_MODE[ftype]) != "deboss":
             continue
         key, default = _DEPTH[ftype]
-        total += float(feature.get(key, default))
+        depth = float(feature.get(key, default))
+        if ftype in ("emboss_text", "motif"):
+            marks[anchor] = max(marks.get(anchor, 0.0), depth)
+        else:
+            per_anchor[anchor] = per_anchor.get(anchor, 0.0) + depth
         keys.append(f"features[{index}].{key}")
+    total = sum(per_anchor.values()) + sum(marks.values())
     return total, keys
+
+
+def _cut_nouns(features: Sequence[Mapping[str, Any]], anchors: Iterable[str]) -> str:
+    wanted = set(anchors)
+    nouns: list[str] = []
+    for feature in features or []:
+        ftype = feature.get("type")
+        if ftype in _DEPTH and feature.get("anchor") in wanted and feature.get("mode", _DEFAULT_MODE[ftype]) == "deboss":
+            noun = _CUT_NOUN[ftype]
+            if noun not in nouns:
+                nouns.append(noun)
+    if not nouns:
+        return "picture"
+    return nouns[0] if len(nouns) == 1 else ", ".join(nouns[:-1]) + " and " + nouns[-1]
 
 
 def check_skin(
@@ -213,25 +239,27 @@ def check_skin(
     """Raise ``ParamOutOfRange`` when cut-in content leaves less than ``min_skin_mm`` of plastic.
 
     ``behind`` is solid already taken away behind the face (a 3.2 mm magnet pocket); ``behind_what``
-    names it for the message ("the magnet").
+    names it for the message ("the magnet"). The message names what is cut in (photo, name, motif).
     """
+    anchors = tuple(anchors)
     depth, keys = cut_in_depth(features, anchors)
     if depth <= 0:
         return
     skin = float(thickness_mm) - float(behind) - depth
     if skin >= min_skin_mm - 1e-9:
         return
+    content = _cut_nouns(features, anchors)
     deepest = float(thickness_mm) - float(behind) - min_skin_mm
     thickest_needed = depth + float(behind) + min_skin_mm
-    target = f"between the picture and {behind_what}" if behind_what else "behind it"
+    target = f"between the {content} and {behind_what}" if behind_what else "behind it"
     advice = (
         f"keep the cut-in to {deepest:.1f} mm or less, or make the {noun} at least {thickest_needed:.1f} mm thick"
         if deepest >= 0.2
-        else f"raise the picture instead of cutting it in, or make the {noun} at least {thickest_needed:.1f} mm thick"
+        else f"raise the {content} instead of cutting it in, or make the {noun} at least {thickest_needed:.1f} mm thick"
     )
     raise ParamOutOfRange(
         keys + [thickness_key],
-        f"Cut in {depth:g} mm, the picture would leave only {max(skin, 0.0):.1f} mm of plastic {target} "
+        f"Cut in {depth:g} mm, the {content} would leave only {max(skin, 0.0):.1f} mm of plastic {target} "
         f"(at least {min_skin_mm:g} mm is needed); {advice}",
         {
             "cut_in_mm": round(depth, 3),

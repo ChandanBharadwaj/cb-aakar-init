@@ -12,7 +12,8 @@ Pieces
   rails     two wall-thick gussets at the outer edges joining lip, base and back rest.
   cable slot 12 mm notch through the lip and a channel in the base for a charging cable.
 
-Anchors (content lands on these, see ``anchor_frame``)
+Anchors (content lands on these, see ``anchor_frame``): each takes a name (Naam) and/or a motif (Buti),
+raised or cut up to ``MAX_RELIEF_MM`` (1.2 mm: a cut leaves at least 1.2 mm of the thinnest 2.4 mm wall).
   side_left / side_right  the largest rectangle inscribed in each rail's outer face (normal ∓X).
   back                    the band of the back rest's rear face below the window (normal leaning +Y).
 The descriptor publishes the anchor sizes at the default parameters; ``anchor_frame`` gives the
@@ -40,6 +41,9 @@ WINDOW_BOTTOM_BAND_MM = 14.0
 MIN_WINDOW_BODY_MM = 10.0
 ARC_QUAD_SEGS = 12
 ANCHOR_MARGIN_MM = 1.0  # kept clear between content and the edge of a face
+# names and motifs on the rails and the back rest stand or cut at most this deep: the contract's default letter
+# depth, and a 1.2 mm cut into the thinnest (2.4 mm) wall still leaves the 1.2 mm minimum wall behind it
+MAX_RELIEF_MM = 1.2
 
 
 def _frame_margin(wall: float) -> float:
@@ -248,18 +252,29 @@ class JharokhaPhoneStand(Template):
     name = "Jharokha phone stand"
     description = (
         "A leaning phone stand with a Mughal cusped-arch jharokha window in the back rest, "
-        "a cable slot in the lip and side rails for stiffness."
+        "a cable slot in the lip and side rails for stiffness. A name or a motif can go on either side rail "
+        "and on the back of the rest."
     )
     environment = "desk_oak"
     params = PARAMS
     anchors = (
-        Anchor("side_left", "Left side rail", "planar", max_text_height_mm=12, size_mm=_size("side_left"), max_relief_mm=1.0),
-        Anchor("side_right", "Right side rail", "planar", max_text_height_mm=12, size_mm=_size("side_right"), max_relief_mm=1.0),
-        Anchor("back", "Back of the rest", "planar", max_text_height_mm=20, size_mm=_size("back"), max_relief_mm=1.0),
+        Anchor(
+            "side_left", "Left side rail", "planar", max_text_height_mm=12, size_mm=_size("side_left"),
+            accepts=("emboss_text", "motif"), max_relief_mm=MAX_RELIEF_MM,
+        ),
+        Anchor(
+            "side_right", "Right side rail", "planar", max_text_height_mm=12, size_mm=_size("side_right"),
+            accepts=("emboss_text", "motif"), max_relief_mm=MAX_RELIEF_MM,
+        ),
+        Anchor(
+            "back", "Back of the rest", "planar", max_text_height_mm=20, size_mm=_size("back"),
+            accepts=("emboss_text", "motif"), max_relief_mm=MAX_RELIEF_MM,
+        ),
     )
     constraints = TemplateConstraints(min_wall_mm=1.2, max_overhang_deg=55, bed_mm=(250, 250, 250))
     style_variants = ()
-    features_supported = ()  # text and motif land with the text release (PR 3b)
+    features_supported = ("emboss_text", "motif")
+    min_feature_mm = 0.8
 
     @classmethod
     def validate_combination(cls, params: dict[str, Any]) -> None:

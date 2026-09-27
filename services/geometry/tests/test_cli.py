@@ -90,29 +90,33 @@ def _content_name(spec: dict) -> str:
     return PurePosixPath(urlparse(spec["features"][0]["source"]["url"]).path).name
 
 
-def test_cli_builds_the_keychain_photo_example_from_a_local_png(tmp_path, capsys):
-    """keychain-photo.spec.json with its photo only (its emboss_text feature needs the text release, PR 3b)."""
-    from conftest import gradient_png
+def test_cli_builds_the_keychain_photo_example_end_to_end(tmp_path, capsys):
+    """keychain-photo.spec.json exactly as committed: a photo raised on the face and the name "Asha" raised on
+    the back (Naam, PR 3b). The photo comes from --content-dir; the name needs nothing fetched."""
+    from conftest import REPO, gradient_png
 
-    spec = _example("keychain-photo.spec.json")
-    spec["features"] = [f for f in spec["features"] if f["type"] == "relief_image"]
-    assert len(spec["features"]) == 1
+    example = REPO / "packages/contracts/examples/keychain-photo.spec.json"
+    spec = json.loads(example.read_text(encoding="utf-8"))
+    assert [f["type"] for f in spec["features"]] == ["relief_image", "emboss_text"]
     content = tmp_path / "content"
     content.mkdir()
     (content / _content_name(spec)).write_bytes(gradient_png())
-    spec_path = tmp_path / "keychain.json"
-    spec_path.write_text(json.dumps(spec))
     out = tmp_path / "keychain"
-    assert main(["build", str(spec_path), "--out", str(out), "--content-dir", str(content)]) == 0
+    assert main(["build", str(example), "--out", str(out), "--content-dir", str(content)]) == 0
     summary = capsys.readouterr().out.strip()
-    assert summary.startswith("keychain_tag@1 · bounds 45 × ") and "passed" in summary and "hardware split_ring_25 ×1" in summary
+    assert summary.startswith("keychain_tag@1 · bounds 45 × ") and "NOT passed" not in summary and "hardware split_ring_25 ×1" in summary
     result = json.loads((out / "result.json").read_text())
     validate("design.completed", result)
+    assert result["printability"]["passed"] is True
     assert result["hardware"] == [{"sku": "split_ring_25", "qty": 1}]
     assert result["spec"]["params"] == {"shape": "rounded", "width_mm": 45.0, "thickness_mm": 3.0, "hole_d_mm": 4.2}
-    assert result["printability"]["geometry"]["bounds_mm"][2] == pytest.approx(3.6, abs=1e-3)  # 3 mm tag + 0.6 mm relief
-    for name in ("model.glb", "model.3mf", "model.stl"):
-        assert (out / name).stat().st_size > 0
+    name = result["spec"]["features"][1]
+    assert (name["text"], name["script"], name["anchor"], name["mode"], name["depth_mm"]) == ("Asha", "latin", "back", "emboss", 0.6)
+    # 3 mm tag + 0.6 mm photo on the face + 0.6 mm name on the back (the piece rests on the letters)
+    assert result["printability"]["geometry"]["bounds_mm"][2] == pytest.approx(4.2, abs=1e-3)
+    assert "“Asha” stands 0.6 mm proud on the back" in result["karigar_note"]
+    for name_ in ("model.glb", "model.3mf", "model.stl"):
+        assert (out / name_).stat().st_size > 0
 
 
 def test_cli_builds_the_raw_print_example_from_a_local_model(tmp_path, capsys):

@@ -20,6 +20,23 @@ from conftest import DESIGN_ID, JOB_ID
 
 CARRIERS = [KeychainTag, FridgeMagnet, HangingOrnament, DeskNameplate]
 
+# PR 3b: every carrier takes names (Naam) and motifs (Buti) besides photos; the nameplate's face leads with text
+FEATURES = {
+    KeychainTag: ["relief_image", "emboss_text", "motif"],
+    FridgeMagnet: ["relief_image", "emboss_text", "motif"],
+    HangingOrnament: ["relief_image", "emboss_text", "motif"],
+    DeskNameplate: ["emboss_text", "motif", "relief_image"],
+}
+ACCEPTS = {
+    (KeychainTag, "face"): ["relief_image", "emboss_text", "motif"],
+    (KeychainTag, "back"): ["relief_image", "emboss_text"],
+    (FridgeMagnet, "face"): ["relief_image", "emboss_text", "motif"],
+    (HangingOrnament, "face_front"): ["relief_image", "emboss_text", "motif"],
+    (HangingOrnament, "face_back"): ["relief_image", "emboss_text", "motif"],
+    (DeskNameplate, "face"): ["emboss_text", "motif", "relief_image"],
+    (DeskNameplate, "base_front"): ["emboss_text", "relief_image"],
+}
+
 HARDWARE = {
     KeychainTag: [{"sku": "split_ring_25", "qty": 1}],
     FridgeMagnet: [{"sku": "magnet_d10x3", "qty": 1}],
@@ -58,10 +75,11 @@ SURFACES = [(t, a.id) for t in CARRIERS for a in t.anchors]
 @pytest.mark.parametrize("template", CARRIERS, ids=lambda t: t.id)
 def test_descriptor_matches_the_family_content_slot(template):
     desc = descriptor_matches_family(template)
-    assert desc["features_supported"] == ["relief_image"]  # text and motifs land with PR 3b
+    assert desc["features_supported"] == FEATURES[template]
     assert desc["hardware"] == HARDWARE[template]
     assert template.hardware_for(template.validate({})) == HARDWARE[template]
-    assert all(a["kind"] == "surface" and a["max_relief_mm"] == 1.5 and a["accepts"] == ["relief_image"] for a in desc["anchors"])
+    assert all(a["kind"] == "surface" and a["max_relief_mm"] == 1.5 for a in desc["anchors"])
+    assert {a["id"]: a["accepts"] for a in desc["anchors"]} == {anchor: accepts for (t, anchor), accepts in ACCEPTS.items() if t is template}
     for key, param in desc["params"].items():
         if param["type"] in ("number", "integer"):
             assert param["min"] <= param["default"] <= param["max"], key

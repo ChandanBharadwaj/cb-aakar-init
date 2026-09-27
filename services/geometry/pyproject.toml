@@ -26,6 +26,10 @@ dependencies = [
   "pillow>=10",
   "fast-simplification>=0.1.9",
   "pi-heif>=1.0",
+  # Naam (text) and Buti (motifs): HarfBuzz shapes and draws the glyph outlines (uharfbuzz, Apache-2.0;
+  # HarfBuzz itself Old MIT), fontTools pens flatten them and parse the motif SVG paths (MIT)
+  "uharfbuzz>=0.50,<1",
+  "fonttools>=4.50",
 ]
 
 [project.scripts]

@@ -11,7 +11,7 @@ Pieces
   border  a ring ``border_mm`` wide just inside the edge, standing ``BORDER_HEIGHT_MM`` proud of the
           front (0 = no border). The back stays flat so the ornament prints lying on it.
 
-Anchors
+Anchors (each takes a photo, or a name (Naam) and/or a motif (Buti))
   face_front  the largest rectangle inside the border, clear of the hole (normal +Z).
   face_back   the same rectangle on the back, seen with the ornament turned over left to right (normal −Z).
 """
@@ -131,18 +131,24 @@ class HangingOrnament(Template):
     family = "ornament"
     name = "Jhoomar hanging ornament"
     description = (
-        "A two-sided disc, star or bauble with a hanging hole and a raised border. A photo can sit in "
-        "relief on the front and another on the back."
+        "A two-sided disc, star or bauble with a hanging hole and a raised border. A photo, a name or a "
+        "motif can sit in relief on the front, and another on the back."
     )
     environment = "teak_table_candlelight"
     params = PARAMS
     anchors = (
-        Anchor("face_front", "Front", "planar", size_mm=_size("face_front"), bleed_mm=BLEED_MM, accepts=("relief_image",), max_relief_mm=MAX_RELIEF_MM),
-        Anchor("face_back", "Back", "planar", size_mm=_size("face_back"), bleed_mm=BLEED_MM, accepts=("relief_image",), max_relief_mm=MAX_RELIEF_MM),
+        Anchor(
+            "face_front", "Front", "planar", size_mm=_size("face_front"), bleed_mm=BLEED_MM,
+            accepts=("relief_image", "emboss_text", "motif"), max_relief_mm=MAX_RELIEF_MM,
+        ),
+        Anchor(
+            "face_back", "Back", "planar", size_mm=_size("face_back"), bleed_mm=BLEED_MM,
+            accepts=("relief_image", "emboss_text", "motif"), max_relief_mm=MAX_RELIEF_MM,
+        ),
     )
     constraints = TemplateConstraints(min_wall_mm=1.2, max_overhang_deg=55, bed_mm=(250, 250, 250))
     style_variants = ()
-    features_supported = ("relief_image",)  # text and motifs land with the text release (PR 3b)
+    features_supported = ("relief_image", "emboss_text", "motif")
     hardware = (HardwareRef("cord_200", 1),)
     min_feature_mm = 0.8
 

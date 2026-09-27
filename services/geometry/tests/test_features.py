@@ -361,10 +361,12 @@ def test_feature_validation_errors(features, error, needle):
 
 
 def test_feature_validation_accepts_sane_specs_and_fills_defaults():
-    out = check_features(ValidationTemplate, [relief(), text(anchor="back"), text(value="नमस्ते दुनिया"), hero(fit="longest", longest_mm=20)])
+    out = check_features(ValidationTemplate, [relief(), text(anchor="back"), hero(fit="longest", longest_mm=20)])
     assert out[0]["mode"] == "emboss" and out[0]["relief_mm"] == 0.6 and out[0]["fit"] == "contain" and out[0]["cutout"] == "none"
     assert out[1]["depth_mm"] == 1.2 and out[1]["mode"] == "emboss" and out[1]["projection"] == "planar"
-    assert out[3]["orientation"] == "as_uploaded" and out[3]["yaw_deg"] == 0
+    assert out[1]["script"] == "latin"  # the detected script is echoed: it picked the font
+    assert out[2]["orientation"] == "as_uploaded" and out[2]["yaw_deg"] == 0
+    assert check_features(ValidationTemplate, [text(value="नमस्ते दुनिया")])[0]["script"] == "devanagari"
     assert out[0]["source"]["origin"] == "upload"
     assert check(ValidationTemplate, {}) == []
     assert normalise_features(None) == []
@@ -412,9 +414,13 @@ def test_apply_features_rejects_wrong_content_kind_and_text_features(content_dir
         features_supported = ("relief_image", "emboss_text")
         anchors = (Anchor("face", "Face", "planar", size_mm=(36, 26), bleed_mm=2, max_relief_mm=1.5),)
 
-    with pytest.raises(UnsupportedFeature) as exc:
-        apply_features(Plaque, body, params, [text()], fetcher)
-    assert "text release" in exc.value.message
+    # names need no fetch: the text release (PR 3b) sets them in without touching the fetcher
+    class NoFetch:
+        def fetch(self, source):  # pragma: no cover - must not be called
+            raise AssertionError("a name was fetched")
+
+    lettered, _ = apply_features(Plaque, body, params, [text()], NoFetch())
+    assert lettered.is_watertight and lettered.volume > body.volume
 
 
 def test_lithophane_mode_hands_the_heightmap_to_the_template(content_dir):
