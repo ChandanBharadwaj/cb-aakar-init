@@ -5,7 +5,8 @@ from __future__ import annotations
 import re
 
 from ..errors import UnknownTemplate
-from .base import Anchor, Param, Template, TemplateConstraints
+from ..families import UnknownFamily, family_ids
+from .base import Anchor, HardwareRef, Param, Template, TemplateConstraints
 from .jharokha_phone_stand import JharokhaPhoneStand
 
 _REF_RE = re.compile(r"^([a-z][a-z0-9_]*)@([0-9]+)$")
@@ -14,6 +15,13 @@ REGISTRY: dict[tuple[str, int], type[Template]] = {}
 
 
 def register(template: type[Template]) -> type[Template]:
+    """Add a template to the registry. Its ``family`` must be an id in families.json (plan §1)."""
+    known = family_ids()
+    if template.family not in known:
+        raise UnknownFamily(
+            f"Template {template.id}@{template.version} declares family {template.family!r}, "
+            f"which is not in families.json (known: {', '.join(known)})"
+        )
     REGISTRY[(template.id, template.version)] = template
     return template
 
@@ -48,6 +56,7 @@ def latest_by_id(template_id: str) -> type[Template] | None:
 
 __all__ = [
     "Anchor",
+    "HardwareRef",
     "JharokhaPhoneStand",
     "Param",
     "REGISTRY",

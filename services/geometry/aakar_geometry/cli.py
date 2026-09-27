@@ -58,7 +58,12 @@ def _cmd_build(args: argparse.Namespace) -> int:
     job_id = args.job_id or str(uuid.uuid4())
     request = {"job_id": job_id, "design_id": design_id, "version_no": args.version, "spec": spec, "outputs": ["glb", "3mf", "stl"]}
     sink = CollectingSink(job_id, design_id)
-    result = build_design(request, sink=sink, storage=FlatLocalStorage(out_dir))
+    fetcher = None
+    if args.content_dir:
+        from .features.fetch import LocalFileFetcher
+
+        fetcher = LocalFileFetcher(args.content_dir)  # content_source URLs resolve by file name inside this folder
+    result = build_design(request, sink=sink, storage=FlatLocalStorage(out_dir), fetcher=fetcher)
     (out_dir / "result.json").write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     if not is_completed(result):
         print(f"FAILED {result['code']}: {result['message']}", file=sys.stderr)
@@ -72,11 +77,14 @@ def _cmd_build(args: argparse.Namespace) -> int:
     grams = est["extruded_volume_cm3"] * density
     hours, minutes = divmod(est["print_seconds"] // 60, 60)
     w, d, h = geo["bounds_mm"]
+    hardware = " · ".join(f"{item['sku']} ×{item['qty']}" for item in result.get("hardware") or [])
     print(
         f"{result['template']['id']}@{result['template']['version']} · bounds {w:g} × {d:g} × {h:g} mm · "
         f"{geo['volume_cm3']:.1f} cm³ · {geo['triangles']} triangles · "
         f"{'passed' if result['printability']['passed'] else 'NOT passed'} · "
-        f"~{grams:.0f} g ({density:g} g/cm³) · {hours}:{minutes:02d} print · wrote {', '.join(sorted(result['assets']))} + result.json to {out_dir}"
+        f"~{grams:.0f} g ({density:g} g/cm³) · {hours}:{minutes:02d} print · "
+        + (f"hardware {hardware} · " if hardware else "")
+        + f"wrote {', '.join(sorted(result['assets']))} + result.json to {out_dir}"
     )
     return 0
 
@@ -108,6 +116,11 @@ def main(argv: list[str] | None = None) -> int:
     build.add_argument("--job-id", default=None)
     build.add_argument("--version", type=int, default=1, help="version_no (default 1)")
     build.add_argument("--density", type=float, default=None, help="g/cm³ for the mass hint (default: the spec material's density, PLA 1.24)")
+    build.add_argument(
+        "--content-dir",
+        default=None,
+        help="folder holding the photos / model files named in the spec's content sources (their URLs resolve by file name here)",
+    )
     build.set_defaults(fn=_cmd_build)
 
     serve = sub.add_parser("serve", help="run the HTTP API (uvicorn)")

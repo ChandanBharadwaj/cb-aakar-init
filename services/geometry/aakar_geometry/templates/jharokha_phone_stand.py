@@ -11,6 +11,12 @@ Pieces
   lip       wall-thick plate at the front, parallel to the back rest, ``lip_height_mm`` above the base.
   rails     two wall-thick gussets at the outer edges joining lip, base and back rest.
   cable slot 12 mm notch through the lip and a channel in the base for a charging cable.
+
+Anchors (content lands on these, see ``anchor_frame``)
+  side_left / side_right  the largest rectangle inscribed in each rail's outer face (normal ∓X).
+  back                    the band of the back rest's rear face below the window (normal leaning +Y).
+The descriptor publishes the anchor sizes at the default parameters; ``anchor_frame`` gives the
+exact frame for any parameters.
 """
 
 from __future__ import annotations
@@ -18,12 +24,14 @@ from __future__ import annotations
 import math
 from typing import Any, Mapping
 
+import numpy as np
 import trimesh
-from shapely.geometry import Point, Polygon, box
+from shapely.geometry import LineString, Point, Polygon, box
 from shapely.ops import unary_union
 
 from .. import cad
 from ..errors import ParamOutOfRange
+from ..features.frames import AnchorFrame
 from .base import Anchor, Param, Template, TemplateConstraints
 
 CABLE_SLOT_MM = 12.0
@@ -31,6 +39,7 @@ MIN_PHONE_SLOT_MM = 12.0  # horizontal gap between lip and back rest at the base
 WINDOW_BOTTOM_BAND_MM = 14.0
 MIN_WINDOW_BODY_MM = 10.0
 ARC_QUAD_SEGS = 12
+ANCHOR_MARGIN_MM = 1.0  # kept clear between content and the edge of a face
 
 
 def _frame_margin(wall: float) -> float:
@@ -73,8 +82,47 @@ def arch_rise_factor(cusps: int) -> float:
     return (1.0 + s) / (2.0 * (c + s))
 
 
+def largest_inscribed_rect(poly: Polygon, margin: float = 0.0, steps: int = 48) -> tuple[float, float, float, float] | None:
+    """``(y0, z0, y1, z1)`` of the largest axis-aligned rectangle inside a convex polygon shrunk by ``margin``.
+
+    For a convex shape a rectangle fits iff its two horizontal edges do, so the search scans pairs of
+    heights and intersects the polygon's horizontal sections there.
+    """
+    inner = poly.buffer(-margin, join_style=2) if margin > 0 else poly
+    if inner.is_empty:
+        return None
+    if inner.geom_type != "Polygon":
+        inner = max(inner.geoms, key=lambda g: g.area)
+    miny, minz, maxy, maxz = inner.bounds
+    zs = np.linspace(minz, maxz, steps)
+    sections: list[tuple[float, float] | None] = []
+    for z in zs:
+        seg = inner.intersection(LineString([(miny - 1.0, z), (maxy + 1.0, z)]))
+        if seg.is_empty or seg.length <= 1e-9:
+            sections.append(None)
+        else:
+            b = seg.bounds
+            sections.append((b[0], b[2]))
+    best: tuple[float, float, float, float, float] | None = None
+    for a in range(steps):
+        sa = sections[a]
+        if sa is None:
+            continue
+        for b in range(a + 1, steps):
+            sb = sections[b]
+            if sb is None:
+                continue
+            lo, hi = max(sa[0], sb[0]), min(sa[1], sb[1])
+            if hi <= lo:
+                continue
+            area = (hi - lo) * (zs[b] - zs[a])
+            if best is None or area > best[0]:
+                best = (area, lo, float(zs[a]), hi, float(zs[b]))
+    return None if best is None else best[1:]
+
+
 class Layout:
-    """Derived dimensions shared by ``build``, ``validate_combination`` and ``karigar_note``."""
+    """Derived dimensions shared by ``build_body``, ``validate_combination``, ``anchor_frame`` and ``karigar_note``."""
 
     def __init__(self, p: Mapping[str, Any]):
         self.W = float(p["width_mm"])
@@ -119,6 +167,79 @@ class Layout:
         poly = cusped_arch(width, body, self.cusps)
         return poly, width, body
 
+    @property
+    def rail_height(self) -> float:
+        return max(0.45 * self.H, self.wall + self.lip + 8.0)
+
+    def rail_profile(self) -> Polygon:
+        """Side rail profile in the (Y, Z) plane (shared by the build and the side anchors)."""
+        z_rail = self.rail_height
+        inset = 0.6 * self.wall / self.sin
+        return Polygon(
+            [
+                (-self.D / 2, 0.0),
+                (self.back_front_y(0.0) + inset, 0.0),
+                (self.back_front_y(z_rail) + inset, z_rail),
+                (self.y_lip - self.wall * self.sin + (self.wall + self.lip - self.wall * self.cos) * self.cot, self.wall + self.lip),
+            ]
+        )
+
+    def rail_rect(self) -> tuple[float, float, float, float]:
+        """``(y0, z0, y1, z1)`` of the content rectangle on a rail's outer face."""
+        rect = largest_inscribed_rect(self.rail_profile(), ANCHOR_MARGIN_MM)
+        if rect is None:  # pragma: no cover - the rail is always big enough for a sliver
+            raise ParamOutOfRange(["height_mm", "lip_height_mm"], "The side rails are too small to carry content")
+        return rect
+
+    def back_plate_point(self, x: float, along: float) -> np.ndarray:
+        """World point on the back rest's rear face, ``along`` mm up the plate from its foot."""
+        return np.array([x, self.y_bb + along * self.cos, along * self.sin])
+
+    def back_band(self) -> tuple[float, float, float, float]:
+        """``(x0, along0, x1, along1)`` in plate coordinates: the band below the window on the rear face."""
+        f = _frame_margin(self.wall)
+        along0 = self.wall / self.sin + ANCHOR_MARGIN_MM  # where the rear face emerges from the base plate
+        along1 = WINDOW_BOTTOM_BAND_MM - ANCHOR_MARGIN_MM
+        return (-(self.W / 2 - f - ANCHOR_MARGIN_MM), along0, self.W / 2 - f - ANCHOR_MARGIN_MM, along1)
+
+    def anchor_frames(self) -> dict[str, AnchorFrame]:
+        y0, z0, y1, z1 = self.rail_rect()
+        rail_size = (y1 - y0, z1 - z0)
+        yc, zc = (y0 + y1) / 2.0, (z0 + z1) / 2.0
+        x0, a0, x1, a1 = self.back_band()
+        back_size = (x1 - x0, a1 - a0)
+        # Rear face normal of the leaning plate: +Y and down; "up" runs along the plate.
+        back_normal = np.array([0.0, self.sin, -self.cos])
+        return {
+            "side_left": AnchorFrame(np.array([-self.W / 2, yc, zc]), [0, -1, 0], [0, 0, 1], [-1, 0, 0], size_mm=rail_size),
+            "side_right": AnchorFrame(np.array([self.W / 2, yc, zc]), [0, 1, 0], [0, 0, 1], [1, 0, 0], size_mm=rail_size),
+            "back": AnchorFrame(
+                self.back_plate_point((x0 + x1) / 2.0, (a0 + a1) / 2.0),
+                [-1, 0, 0],
+                [0, self.cos, self.sin],
+                back_normal,
+                size_mm=back_size,
+            ),
+        }
+
+
+PARAMS = {
+    "width_mm": Param("number", "Width", 92.0, "mm", 70, 110, 1, handle=True, group="Size"),
+    "depth_mm": Param("number", "Depth", 78.0, "mm", 60, 100, 1, handle=True, group="Size"),
+    "height_mm": Param("number", "Height", 120.0, "mm", 90, 150, 1, handle=True, group="Size"),
+    "tilt_deg": Param("number", "Tilt", 70.0, "deg", 60, 78, 1, group="Shape", description="Back rest angle from horizontal."),
+    "lip_height_mm": Param("number", "Lip height", 12.0, "mm", 8, 18, 0.5, group="Shape"),
+    "wall_mm": Param("number", "Wall thickness", 3.2, "mm", 2.4, 4.0, 0.1, group="Details"),
+    "arch_cusps": Param("integer", "Arch cusps", 5, "count", 3, 7, 1, group="Details", description="Lobes in the jharokha arch."),
+}
+
+_DEFAULT_FRAMES = Layout({k: p.default for k, p in PARAMS.items()}).anchor_frames()
+
+
+def _size(anchor_id: str) -> tuple[float, float]:
+    w, h = _DEFAULT_FRAMES[anchor_id].size_mm  # type: ignore[misc]
+    return (round(w, 1), round(h, 1))
+
 
 class JharokhaPhoneStand(Template):
     id = "jharokha_phone_stand"
@@ -130,23 +251,15 @@ class JharokhaPhoneStand(Template):
         "a cable slot in the lip and side rails for stiffness."
     )
     environment = "desk_oak"
-    params = {
-        "width_mm": Param("number", "Width", 92.0, "mm", 70, 110, 1, handle=True, group="Size"),
-        "depth_mm": Param("number", "Depth", 78.0, "mm", 60, 100, 1, handle=True, group="Size"),
-        "height_mm": Param("number", "Height", 120.0, "mm", 90, 150, 1, handle=True, group="Size"),
-        "tilt_deg": Param("number", "Tilt", 70.0, "deg", 60, 78, 1, group="Shape", description="Back rest angle from horizontal."),
-        "lip_height_mm": Param("number", "Lip height", 12.0, "mm", 8, 18, 0.5, group="Shape"),
-        "wall_mm": Param("number", "Wall thickness", 3.2, "mm", 2.4, 4.0, 0.1, group="Details"),
-        "arch_cusps": Param("integer", "Arch cusps", 5, "count", 3, 7, 1, group="Details", description="Lobes in the jharokha arch."),
-    }
+    params = PARAMS
     anchors = (
-        Anchor("side_left", "Left side rail", "planar", max_text_height_mm=12),
-        Anchor("side_right", "Right side rail", "planar", max_text_height_mm=12),
-        Anchor("back", "Back of the rest", "planar", max_text_height_mm=20),
+        Anchor("side_left", "Left side rail", "planar", max_text_height_mm=12, size_mm=_size("side_left"), max_relief_mm=1.0),
+        Anchor("side_right", "Right side rail", "planar", max_text_height_mm=12, size_mm=_size("side_right"), max_relief_mm=1.0),
+        Anchor("back", "Back of the rest", "planar", max_text_height_mm=20, size_mm=_size("back"), max_relief_mm=1.0),
     )
     constraints = TemplateConstraints(min_wall_mm=1.2, max_overhang_deg=55, bed_mm=(250, 250, 250))
     style_variants = ()
-    features_supported = ()
+    features_supported = ()  # text and motif land with the text release (PR 3b)
 
     @classmethod
     def validate_combination(cls, params: dict[str, Any]) -> None:
@@ -180,16 +293,7 @@ class JharokhaPhoneStand(Template):
         lip = cad.translate(cad.rotate_x(cad.prism(box(-W / 2, 0.0, W / 2, L.lip_len), wall), L.tilt), dy=L.y_lip)
 
         # Side rails: profile in the (Y, Z) plane, extruded along +X by `wall`.
-        z_rail = max(0.45 * H, wall + L.lip + 8.0)
-        inset = 0.6 * wall / L.sin
-        rail_profile = Polygon(
-            [
-                (-D / 2, 0.0),
-                (L.back_front_y(0.0) + inset, 0.0),
-                (L.back_front_y(z_rail) + inset, z_rail),
-                (L.y_lip - wall * L.sin + (wall + L.lip - wall * L.cos) * L.cot, wall + L.lip),
-            ]
-        )
+        rail_profile = L.rail_profile()
         rail_left = cad.translate(cad.prism(rail_profile, wall, cad.Plane.YZ), dx=-W / 2)
         rail_right = cad.translate(cad.prism(rail_profile, wall, cad.Plane.YZ), dx=W / 2 - wall)
 
@@ -203,11 +307,19 @@ class JharokhaPhoneStand(Template):
         return cad.cut(body, [cable])
 
     @classmethod
-    def build(cls, params: Mapping[str, Any]) -> trimesh.Trimesh:
+    def build_body(cls, params: Mapping[str, Any]) -> trimesh.Trimesh:
         mesh = cad.to_trimesh(cls.build_part(params))
         # Sit exactly on Z = 0 and centre in X/Y (guards against kernel rounding).
         mesh.apply_translation([0.0, 0.0, -float(mesh.bounds[0][2])])
         return mesh
+
+    @classmethod
+    def anchor_frame(cls, anchor_id: str, params: Mapping[str, Any]) -> AnchorFrame:
+        frames = Layout(params).anchor_frames()
+        try:
+            return frames[anchor_id]
+        except KeyError:
+            raise NotImplementedError(f"{cls.ref()} does not place anchor {anchor_id!r}") from None
 
     @classmethod
     def karigar_note(cls, params: Mapping[str, Any]) -> str:

@@ -40,3 +40,34 @@ def test_cli_build_reports_failure(tmp_path, capsys):
 def test_console_script_help():
     proc = subprocess.run([sys.executable, "-m", "aakar_geometry.cli", "--help"], capture_output=True, text=True)
     assert proc.returncode == 0 and "templates" in proc.stdout and "worker" in proc.stdout
+
+
+def test_cli_build_with_content_dir(test_templates, content_dir, tmp_path, capsys, monkeypatch):
+    from aakar_geometry.errors import ContentUnusable
+    from conftest import content_source
+
+    spec = {
+        "spec_version": "1.0",
+        "family": "keychain",
+        "template": "test_plate@1",
+        "params": {"thickness_mm": 3},
+        "features": [{"type": "relief_image", "source": content_source("photo.png", "png"), "anchor": "face"}],
+        "material": "basic_white",
+    }
+    spec_path = tmp_path / "plate.json"
+    spec_path.write_text(json.dumps(spec))
+    out = tmp_path / "out"
+    assert main(["build", str(spec_path), "--out", str(out), "--content-dir", str(content_dir)]) == 0
+    summary = capsys.readouterr().out.strip()
+    assert "test_plate@1" in summary and "hardware split_ring_25 ×1" in summary
+    result = json.loads((out / "result.json").read_text())
+    validate("design.completed", result)
+    assert result["hardware"] == [{"sku": "split_ring_25", "qty": 1}]
+    # without --content-dir the pipeline's HttpFetcher is used; a failed fetch is a clean design.failed
+    class Offline:
+        def fetch(self, source):
+            raise ContentUnusable("We couldn't find your photo; please upload it again", {"url": source.get("url")})
+
+    monkeypatch.setattr("aakar_geometry.pipeline.HttpFetcher", Offline)
+    assert main(["build", str(spec_path), "--out", str(tmp_path / "out2")]) == 1
+    assert json.loads((tmp_path / "out2" / "result.json").read_text())["code"] == "content_unusable"

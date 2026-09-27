@@ -1,15 +1,16 @@
-"""Template base class: descriptor, parameter validation (no silent clamping), build, karigar note."""
+"""Template base class: descriptor, parameter validation (no silent clamping), body + features build, karigar note."""
 
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
-from typing import Any, ClassVar, Mapping
+from dataclasses import dataclass
+from typing import Any, ClassVar, Mapping, Sequence
 
 import trimesh
 
 from ..contracts import validate
-from ..errors import InvalidSpec, ParamOutOfRange
+from ..errors import InvalidSpec, ParamOutOfRange, UnsupportedFeature
+from ..features.frames import AnchorFrame
 
 
 @dataclass(frozen=True)
@@ -77,16 +78,62 @@ class Param:
 
 @dataclass(frozen=True)
 class Anchor:
+    """One entry of ``template-descriptor.v1.json#/$defs/anchor``: a place where content may land.
+
+    ``kind`` ``surface`` (text, motif, photo relief; ``size_mm`` = printable width × height, ``bleed_mm``
+    the safe margin inside it) or ``volume`` (a customer's own 3D form; ``bounds_mm`` = width × depth ×
+    height above the anchor's bottom plane). ``accepts`` narrows the template's ``features_supported``
+    for this anchor (None = all of them); ``max_relief_mm`` caps relief and emboss depth.
+    """
+
     id: str
     label: str
     projection: str  # planar | cylindrical | conformal
     max_text_height_mm: float | None = None
+    kind: str = "surface"
+    size_mm: tuple[float, float] | None = None
+    bleed_mm: float = 0.0
+    bounds_mm: tuple[float, float, float] | None = None
+    accepts: tuple[str, ...] | None = None
+    max_relief_mm: float | None = None
+
+    def __post_init__(self) -> None:
+        if self.kind not in ("surface", "volume"):
+            raise ValueError(f"Anchor {self.id}: kind must be surface or volume, got {self.kind!r}")
+        if self.size_mm is not None:
+            object.__setattr__(self, "size_mm", tuple(float(s) for s in self.size_mm))
+        if self.bounds_mm is not None:
+            object.__setattr__(self, "bounds_mm", tuple(float(b) for b in self.bounds_mm))
+        if self.accepts is not None:
+            object.__setattr__(self, "accepts", tuple(self.accepts))
 
     def descriptor(self) -> dict[str, Any]:
-        out: dict[str, Any] = {"id": self.id, "label": self.label, "projection": self.projection}
+        out: dict[str, Any] = {"id": self.id, "label": self.label, "kind": self.kind, "projection": self.projection}
         if self.max_text_height_mm is not None:
             out["max_text_height_mm"] = self.max_text_height_mm
+        if self.size_mm is not None:
+            out["size_mm"] = [round(float(s), 3) for s in self.size_mm]
+            out["bleed_mm"] = float(self.bleed_mm)
+        elif self.bleed_mm:
+            out["bleed_mm"] = float(self.bleed_mm)
+        if self.bounds_mm is not None:
+            out["bounds_mm"] = [round(float(b), 3) for b in self.bounds_mm]
+        if self.accepts is not None:
+            out["accepts"] = list(self.accepts)
+        if self.max_relief_mm is not None:
+            out["max_relief_mm"] = float(self.max_relief_mm)
         return out
+
+
+@dataclass(frozen=True)
+class HardwareRef:
+    """A bought-in part packed with every piece (``template-descriptor.v1.json#/properties/hardware``)."""
+
+    sku: str
+    qty: int = 1
+
+    def descriptor(self) -> dict[str, Any]:
+        return {"sku": self.sku, "qty": int(self.qty)}
 
 
 @dataclass(frozen=True)
@@ -100,7 +147,8 @@ class TemplateConstraints:
 
 
 class Template:
-    """A parametric template. Subclasses set the class attributes and implement ``build_part``."""
+    """A parametric template. Subclasses set the class attributes and implement ``build_body`` (and
+    ``anchor_frame`` for every anchor that accepts content)."""
 
     id: ClassVar[str]
     version: ClassVar[int]
@@ -113,6 +161,8 @@ class Template:
     constraints: ClassVar[TemplateConstraints] = TemplateConstraints()
     style_variants: ClassVar[tuple[str, ...]] = ()
     features_supported: ClassVar[tuple[str, ...]] = ()
+    hardware: ClassVar[tuple[HardwareRef, ...]] = ()
+    min_feature_mm: ClassVar[float | None] = None
 
     @classmethod
     def ref(cls) -> str:
@@ -120,14 +170,15 @@ class Template:
 
     @classmethod
     def materials(cls) -> list[str]:
-        from ..materials import material_ids
+        """Material ids this template offers: every material, filtered by the family's ``material_rules``."""
+        from ..families import allowed_material_ids
 
-        return material_ids()
+        return allowed_material_ids(cls.family)
 
     @classmethod
     def descriptor(cls) -> dict[str, Any]:
         """Template descriptor v1; validated against the contract before it is returned."""
-        doc = {
+        doc: dict[str, Any] = {
             "id": cls.id,
             "version": cls.version,
             "family": cls.family,
@@ -140,9 +191,27 @@ class Template:
             "materials": cls.materials(),
             "style_variants": list(cls.style_variants),
             "features_supported": list(cls.features_supported),
+            "hardware": [h.descriptor() for h in cls.hardware],
         }
+        if cls.min_feature_mm is not None:
+            doc["min_feature_mm"] = float(cls.min_feature_mm)
         validate("template-descriptor", doc)
         return doc
+
+    @classmethod
+    def anchor(cls, anchor_id: str) -> Anchor:
+        for a in cls.anchors:
+            if a.id == anchor_id:
+                return a
+        raise InvalidSpec(
+            f"{cls.name} has no anchor called {anchor_id!r}",
+            {"anchor": anchor_id, "anchors": [a.id for a in cls.anchors]},
+        )
+
+    @classmethod
+    def hardware_for(cls, params: Mapping[str, Any]) -> list[dict[str, Any]]:
+        """Bill of materials for this piece as ``[{sku, qty}]``; override when a parameter changes quantities."""
+        return [h.descriptor() for h in cls.hardware]
 
     @classmethod
     def validate(cls, params: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -181,9 +250,47 @@ class Template:
         """Hook for coupled constraints between parameters (raise ``ParamOutOfRange``)."""
 
     @classmethod
-    def build(cls, params: Mapping[str, Any]) -> trimesh.Trimesh:
-        """Validated params -> watertight trimesh in mm, Z up, sitting on Z = 0."""
+    def anchor_frame(cls, anchor_id: str, params: Mapping[str, Any]) -> AnchorFrame:
+        """Where content lands for ``anchor_id`` at these params (see ``features.frames.AnchorFrame``)."""
+        raise NotImplementedError(f"{cls.ref()} does not place anchor {anchor_id!r}")
+
+    @classmethod
+    def build_body(cls, params: Mapping[str, Any]) -> trimesh.Trimesh:
+        """Validated params -> watertight trimesh in mm, Z up, sitting on Z = 0, before any content is added.
+        A template whose whole geometry is a customer's form (``raw_print``) returns an empty ``trimesh.Trimesh()``."""
         raise NotImplementedError
+
+    @classmethod
+    def build(
+        cls,
+        params: Mapping[str, Any],
+        features: Sequence[Mapping[str, Any]] = (),
+        fetcher: Any | None = None,
+    ) -> trimesh.Trimesh:
+        """``build_body`` + ``features.apply_features``. With no features the body is returned untouched."""
+        body = cls.build_body(params)
+        if not features:
+            return body
+        from ..features import apply_features
+
+        mesh, _hardware = apply_features(cls, body, params, features, fetcher)
+        return mesh
+
+    @classmethod
+    def lithophane(
+        cls,
+        body: trimesh.Trimesh | None,
+        params: Mapping[str, Any],
+        frame: AnchorFrame,
+        anchor: Anchor,
+        feature: Mapping[str, Any],
+        relief: Any,
+    ) -> trimesh.Trimesh:
+        """Hook for ``relief_image`` in ``lithophane`` mode: the template turns the ``ReliefMap`` into its plate."""
+        raise UnsupportedFeature(
+            f"{cls.name} cannot make a photo night light",
+            {"template": cls.ref(), "anchor": anchor.id, "mode": "lithophane"},
+        )
 
     @classmethod
     def karigar_note(cls, params: Mapping[str, Any]) -> str:

@@ -25,6 +25,7 @@ SCHEMA_ID_BASE = "https://aakar.studio/schemas/"
 SCHEMA_FILES = {
     "design-spec": "design-spec.v1.json",
     "template-descriptor": "template-descriptor.v1.json",
+    "template-family": "template-family.v1.json",
     "printability-report": "printability-report.v1.json",
     "print-estimate": "print-estimate.v1.json",
     "price-breakdown": "price-breakdown.v1.json",

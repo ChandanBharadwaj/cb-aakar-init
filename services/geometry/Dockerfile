@@ -9,6 +9,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_COMPILE_BYTECODE=1 \
     AAKAR_CONTRACTS_DIR=/contracts/schemas \
     AAKAR_MATERIALS_FILE=/design-tokens/materials.json \
+    AAKAR_FAMILIES_FILE=/design-tokens/families.json \
     AAKAR_STORAGE=local \
     AAKAR_ASSET_DIR=/data/assets \
     AAKAR_PUBLIC_URL=http://localhost:8081
@@ -24,9 +25,10 @@ COPY --from=ghcr.io/astral-sh/uv:0.8.17 /uv /uvx /bin/
 
 WORKDIR /app/services/geometry
 
-# Contracts are the law; the materials file feeds the template descriptors.
+# Contracts are the law; the materials and families files feed the template descriptors and registry.
 COPY packages/contracts/schemas /contracts/schemas
 COPY packages/design-tokens/materials.json /design-tokens/materials.json
+COPY packages/design-tokens/families.json /design-tokens/families.json
 
 # aakar-inspect is a path dependency (../inspect), so both services ship in the image.
 COPY services/inspect/pyproject.toml services/inspect/README.md /app/services/inspect/
@@ -36,7 +38,7 @@ COPY services/geometry/aakar_geometry ./aakar_geometry
 RUN uv sync --no-dev
 
 ENV PATH="/app/services/geometry/.venv/bin:${PATH}"
-RUN mkdir -p /data/assets && python -c "import build123d, aakar_geometry.templates"  # warm import + sanity
+RUN mkdir -p /data/assets && python -c "import build123d, manifold3d, aakar_geometry.templates, aakar_geometry.features"  # warm import + sanity
 
 EXPOSE 8081
 HEALTHCHECK --interval=15s --timeout=3s --retries=5 CMD curl -fsS http://localhost:8081/healthz || exit 1

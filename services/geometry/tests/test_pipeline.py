@@ -196,3 +196,94 @@ def test_inspector_from_env():
     assert isinstance(inspector_from_env({}), InProcessInspector)
     http = inspector_from_env({"AAKAR_INSPECT_URL": "http://inspect:8082/"})
     assert isinstance(http, HttpInspector) and http.base_url == "http://inspect:8082"
+
+
+# --------------------------------------------------------------------------- Chhaap: content features through the pipeline
+
+from aakar_geometry.features.fetch import LocalFileFetcher  # noqa: E402
+
+from conftest import content_source  # noqa: E402
+
+
+def _request(template_ref: str, family: str, params: dict, features: list, material: str = "basic_white") -> dict:
+    return {
+        "job_id": JOB_ID,
+        "design_id": DESIGN_ID,
+        "version_no": 2,
+        "outputs": ["glb", "stl"],
+        "spec": {"spec_version": "1.0", "family": family, "template": template_ref, "params": params, "features": features, "material": material},
+    }
+
+
+def test_jharokha_example_is_unchanged_by_the_features_stage(generate_request, local_storage, built_example):
+    payload = build_design(generate_request, storage=local_storage)
+    assert is_completed(payload)
+    validate("design.completed", payload)
+    assert payload["hardware"] == []
+    assert payload["spec"]["features"] == []
+    _, _, mesh = built_example
+    assert payload["printability"]["geometry"]["bounds_mm"] == pytest.approx(list(mesh.extents), abs=1e-3)
+    assert payload["printability"]["geometry"]["bounds_mm"] == pytest.approx([92, 78, 120], abs=1.0)
+
+
+def test_relief_image_spec_completes_with_hardware(test_templates, content_dir, local_storage):
+    Plate, _, _ = test_templates
+    feature = {"type": "relief_image", "source": content_source("photo.png", "png"), "anchor": "face", "relief_mm": 0.8}
+    request = _request("test_plate@1", "keychain", {"thickness_mm": 3}, [feature], material="indigo_matte")
+    payload = build_design(request, storage=local_storage, fetcher=LocalFileFetcher(content_dir))
+    assert is_completed(payload), payload
+    validate("design.completed", payload)
+    assert payload["hardware"] == [{"sku": "split_ring_25", "qty": 1}]
+    assert payload["template"] == {"id": "test_plate", "version": 1}
+    normalised = payload["spec"]["features"][0]
+    assert normalised["mode"] == "emboss" and normalised["fit"] == "contain" and normalised["relief_mm"] == 0.8 and normalised["cutout"] == "none"
+    geometry = payload["printability"]["geometry"]
+    assert geometry["bounds_mm"] == pytest.approx([40, 30, 3.8], abs=1e-3)
+    assert geometry["volume_cm3"] > 40 * 30 * 3 / 1000
+    assert payload["printability"]["checks"]["manifold"]["status"] == "pass"
+    assert sorted(payload["assets"]) == ["glb", "stl"]
+
+    deboss = dict(feature, mode="deboss")
+    payload = build_design(_request("test_plate@1", "keychain", {"thickness_mm": 3}, [deboss]), storage=local_storage, fetcher=LocalFileFetcher(content_dir))
+    assert is_completed(payload) and payload["printability"]["geometry"]["volume_cm3"] < 40 * 30 * 3 / 1000
+
+
+def test_hero_mesh_spec_completes_on_a_volume_anchor_and_as_raw_print(test_templates, content_dir, local_storage):
+    fetcher = LocalFileFetcher(content_dir)
+    hero = {"type": "hero_mesh", "source": content_source("sphere.stl", "stl"), "anchor": "top"}
+    payload = build_design(_request("test_plinth@1", "figurine_base", {}, [hero]), storage=local_storage, fetcher=fetcher)
+    assert is_completed(payload), payload
+    validate("design.completed", payload)
+    assert payload["hardware"] == []
+    assert payload["printability"]["geometry"]["bounds_mm"] == pytest.approx([50, 50, 49.5], abs=1e-3)
+    assert payload["spec"]["features"][0]["orientation"] == "as_uploaded"
+
+    raw = {"type": "hero_mesh", "source": content_source("sphere.stl"), "anchor": "body", "fit": "longest", "longest_mm": 80, "orientation": "lay_flat"}
+    payload = build_design(_request("test_raw@1", "raw_print", {"longest_mm": 80}, [raw]), storage=local_storage, fetcher=fetcher)
+    assert is_completed(payload), payload
+    assert payload["printability"]["geometry"]["bounds_mm"] == pytest.approx([80, 80, 80], abs=1e-3)
+    assert payload["printability"]["passed"] is True
+
+
+@pytest.mark.parametrize(
+    "template_ref, family, params, feature, code",
+    [
+        ("test_plinth@1", "figurine_base", {}, {"type": "hero_mesh", "source": content_source("soup.stl", "stl"), "anchor": "top"}, "content_unusable"),
+        ("test_plinth@1", "figurine_base", {}, {"type": "hero_mesh", "source": content_source("open.stl", "stl"), "anchor": "top"}, "content_unusable"),
+        ("test_plate@1", "keychain", {}, {"type": "relief_image", "source": content_source("flat.png", "png"), "anchor": "face"}, "content_unusable"),
+        ("test_plate@1", "keychain", {}, {"type": "relief_image", "source": content_source("notes.txt"), "anchor": "face"}, "content_unusable"),
+        ("test_plate@1", "keychain", {}, {"type": "relief_image", "source": content_source("missing.png", "png"), "anchor": "face"}, "content_unusable"),
+        ("test_plate@1", "keychain", {}, {"type": "relief_image", "source": content_source("photo.png", "png"), "anchor": "lid"}, "invalid_spec"),
+        ("test_plate@1", "keychain", {}, {"type": "relief_image", "source": content_source("photo.png", "png"), "anchor": "face", "relief_mm": 2.5}, "param_out_of_range"),
+        ("test_plate@1", "keychain", {}, {"type": "hero_mesh", "source": content_source("sphere.stl", "stl"), "anchor": "face"}, "unsupported_feature"),
+        ("test_plinth@1", "figurine_base", {}, {"type": "hero_mesh", "source": content_source("sphere.stl", "stl"), "anchor": "top", "fit": "longest", "longest_mm": 90}, "param_out_of_range"),
+    ],
+)
+def test_content_failures_surface_as_design_failed(test_templates, content_dir, local_storage, template_ref, family, params, feature, code):
+    payload = build_design(_request(template_ref, family, params, [feature]), storage=local_storage, fetcher=LocalFileFetcher(content_dir))
+    assert not is_completed(payload)
+    validate("design.failed", payload)
+    assert payload["code"] == code, payload
+    assert http_status_for(payload) == 422
+    for word in ("mesh", "STL", "stl"):
+        assert word not in payload["message"], payload["message"]

@@ -137,3 +137,43 @@ def test_example_inspects_as_printable(built_example):
     assert 45 <= grams <= 70
     assert 3 * 3600 <= estimate["print_seconds"] <= 5 * 3600
     assert estimate["layers"] == math.ceil(120 / 0.2)
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {},
+        {"width_mm": 70, "depth_mm": 60, "height_mm": 90, "tilt_deg": 78, "lip_height_mm": 8, "wall_mm": 2.4, "arch_cusps": 3},
+        {"width_mm": 110, "depth_mm": 100, "height_mm": 150, "tilt_deg": 66, "lip_height_mm": 18, "wall_mm": 4.0, "arch_cusps": 7},
+    ],
+)
+def test_anchor_frames_lie_on_the_surface(overrides):
+    """Every anchor's centre and printable corners sit on the built skin with the frame's normal pointing out."""
+    import numpy as np
+    from trimesh.proximity import closest_point
+
+    params = JharokhaPhoneStand.validate(overrides)
+    mesh = JharokhaPhoneStand.build_body(params)
+    for anchor in JharokhaPhoneStand.anchors:
+        frame = JharokhaPhoneStand.anchor_frame(anchor.id, params)
+        assert frame.size_mm is not None and min(frame.size_mm) > 5
+        points = np.vstack([frame.origin[None, :], frame.corners()])
+        _, distance, triangle = closest_point(mesh, points)
+        assert distance.max() < 0.05, (anchor.id, distance)
+        assert float(np.dot(mesh.face_normals[triangle[0]], frame.normal)) > 0.999
+    with pytest.raises(NotImplementedError):
+        JharokhaPhoneStand.anchor_frame("lid", params)
+
+
+def test_descriptor_publishes_default_anchor_sizes_and_no_hardware():
+    desc = JharokhaPhoneStand.descriptor()
+    validate("template-descriptor", desc)
+    by_id = {a["id"]: a for a in desc["anchors"]}
+    defaults = JharokhaPhoneStand.validate({})
+    for anchor_id, anchor in by_id.items():
+        assert anchor["kind"] == "surface" and anchor["max_relief_mm"] == 1.0 and anchor["bleed_mm"] == 0.0
+        frame = JharokhaPhoneStand.anchor_frame(anchor_id, defaults)
+        assert anchor["size_mm"] == pytest.approx(list(frame.size_mm), abs=0.06)
+    assert by_id["back"]["size_mm"][0] == pytest.approx(92 - 2 * 8 - 2 * 1.0, abs=0.06)  # width minus frame margins
+    assert desc["hardware"] == [] and "min_feature_mm" not in desc
+    assert JharokhaPhoneStand.hardware_for(defaults) == []
