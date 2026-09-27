@@ -97,6 +97,12 @@ aakar:
     # The API origin the geometry service fetches customer uploads from (content_source.url in design specs), e.g.
     # http://api:8080 in Compose while api.public-url is the browser's http://localhost:8080. Blank = api.public-url.
     internal-base-url: ${AAKAR_MEDIA_INTERNAL_BASE_URL:}
+  motifs:
+    # The Buti motif library (index.json + one SVG per motif) behind GET /api/motifs and the motif checks on designs; the
+    # geometry service builds from the same folder. Blank: the first packages/design-tokens/motifs found from the working
+    # directory upwards (the monorepo's); the image sets /design-tokens/motifs. Missing or broken: a production start fails,
+    # a local one logs a warning and lists no motifs.
+    dir: ${AAKAR_MOTIFS_DIR:}
   uploads:
     # Customer uploads (POST /api/uploads, plan §4): photos for a relief, model files for a hero form or Swaroop.
     # `terms` flags a file whose name mentions one of flag-terms (comma-separated; case, spaces and punctuation ignored)

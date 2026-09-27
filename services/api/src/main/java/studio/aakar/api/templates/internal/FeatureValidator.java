@@ -1,6 +1,7 @@
 package studio.aakar.api.templates.internal;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -15,16 +16,27 @@ import studio.aakar.api.shared.ApiProblemException;
 import studio.aakar.api.shared.ProblemCodes;
 import studio.aakar.api.templates.FamilyLimits;
 import studio.aakar.api.templates.FeatureLabels;
+import studio.aakar.api.templates.MotifDto;
+import studio.aakar.api.templates.Motifs;
 import studio.aakar.api.templates.TemplateDescriptor;
 
 /**
  * Checks content features (the Chhaap) the way the geometry service's {@code features/validate.py} does, so a request
  * the geometry would refuse is answered 422 before a job starts: the feature shape of {@code design-spec.v1.json}
  * (known type, no unknown settings, required settings, types, enums and ranges), then the descriptor
- * ({@code features_supported}, the anchor's {@code accepts}, surface vs volume, one photo or form per anchor,
- * {@code max_relief_mm} with the lithophane exemption), then the family (text length without marks, and for the raw
- * family exactly one form sized inside the envelope). Values are never clamped. Returns the features normalised with
- * the contract defaults, in schema order. Customer-facing {@code detail}s use labels, never code words.
+ * ({@code features_supported}, the anchor's {@code accepts}, surface vs volume, what one anchor holds, flat lettering,
+ * {@code max_relief_mm} with the lithophane exemption, {@code max_text_height_mm}), then the family (text length without
+ * marks, and for the raw family exactly one form sized inside the envelope), the letters of a text ({@link Lettering}) and
+ * the motif library ({@link Motifs}). Values are never clamped. Returns the features normalised with the contract
+ * defaults, in schema order. Customer-facing {@code detail}s use labels, never code words.
+ *
+ * <p>What one anchor holds: at most one photo or form, one text (Naam) and one motif (Buti). A text and a motif share a
+ * spot side by side; a photo relief fills its spot, so a text or a motif beside it is refused as crowded, whichever
+ * came first. Texts and motifs are flat for now: a curved projection is {@code unsupported_feature}.
+ *
+ * <p>Left to the geometry service, which needs the fonts and the anchor's size for them: characters the bundled fonts
+ * lack, and whether a text or a motif fits its spot at a printable stroke. When the motif library is not loaded (a local
+ * run without it) motif ids and {@code min_scale} are left to it too.
  */
 @Component
 class FeatureValidator {
@@ -37,6 +49,9 @@ class FeatureValidator {
     static final Set<String> SURFACE_TYPES = Set.of(EMBOSS_TEXT, MOTIF, RELIEF_IMAGE);
     /** At most one of these per anchor. */
     static final Set<String> CONTENT_TYPES = Set.of(RELIEF_IMAGE, HERO_MESH);
+    /** A text and a motif: one of each per anchor, side by side, never beside a photo; flat lettering only. */
+    static final Set<String> MARK_TYPES = Set.of(EMBOSS_TEXT, MOTIF);
+    static final String PLANAR = "planar";
     static final Map<String, String> LABELS = FeatureLabels.LABELS;
     static final Map<String, String> DEPTH_KEY = Map.of(RELIEF_IMAGE, "relief_mm", EMBOSS_TEXT, "depth_mm", MOTIF, "depth_mm");
     /** {@code emboss_text.text} maxLength in the contract (code points). */
@@ -85,10 +100,16 @@ class FeatureValidator {
             MOTIF, List.of(
                     new Field("motif_id", Rule.ID, true, null, null, null, null, null, "motif"),
                     new Field("anchor", Rule.ANCHOR, true, null, null, null, null, null, "place"),
-                    new Field("scale", Rule.NUMBER, false, 1, null, 0.2, 3.0, "", "scale"),
+                    new Field("scale", Rule.NUMBER, false, 1, null, 0.2, 1.0, "", "scale"),
                     new Field("depth_mm", Rule.NUMBER, false, 1.0, null, 0.4, 3.0, "mm", "depth"),
                     new Field("mode", Rule.ENUM, false, "deboss", List.of("emboss", "deboss"), null, null, null, "style")));
     private static final List<String> SOURCE_KEYS = List.of("upload_id", "url", "format", "origin", "provider");
+
+    private final Motifs motifs;
+
+    FeatureValidator(Motifs motifs) {
+        this.motifs = motifs;
+    }
 
     List<Map<String, Object>> validate(TemplateDescriptor descriptor, FamilyLimits family, List<Map<String, Object>> requested) {
         FamilyLimits limits = family == null ? FamilyLimits.none(descriptor.family()) : family;
@@ -109,9 +130,9 @@ class FeatureValidator {
 
         Map<String, TemplateDescriptor.Anchor> anchors = new LinkedHashMap<>();
         descriptor.anchors().forEach(a -> anchors.put(a.id(), a));
-        Set<String> contentAnchors = new LinkedHashSet<>();
+        Map<String, List<String>> onAnchor = new HashMap<>();
         for (int i = 0; i < normalised.size(); i++) {
-            checkPlacement(descriptor, limits, anchors, contentAnchors, i, normalised.get(i));
+            checkPlacement(descriptor, limits, anchors, onAnchor, i, normalised.get(i));
         }
         if (limits.raw()) {
             checkRaw(descriptor, limits, normalised);
@@ -260,7 +281,7 @@ class FeatureValidator {
     // ---- where it goes ------------------------------------------------------------------------------------------------
 
     private void checkPlacement(TemplateDescriptor descriptor, FamilyLimits limits, Map<String, TemplateDescriptor.Anchor> anchors,
-            Set<String> contentAnchors, int index, Map<String, Object> feature) {
+            Map<String, List<String>> onAnchor, int index, Map<String, Object> feature) {
         String type = (String) feature.get("type");
         String label = LABELS.get(type);
         String anchorId = (String) feature.get("anchor");
@@ -284,9 +305,9 @@ class FeatureValidator {
             throw problem(ProblemCodes.UNSUPPORTED_FEATURE, "Unsupported feature", "The " + labelOf(anchor) + " holds a 3D form; " + label
                     + " needs a flat surface", descriptor, index, Map.of("anchor", anchor.id()));
         }
-        if (CONTENT_TYPES.contains(type) && !contentAnchors.add(anchor.id())) {
-            throw problem(ProblemCodes.VALIDATION_FAILED, "Validation failed", "Only one photo or 3D form can go on the " + labelOf(anchor),
-                    descriptor, index, Map.of("anchor", anchor.id()));
+        checkCompany(descriptor, anchor, onAnchor.computeIfAbsent(anchor.id(), id -> new ArrayList<>()), index, type);
+        if (MARK_TYPES.contains(type)) {
+            checkFlat(descriptor, anchor, index, feature);
         }
         if (HERO_MESH.equals(type) && "longest".equals(feature.get("fit")) && feature.get("longest_mm") == null) {
             throw problem(ProblemCodes.VALIDATION_FAILED, "Validation failed", "Choose how long your own 3D form (Roop) should be on its longest side",
@@ -311,6 +332,86 @@ class FeatureValidator {
                 throw outOfRange(descriptor, index, path(index, "text"), "Text (Naam) on the " + labelOf(anchor) + " can be at most "
                         + limits.maxTextChars() + " characters; " + length + " were given");
             }
+        }
+        if (EMBOSS_TEXT.equals(type)) {
+            checkLettering(descriptor, anchor, index, feature);
+        }
+        if (MOTIF.equals(type)) {
+            checkMotif(descriptor, index, feature);
+        }
+    }
+
+    /**
+     * What one anchor holds, given what the features before this one put there ({@code seen}, which this one joins): one
+     * photo or form, one text, one motif, and never a photo beside a text or a motif.
+     */
+    private static void checkCompany(TemplateDescriptor descriptor, TemplateDescriptor.Anchor anchor, List<String> seen, int index, String type) {
+        String place = labelOf(anchor);
+        if (CONTENT_TYPES.contains(type) && seen.stream().anyMatch(CONTENT_TYPES::contains)) {
+            throw problem(ProblemCodes.VALIDATION_FAILED, "Validation failed", "Only one photo or 3D form can go on the " + place,
+                    descriptor, index, Map.of("anchor", anchor.id()));
+        }
+        if (MARK_TYPES.contains(type) && seen.contains(type)) {
+            throw problem(ProblemCodes.VALIDATION_FAILED, "Validation failed", "Only one " + LABELS.get(type) + " can go on the " + place
+                    + "; put the other one on another spot", descriptor, index, Map.of("anchor", anchor.id()));
+        }
+        // a photo fills its spot: a text or a motif beside it is refused as crowded, whichever came first
+        String crowding = RELIEF_IMAGE.equals(type) ? seen.stream().filter(MARK_TYPES::contains).findFirst().orElse(null)
+                : MARK_TYPES.contains(type) && seen.contains(RELIEF_IMAGE) ? type : null;
+        if (crowding != null) {
+            String other = LABELS.get(crowding);
+            throw problem(ProblemCodes.VALIDATION_FAILED, "Validation failed", "The " + place + " is too crowded for a photo relief (Chhavi) and "
+                    + (MOTIF.equals(crowding) ? "a " : "") + other + " together; put the " + other + " on another spot", descriptor, index,
+                    Map.of("anchor", anchor.id()));
+        }
+        seen.add(type);
+    }
+
+    /** No anchor is curved yet, so a text or a motif is set flat: a curved projection (or a curved anchor) is not built. */
+    private static void checkFlat(TemplateDescriptor descriptor, TemplateDescriptor.Anchor anchor, int index, Map<String, Object> feature) {
+        String type = (String) feature.get("type");
+        String projection = EMBOSS_TEXT.equals(type) ? String.valueOf(feature.get("projection")) : PLANAR;
+        String anchorProjection = anchor.projection() == null ? PLANAR : anchor.projection();
+        if (PLANAR.equals(projection) && PLANAR.equals(anchorProjection)) {
+            return;
+        }
+        Map<String, Object> where = new LinkedHashMap<>();
+        where.put("anchor", anchor.id());
+        if (!PLANAR.equals(projection)) {
+            where.put("field", path(index, "projection"));
+        }
+        String what = EMBOSS_TEXT.equals(type) ? "Text (Naam) that wraps" : "A motif (Buti) that wraps";
+        throw problem(ProblemCodes.UNSUPPORTED_FEATURE, "Unsupported feature", what + " around a curved surface is not available yet; every spot "
+                + "today is flat", descriptor, index, where);
+    }
+
+    /** The letters ({@link Lettering}: one line, one launch script, the bundled lettering) and their height on this anchor. */
+    private static void checkLettering(TemplateDescriptor descriptor, TemplateDescriptor.Anchor anchor, int index, Map<String, Object> feature) {
+        Lettering.Refusal refusal = Lettering.check((String) feature.get("text"), (String) feature.get("script"), (String) feature.get("font"));
+        if (refusal != null) {
+            boolean unsupported = ProblemCodes.UNSUPPORTED_FEATURE.equals(refusal.code());
+            throw problem(refusal.code(), unsupported ? "Unsupported feature" : "Validation failed", refusal.detail(), descriptor, index,
+                    Map.of("field", path(index, refusal.field())));
+        }
+        if (anchor.maxTextHeightMm() != null && feature.get("height_mm") instanceof Number height
+                && height.doubleValue() > anchor.maxTextHeightMm() + EPSILON) {
+            throw outOfRange(descriptor, index, path(index, "height_mm"), "Text (Naam) on the " + labelOf(anchor) + " can be at most "
+                    + fmt(anchor.maxTextHeightMm()) + " mm tall; " + fmt(height.doubleValue()) + " mm was asked");
+        }
+    }
+
+    /** The motif must be in the library, at a scale it still prints at: from its {@code min_scale} up to 1, which fills the spot. */
+    private void checkMotif(TemplateDescriptor descriptor, int index, Map<String, Object> feature) {
+        if (!motifs.available()) {
+            return; // a local run without the library: the geometry service still checks both
+        }
+        String motifId = (String) feature.get("motif_id");
+        MotifDto motif = motifs.find(motifId).orElseThrow(() -> invalid(descriptor, index, path(index, "motif_id"),
+                "We don't have a motif (Buti) called “" + motifId + "”; choose one from the motif library"));
+        double scale = ((Number) feature.get("scale")).doubleValue();
+        if (scale < motif.minScale() - EPSILON) {
+            throw outOfRange(descriptor, index, path(index, "scale"), "The " + motif.label() + " motif (Buti) can't be printed smaller than scale "
+                    + fmt(motif.minScale()) + "; choose a larger scale");
         }
     }
 

@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -20,12 +21,18 @@ import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 import studio.aakar.api.shared.ApiProblemException;
 import studio.aakar.api.shared.ProblemCodes;
 import studio.aakar.api.templates.FamilyLimits;
+import studio.aakar.api.templates.MotifDto;
+import studio.aakar.api.templates.Motifs;
 import studio.aakar.api.templates.TemplateDescriptor;
 
 /**
- * The API's copy of the geometry service's feature checks ({@code features/validate.py}): every rule, the
- * Devanagari text length and the lithophane exemption. Real descriptors come from {@code fixtures/templates.json} (the
- * carriers take text and motifs since PR 3b); a plaque with a text-only edge, a lithophane window and a volume is built inline.
+ * The API's copy of the geometry service's feature checks ({@code features/validate.py}, {@code emboss_text.py},
+ * {@code motif.py}): every rule, the Devanagari text length, the lithophane exemption, what one anchor holds (one photo or
+ * form, one text, one motif, never a photo beside a text or a motif), flat lettering, letter height, the launch scripts and
+ * the bundled lettering, and motifs from the library within their scale. Real descriptors come from
+ * {@code fixtures/templates.json} (the carriers take text and motifs since PR 3b); a plaque with a text-only edge, a
+ * lithophane window and a volume, and a mug with a curved wrap, are built inline. The motif library is a stand-in with the
+ * real ids, labels and {@code min_scale}s ({@code MotifLibraryTest} and {@code MotifsIntegrationTest} read the files).
  */
 class FeatureValidatorTest {
 
@@ -33,11 +40,18 @@ class FeatureValidatorTest {
     static final String UPLOAD = UUID.randomUUID().toString();
     static final FamilyLimits KEYCHAIN = new FamilyLimits("keychain", "carrier", 16, 30.0, 60.0);
     static final FamilyLimits RAW = new FamilyLimits("raw_print", "raw", null, 20.0, 240.0);
+    static final FamilyLimits NAMEPLATE = FamilyLimits.none("nameplate");
+    static final Motifs LIBRARY = new StubMotifs(true, List.of(
+            new MotifDto("paisley", "Paisley", List.of("textile"), 0.3, "http://localhost:8080/api/motifs/paisley.svg"),
+            new MotifDto("lotus", "Lotus", List.of("flower"), 0.25, "http://localhost:8080/api/motifs/lotus.svg"),
+            new MotifDto("star_rangoli", "Rangoli star", List.of("rangoli"), 0.3, "http://localhost:8080/api/motifs/star_rangoli.svg")));
 
     static TemplateDescriptor keychain;
     static TemplateDescriptor raw;
+    static TemplateDescriptor nameplate;
     static TemplateDescriptor plaque;
-    final FeatureValidator validator = new FeatureValidator();
+    static TemplateDescriptor mug;
+    final FeatureValidator validator = new FeatureValidator(LIBRARY);
 
     @BeforeAll
     static void loadDescriptors() throws IOException {
@@ -45,6 +59,7 @@ class FeatureValidatorTest {
             List<TemplateDescriptor> all = JSON.readValue(in, new TypeReference<>() { });
             keychain = all.stream().filter(d -> d.id().equals("keychain_tag")).findFirst().orElseThrow();
             raw = all.stream().filter(d -> d.id().equals("raw_print")).findFirst().orElseThrow();
+            nameplate = all.stream().filter(d -> d.id().equals("desk_nameplate")).findFirst().orElseThrow();
         }
         // A plaque that takes text and motifs on its face, text only on its edge, a lithophane window and a plinth volume.
         plaque = JSON.readValue("""
@@ -57,6 +72,13 @@ class FeatureValidatorTest {
                    {"id": "window", "label": "Window", "kind": "surface", "projection": "planar", "accepts": ["relief_image"], "max_relief_mm": 1.0},
                    {"id": "plinth", "label": "Plinth", "kind": "volume", "projection": "planar", "bounds_mm": [60, 60, 80], "accepts": ["hero_mesh", "relief_image"]}
                  ]}
+                """, TemplateDescriptor.class);
+        // No template is curved yet; this one is, to show that lettering and motifs are not wrapped around anything.
+        mug = JSON.readValue("""
+                {"id": "test_mug", "version": 1, "family": "mug", "name": "Test mug", "params": {}, "materials": ["basic_white"],
+                 "features_supported": ["emboss_text", "motif"],
+                 "anchors": [{"id": "wrap", "label": "Wrap", "kind": "surface", "projection": "cylindrical", "size_mm": [200, 80],
+                              "accepts": ["emboss_text", "motif"], "max_relief_mm": 1.5}]}
                 """, TemplateDescriptor.class);
     }
 
@@ -81,7 +103,7 @@ class FeatureValidatorTest {
         assertThat(text).containsEntry("depth_mm", 1.2).containsEntry("projection", "planar").containsEntry("mode", "emboss")
                 .doesNotContainKey("height_mm").doesNotContainKey("script");
         Map<String, Object> motif = validator.validate(plaque, FamilyLimits.none("nameplate"),
-                List.of(Map.of("type", "motif", "motif_id", "lotus_border", "anchor", "face"))).get(0);
+                List.of(Map.of("type", "motif", "motif_id", "lotus", "anchor", "face"))).get(0);
         assertThat(motif).containsEntry("scale", 1).containsEntry("depth_mm", 1.0).containsEntry("mode", "deboss");
         Map<String, Object> form = validator.validate(raw, RAW, List.of(hero(80))).get(0);
         assertThat(form).containsEntry("fit", "longest").containsEntry("longest_mm", 80).containsEntry("yaw_deg", 0)
@@ -128,8 +150,179 @@ class FeatureValidatorTest {
         ApiProblemException problem = rejects(keychain, KEYCHAIN, List.of(relief("face"), relief("face")), ProblemCodes.VALIDATION_FAILED);
         assertThat(problem.getMessage()).isEqualTo("Only one photo or 3D form can go on the Face");
         assertThat(problem.properties()).containsEntry("feature", 1);
-        // text beside a photo on the same anchor is fine
-        assertThat(validator.validate(plaque, FamilyLimits.none("nameplate"), List.of(relief("face"), text("face", "Asha")))).hasSize(2);
+        // a text on the other face is fine (beside the photo it would be crowded, see below)
+        assertThat(validator.validate(keychain, KEYCHAIN, List.of(relief("face"), text("back", "Asha")))).hasSize(2);
+    }
+
+    @Test
+    void anAnchorTakesOneTextAndOneMotifSideBySide() {
+        // a text and a motif share the face (the motif first, the text beside it); another text goes on the back
+        assertThat(validator.validate(keychain, KEYCHAIN, List.of(text("face", "Asha"), motif("face"), text("back", "Ravi")))).hasSize(3);
+        ApiProblemException problem = rejects(keychain, KEYCHAIN, List.of(text("face", "Asha"), text("face", "Ravi")), ProblemCodes.VALIDATION_FAILED);
+        assertThat(problem.getMessage()).isEqualTo("Only one text (Naam) can go on the Face; put the other one on another spot");
+        assertThat(problem.properties()).containsEntry("anchor", "face").containsEntry("feature", 1);
+        problem = rejects(keychain, KEYCHAIN, List.of(motif("face"), text("face", "Asha"), motif("face", "paisley")), ProblemCodes.VALIDATION_FAILED);
+        assertThat(problem.getMessage()).isEqualTo("Only one motif (Buti) can go on the Face; put the other one on another spot");
+        assertThat(problem.properties()).containsEntry("feature", 2);
+        problem = rejects(keychain, KEYCHAIN, List.of(text("back", "Asha"), text("back", "Ravi")), ProblemCodes.VALIDATION_FAILED);
+        assertThat(problem.getMessage()).isEqualTo("Only one text (Naam) can go on the Back; put the other one on another spot");
+    }
+
+    @Test
+    void aPhotoFillsItsSpotSoATextOrAMotifBesideItIsCrowded() {
+        String crowdedByText = "The Face is too crowded for a photo relief (Chhavi) and text (Naam) together; put the text (Naam) on another spot";
+        String crowdedByMotif = "The Face is too crowded for a photo relief (Chhavi) and a motif (Buti) together; put the motif (Buti) on another spot";
+        ApiProblemException problem = rejects(keychain, KEYCHAIN, List.of(relief("face"), text("face", "Asha")), ProblemCodes.VALIDATION_FAILED);
+        assertThat(problem.getMessage()).isEqualTo(crowdedByText);
+        assertThat(problem.properties()).containsEntry("anchor", "face").containsEntry("feature", 1);
+        // whichever came first
+        assertThat(rejects(keychain, KEYCHAIN, List.of(text("face", "Asha"), relief("face")), ProblemCodes.VALIDATION_FAILED).getMessage())
+                .isEqualTo(crowdedByText);
+        assertThat(rejects(keychain, KEYCHAIN, List.of(relief("face"), motif("face")), ProblemCodes.VALIDATION_FAILED).getMessage())
+                .isEqualTo(crowdedByMotif);
+        assertThat(rejects(keychain, KEYCHAIN, List.of(motif("face"), relief("face")), ProblemCodes.VALIDATION_FAILED).getMessage())
+                .isEqualTo(crowdedByMotif);
+        // a photo joining a text and a motif names the first of them
+        assertThat(rejects(keychain, KEYCHAIN, List.of(text("face", "Asha"), motif("face"), relief("face")), ProblemCodes.VALIDATION_FAILED)
+                .properties()).containsEntry("feature", 2);
+        // the plaque's face takes all three kinds, but still not together
+        rejects(plaque, NAMEPLATE, List.of(relief("face"), text("face", "Asha")), ProblemCodes.VALIDATION_FAILED);
+    }
+
+    @Test
+    void textsAndMotifsAreSetFlatForNow() {
+        String curvedText = "Text (Naam) that wraps around a curved surface is not available yet; every spot today is flat";
+        Map<String, Object> curved = new LinkedHashMap<>(text("back", "Asha"));
+        for (String projection : List.of("cylindrical", "conformal")) {
+            curved.put("projection", projection);
+            ApiProblemException problem = rejects(keychain, KEYCHAIN, List.of(curved), ProblemCodes.UNSUPPORTED_FEATURE);
+            assertThat(problem.getMessage()).isEqualTo(curvedText);
+            assertThat(problem.properties()).containsEntry("field", "features[0].projection").containsEntry("anchor", "back");
+        }
+        curved.put("projection", "planar");
+        assertThat(validator.validate(keychain, KEYCHAIN, List.of(curved))).hasSize(1);
+        // nor on a curved anchor, whatever the text asks
+        ApiProblemException problem = rejects(mug, FamilyLimits.none("mug"), List.of(text("wrap", "Asha")), ProblemCodes.UNSUPPORTED_FEATURE);
+        assertThat(problem.getMessage()).isEqualTo(curvedText);
+        assertThat(problem.properties()).containsEntry("anchor", "wrap").doesNotContainKey("field");
+        problem = rejects(mug, FamilyLimits.none("mug"), List.of(motif("wrap")), ProblemCodes.UNSUPPORTED_FEATURE);
+        assertThat(problem.getMessage()).isEqualTo("A motif (Buti) that wraps around a curved surface is not available yet; every spot today is flat");
+        // the contract's own values still come first
+        curved.put("projection", "spherical");
+        rejects(keychain, KEYCHAIN, List.of(curved), ProblemCodes.VALIDATION_FAILED);
+    }
+
+    @Test
+    void lettersStayWithinTheAnchorsTallestLetters() {
+        Map<String, Object> tall = new LinkedHashMap<>(text("base_front", "Asha Rao"));
+        tall.put("height_mm", 10);
+        ApiProblemException problem = rejects(nameplate, NAMEPLATE, List.of(tall), ProblemCodes.PARAM_OUT_OF_RANGE);
+        assertThat(problem.getMessage()).isEqualTo("Text (Naam) on the Front of the foot can be at most 8 mm tall; 10 mm was asked");
+        assertThat(problem.properties()).containsEntry("params", List.of("features[0].height_mm")).containsEntry("feature", 0);
+        tall.put("height_mm", 8);
+        assertThat(validator.validate(nameplate, NAMEPLATE, List.of(tall))).hasSize(1);
+        tall.put("anchor", "face");
+        tall.put("height_mm", 40.5);
+        problem = rejects(nameplate, NAMEPLATE, List.of(tall), ProblemCodes.PARAM_OUT_OF_RANGE);
+        assertThat(problem.getMessage()).isEqualTo("Text (Naam) on the Face can be at most 36 mm tall; 40.5 mm was asked");
+        tall.put("height_mm", 36);
+        assertThat(validator.validate(nameplate, NAMEPLATE, List.of(tall))).hasSize(1);
+        // an anchor without max_text_height_mm leaves the contract's 4–60 mm (the geometry service fits the letters to the spot)
+        Map<String, Object> free = new LinkedHashMap<>(text("face", "Asha"));
+        free.put("height_mm", 20);
+        assertThat(validator.validate(keychain, KEYCHAIN, List.of(free))).hasSize(1);
+        free.put("height_mm", 61);
+        problem = rejects(keychain, KEYCHAIN, List.of(free), ProblemCodes.PARAM_OUT_OF_RANGE);
+        assertThat(problem.getMessage()).isEqualTo("The letter height of the text (Naam) can be 4–60 mm; 61 mm was asked");
+    }
+
+    @Test
+    void motifsComeFromTheLibraryAtAScaleThatPrints() {
+        ApiProblemException problem = rejects(keychain, KEYCHAIN, List.of(motif("face", "peacock")), ProblemCodes.VALIDATION_FAILED);
+        assertThat(problem.getMessage()).isEqualTo("We don't have a motif (Buti) called “peacock”; choose one from the motif library");
+        assertThat(problem.properties()).containsEntry("field", "features[0].motif_id").containsEntry("feature", 0);
+        // a malformed id never reaches the library
+        problem = rejects(keychain, KEYCHAIN, List.of(motif("face", "Peacock!")), ProblemCodes.VALIDATION_FAILED);
+        assertThat(problem.getMessage()).isEqualTo("That motif isn't one we know");
+
+        Map<String, Object> small = new LinkedHashMap<>(motif("face", "paisley"));
+        small.put("scale", 0.25);
+        problem = rejects(keychain, KEYCHAIN, List.of(small), ProblemCodes.PARAM_OUT_OF_RANGE);
+        assertThat(problem.getMessage()).isEqualTo("The Paisley motif (Buti) can't be printed smaller than scale 0.3; choose a larger scale");
+        assertThat(problem.properties()).containsEntry("params", List.of("features[0].scale"));
+        small.put("scale", 0.3);
+        assertThat(validator.validate(keychain, KEYCHAIN, List.of(small))).singleElement().satisfies(f -> assertThat(f).containsEntry("scale", 0.3));
+        small.put("scale", 1);
+        assertThat(validator.validate(keychain, KEYCHAIN, List.of(small))).hasSize(1);
+        // each motif has its own floor: the lotus prints down to 0.25, the rangoli star (a label, not the id) to 0.3
+        Map<String, Object> lotus = new LinkedHashMap<>(motif("face", "lotus"));
+        lotus.put("scale", 0.25);
+        assertThat(validator.validate(keychain, KEYCHAIN, List.of(lotus))).hasSize(1);
+        Map<String, Object> star = new LinkedHashMap<>(motif("face", "star_rangoli"));
+        star.put("scale", 0.2);
+        assertThat(rejects(keychain, KEYCHAIN, List.of(star), ProblemCodes.PARAM_OUT_OF_RANGE).getMessage())
+                .isEqualTo("The Rangoli star motif (Buti) can't be printed smaller than scale 0.3; choose a larger scale");
+        // scale 1 fills the spot: more would run past its edge, and under 0.2 is outside the contract (never clamped)
+        small.put("scale", 1.5);
+        problem = rejects(keychain, KEYCHAIN, List.of(small), ProblemCodes.PARAM_OUT_OF_RANGE);
+        assertThat(problem.getMessage()).isEqualTo("The scale of the motif (Buti) can be 0.2–1; 1.5 was asked");
+        assertThat(problem.properties()).containsEntry("params", List.of("features[0].scale"));
+        small.put("scale", 0.1);
+        rejects(keychain, KEYCHAIN, List.of(small), ProblemCodes.PARAM_OUT_OF_RANGE);
+    }
+
+    @Test
+    void withoutTheLibraryMotifIdsAndScalesAreLeftToTheGeometryService() {
+        FeatureValidator blind = new FeatureValidator(new StubMotifs(false, List.of()));
+        Map<String, Object> unknown = new LinkedHashMap<>(motif("face", "peacock"));
+        unknown.put("scale", 0.2);
+        assertThat(blind.validate(keychain, KEYCHAIN, List.of(unknown))).hasSize(1);
+        // the contract and the anchor still apply
+        unknown.put("scale", 2);
+        assertThatThrownBy(() -> blind.validate(keychain, KEYCHAIN, List.of(unknown))).isInstanceOfSatisfying(ApiProblemException.class,
+                e -> assertThat(e.code()).isEqualTo(ProblemCodes.PARAM_OUT_OF_RANGE));
+        assertThatThrownBy(() -> blind.validate(keychain, KEYCHAIN, List.of(motif("back")))).isInstanceOfSatisfying(ApiProblemException.class,
+                e -> assertThat(e.code()).isEqualTo(ProblemCodes.UNSUPPORTED_FEATURE));
+    }
+
+    @Test
+    void aTextIsWrittenInOneLaunchScriptInTheBundledLettering() {
+        for (String word : List.of("Asha", "2024", "José", "नमस्ते दुनिया", "నమస్తే", "வணக்கம்", "ನಮಸ್ಕಾರ", "নমস্কার", "નમસ્તે", "राम।", "Asha & Ravi")) {
+            assertThat(validator.validate(plaque, NAMEPLATE, List.of(text("face", word)))).as(word).hasSize(1);
+        }
+        // naming the right script is fine, and so is naming the bundled lettering (case, spaces and punctuation aside)
+        assertThat(validator.validate(plaque, NAMEPLATE, List.of(lettering("नमस्ते", "devanagari", "Noto Sans Devanagari")))).hasSize(1);
+        assertThat(validator.validate(plaque, NAMEPLATE, List.of(lettering("नमस्ते", null, "")))).hasSize(1);
+        assertThat(validator.validate(plaque, NAMEPLATE, List.of(lettering("नमस्ते", null, "Noto Sans Bold")))).hasSize(1);
+        for (String font : List.of("Noto Sans", "noto_sans", "Noto Sans Bold", "NotoSans-Bold")) {
+            assertThat(validator.validate(plaque, NAMEPLATE, List.of(lettering("Asha", "latin", font)))).as(font).hasSize(1);
+        }
+
+        ApiProblemException problem = rejects(plaque, NAMEPLATE, List.of(text("face", "Asha आशा")), ProblemCodes.VALIDATION_FAILED);
+        assertThat(problem.getMessage()).isEqualTo("Please write the text (Naam) in one script: this mixes Latin and Devanagari letters. "
+                + "Each can go on its own spot");
+        assertThat(problem.properties()).containsEntry("field", "features[0].text");
+        problem = rejects(plaque, NAMEPLATE, List.of(text("face", "Αθηνά")), ProblemCodes.VALIDATION_FAILED);
+        assertThat(problem.getMessage()).isEqualTo("We can print Latin letters and six Indian scripts (Devanagari, Telugu, Tamil, Kannada, Bengali, "
+                + "Gujarati); “Αθη” is not one of them yet");
+        problem = rejects(plaque, NAMEPLATE, List.of(lettering("नमस्ते", "telugu", null)), ProblemCodes.VALIDATION_FAILED);
+        assertThat(problem.getMessage()).isEqualTo("This text (Naam) is written in Devanagari letters, but Telugu lettering was chosen; "
+                + "choose Devanagari or let us pick");
+        assertThat(problem.properties()).containsEntry("field", "features[0].script");
+        problem = rejects(plaque, NAMEPLATE, List.of(text("face", "Asha\nRao")), ProblemCodes.VALIDATION_FAILED);
+        assertThat(problem.getMessage()).isEqualTo("Text (Naam) goes on a single line");
+        // no-break spaces are spaces, as the geometry service trims them
+        problem = rejects(plaque, NAMEPLATE, List.of(text("face", "\u00A0\u00A0")), ProblemCodes.VALIDATION_FAILED);
+        assertThat(problem.getMessage()).isEqualTo("Type the text (Naam) to add");
+
+        problem = rejects(plaque, NAMEPLATE, List.of(lettering("Asha", null, "Comic Sans")), ProblemCodes.UNSUPPORTED_FEATURE);
+        assertThat(problem.getMessage()).isEqualTo("The lettering style “Comic Sans” is not available yet; leave the font empty for our standard "
+                + "Latin lettering");
+        assertThat(problem.properties()).containsEntry("field", "features[0].font");
+        // a script's own lettering belongs to that script
+        problem = rejects(plaque, NAMEPLATE, List.of(lettering("नमस्ते", null, "Noto Sans Tamil")), ProblemCodes.UNSUPPORTED_FEATURE);
+        assertThat(problem.getMessage()).endsWith("leave the font empty for our standard Devanagari lettering");
+        rejects(plaque, NAMEPLATE, List.of(lettering("Asha", null, "Noto Sans Devanagari")), ProblemCodes.UNSUPPORTED_FEATURE);
     }
 
     @Test
@@ -244,14 +437,26 @@ class FeatureValidatorTest {
 
     @Test
     void customerDetailsNeverUseCodeWords() {
+        Map<String, Object> curved = new LinkedHashMap<>(text("face", "Asha"));
+        curved.put("projection", "cylindrical");
+        Map<String, Object> small = new LinkedHashMap<>(motif("face", "paisley"));
+        small.put("scale", 0.25);
         List<List<Map<String, Object>>> bad = List.of(
                 List.of(motif("back")),
                 List.of(text("face", "x".repeat(17))),
                 List.of(relief("face"), relief("face")),
-                List.of(Map.of("type", "hero_mesh", "source", Map.of("upload_id", UPLOAD), "anchor", "face")));
+                List.of(Map.of("type", "hero_mesh", "source", Map.of("upload_id", UPLOAD), "anchor", "face")),
+                List.of(relief("face"), text("face", "Asha")),
+                List.of(motif("face"), motif("face")),
+                List.of(curved),
+                List.of(motif("face", "peacock")),
+                List.of(small),
+                List.of(text("face", "Asha आशा")),
+                List.of(lettering("Asha", null, "Comic Sans")));
         for (List<Map<String, Object>> features : bad) {
             assertThatThrownBy(() -> validator.validate(keychain, KEYCHAIN, features)).isInstanceOfSatisfying(ApiProblemException.class,
-                    e -> assertThat(e.getMessage()).doesNotContain("relief_image", "hero_mesh", "emboss_text", "_mm", "anchor"));
+                    e -> assertThat(e.getMessage()).doesNotContain("relief_image", "hero_mesh", "emboss_text", "motif_id", "_mm", "anchor", "planar",
+                            "cylindrical", "min_scale"));
         }
     }
 
@@ -276,7 +481,23 @@ class FeatureValidatorTest {
     }
 
     private static Map<String, Object> motif(String anchor) {
-        return Map.of("type", "motif", "motif_id", "lotus", "anchor", anchor);
+        return motif(anchor, "lotus");
+    }
+
+    private static Map<String, Object> motif(String anchor, String motifId) {
+        return Map.of("type", "motif", "motif_id", motifId, "anchor", anchor);
+    }
+
+    /** A text on the plaque's face with an optional {@code script} and {@code font}. */
+    private static Map<String, Object> lettering(String text, String script, String font) {
+        Map<String, Object> feature = new LinkedHashMap<>(text("face", text));
+        if (script != null) {
+            feature.put("script", script);
+        }
+        if (font != null) {
+            feature.put("font", font);
+        }
+        return feature;
     }
 
     private static Map<String, Object> hero(int longest) {
@@ -292,5 +513,19 @@ class FeatureValidatorTest {
     @SuppressWarnings("unchecked")
     private static List<Map<String, Object>> castList(List<Object> list) {
         return (List<Map<String, Object>>) (List<?>) list;
+    }
+
+    /** A motif library held in memory; {@code available: false} is a local run without the files. */
+    record StubMotifs(boolean available, List<MotifDto> list) implements Motifs {
+
+        @Override
+        public Optional<MotifDto> find(String id) {
+            return list.stream().filter(m -> m.id().equals(id)).findFirst();
+        }
+
+        @Override
+        public Optional<byte[]> svg(String id) {
+            return Optional.empty();
+        }
     }
 }

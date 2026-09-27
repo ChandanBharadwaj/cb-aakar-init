@@ -56,6 +56,9 @@ public final class ProblemCodes {
     public static final String UNKNOWN_EXPERIENCE = "unknown_experience";
     public static final String EXPERIENCE_EXISTS = "experience_exists";
 
+    // The motif library (Buti): artwork served for previews
+    public static final String UNKNOWN_MOTIF = "unknown_motif";
+
     private ProblemCodes() {
     }
 }

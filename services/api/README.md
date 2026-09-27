@@ -107,8 +107,10 @@ Builds keyed on `$.spec.template` (`keychain_tag@1`, `fridge_magnet@1`, `raw_pri
 included) with the template's `hardware` (the magnet reports `magnet_count` magnets) and a small estimate; a `hero_mesh`
 (`$.spec.features[0].type`) whose URL contains `broken` fails with `content_unusable`. `support/SampleFiles` makes small
 genuine files of every upload format.
-Tests that read monorepo files (`packages/contracts`, `packages/design-tokens/materials.json`, `families.json` and
-`experiences.json`) skip with a message when those files are missing; `-Daakar.repo.root=…` overrides the monorepo location.
+Tests that read monorepo files (`packages/contracts`, `packages/design-tokens/materials.json`, `families.json`,
+`experiences.json` and `motifs/`) skip with a message when those files are missing; `-Daakar.repo.root=…` overrides the
+monorepo location. The test context loads the motif library from the monorepo too: with `aakar.motifs.dir` blank the API
+takes the first `packages/design-tokens/motifs` above its working directory (`services/api`).
 
 | Test | Covers |
 |---|---|
@@ -136,7 +138,9 @@ Tests that read monorepo files (`packages/contracts`, `packages/design-tokens/ma
 | `UploadsIntegrationTest` | `POST /api/uploads` for every image and model format (sha256, served URL, owner folder without the guest id), 413 over 15 MB, 422 `unsupported_format` for a `.txt`, a kind mismatch or a renamed file, 400 / 401 / 415, owner-only `GET` (404 otherwise), guest uploads moving to the user on sign-in; a flagged file name → `pending_review`, a design with it → 409 `upload_not_ready`, the queue with owner and reason, a `studio` reviewer approves → `ready` → the design starts; a rejection → the note as `message`, 422 `upload_rejected`; 409 `review_already_decided`, queue filters, audit `review.decide` |
 | `CarrierDesignFlowIntegrationTest` | Walk (1): a guest's photos on both faces of a keychain (`family_id` + `features`), the spec carrying each photo by its internal URL (never the client's), the build request WireMock saw, the version's named split ring, the price with the hardware line and the ₹249 keychain minimum, cart and checkout snapshots, the print pack's Hardware/Content rows and `packing-list.txt`; the magnet's reported `magnet_count` hardware, edits that keep (`features` absent), replace or clear the content, stranger uploads 404; `unknown_family`, `family_not_available`, template of another family, a name on the keychain's back (accepted since the PR 3b descriptors) but not a motif or a 3D form (customer labels), relief depth cap, model-as-photo, 8-feature cap, default template/finish, a prompt as the working title, family material rules |
 | `RawPrintIntegrationTest` | Walk (2), Swaroop: `source: upload` + `raw_print` + one `hero_mesh` (fit longest 80) → ready with the `setup` line; resize by feature, finish swap keeps the form; missing form, 10 / 245 mm (never clamped), no fit, template params, a photo as the model, a relief on the body, wrong source → 4xx; a model the geometry stub cannot repair → job `failed` with `content_unusable` |
-| `templates/internal/FeatureValidatorTest` | Every feature rule (type supported, anchor exists and accepts, surface vs volume, one photo or form per anchor, `max_relief_mm` with the lithophane exemption, family text length counting Devanagari without marks ("नमस्ते" = 4), the raw family's single form inside 20–240 mm, contract shapes and ranges) and customer-worded details |
+| `templates/internal/FeatureValidatorTest` | Every feature rule (type supported, anchor exists and accepts, surface vs volume, one photo or form per anchor, one text and one motif per anchor side by side, a photo beside a text or a motif refused as crowded whichever came first, flat lettering only (a curved projection or anchor → `unsupported_feature`), `max_relief_mm` with the lithophane exemption, `max_text_height_mm`, family text length counting Devanagari without marks ("नमस्ते" = 4), one line in one of the seven launch scripts matching `script`, only the bundled lettering as `font`, motifs from the library between their `min_scale` and 1 (and left to the geometry service when the library is not loaded), the raw family's single form inside 20–240 mm, contract shapes and ranges) and customer-worded details |
+| `templates/internal/MotifLibraryTest` | The monorepo's motif library read in index order (labels, tags, `min_scale`, `svg_url`, artwork), the default folder found from the working directory, the geometry service's entry rules (id pattern, no repeats, `min_scale` 0.2–1, defaults), file names that cannot leave the folder (`../`, absolute, sub-folders, backslashes, NUL, a symbolic link out), and a missing or broken library: empty with a warning locally, a failed start with `aakar.profile=production` |
+| `MotifsIntegrationTest` | `GET /api/motifs` equals `index.json` in order with `svg_url` = `{aakar.api.public-url}/api/motifs/{id}.svg`; every artwork served as `image/svg+xml` byte for byte with `Cache-Control: max-age=86400, public`, an ETag (304 on revalidation) and a CSP; `GET /admin/api/motifs` for owner and `studio` roles, 401 without a staff token; 404 `unknown_motif` for an unknown id and for every trick that reaches the controller, and encoded slashes, backslashes and dot segments refused before routing (never a file); `POST /api/designs` refuses an unknown motif, a scale under the motif's `min_scale` and a photo crowded by a motif or a text with 422 before any build, and accepts a text and a motif side by side |
 | `media/internal/UploadFormatsTest` · `TermsContentScannerTest` · `templates/TemplateFixturesTest` | Magic-byte sniffing of every format and renamed or damaged files; flagged terms ignoring case, spaces and punctuation; fixtures equal the exported descriptors |
 | `AdminFamiliesIntegrationTest` | Owner creates and updates hardware and families (201/200; 409 `hardware_exists` / `family_exists`; 422 for an unknown shelf, backdrop, hardware SKU or allowed material, a `min > max` envelope, bad enums), the path id wins on PUT, an available family without a live template stays off the storefront, the pricing preview with a `family_id` (hardware line, minimum, setup) and `family_rules` checks, `studio` role 403, audit `family.create|update` and `hardware.create|update` with before/after |
 | `ExperiencesSeedTest` | `V11__experiences_environments.sql`: every `environments` row and every `experiences` row (JSONB `surface`, `motif_pack`, `collections`, `season` included) with its ordered `experience_avatars` and `experience_items` match `packages/design-tokens/experiences.json`; `catalog_items`, `template_families` and `experiences` reference `environments`; `designs.experience_id` exists |
@@ -212,6 +216,7 @@ templates answer 403 `forbidden`.
 | GET · POST | `/admin/api/experiences` | Every experience (Duniya) as stored — `avatars` family ids and `items` slugs in order, available or not, `updated_at`; create (owner; 409 `experience_exists` / `slug_exists`; 422 `validation_failed` for an unknown backdrop (naming the known ones) or Shop item, a repeated avatar, item, motif or collection, a season window that is not two dates in order or two month-days; 422 `unknown_family`); audit `experience.create` |
 | PUT | `/admin/api/experiences/{experienceId}` | Replace copy, slug, backdrop, style, motif pack, avatars (order), items, collections, seasons, availability, sort order (owner; the path id wins; 404 `unknown_experience`; 409 `slug_exists` when another experience has the slug); audit `experience.update` |
 | GET | `/admin/api/environments` | The viewer backdrops (Mahaul), read-only: the valid `environment` values |
+| GET | `/admin/api/motifs` | The motif library (Buti), read-only, any staff role: the storefront's `Motif` rows (for experience motif packs and template previews) |
 | GET | `/admin/api/templates` | Geometry descriptors merged with `template_flags` (`live` default true) and the slugs using each |
 | PUT | `/admin/api/templates/{templateId}` | `{live}` (owner; 404); `live: false` hides it from `GET /api/templates` and makes `POST /api/designs` answer 422 `template_not_available` |
 | GET | `/admin/api/uploads?status&limit` | Customer uploads newest first (`status` ready · pending_review · rejected, 422 otherwise; `limit` 1–200, default 50) as `AdminUpload`: the `Upload` fields with a `url` staff can open in any status, `owner {user_id, guest_id, phone}`, `origin` and the latest `review {id, reason, status, decision_note, reviewer_email, decided_at}` |
@@ -336,10 +341,28 @@ finish must be one the template offers and pass the family's `material_rules` (a
 classes; 422 `unknown_material` naming the rule); without one the first allowed finish is used. `Templates.validateFeatures`
 (`templates/internal/FeatureValidator`, a mirror of the geometry service's `features/validate.py`) checks and normalises the
 features with the contract defaults — type in `features_supported`, anchor exists and `accepts` it, text/motif/photo on
-surfaces and a customer's form on volumes, one photo or form per anchor, relief and emboss depth within `max_relief_mm`
-(a lithophane relief is exempt), text within the family's `max_text_chars` counted without marks, never clamped: 422
-`unsupported_feature`, `param_out_of_range` (with `params: ["features[i].field"]`) or `validation_failed`, worded with
-customer labels ("photo relief (Chhavi)"). Each `content_source.upload_id` must be the caller's upload (404), `ready` (409
+surfaces and a customer's form on volumes, relief and emboss depth within `max_relief_mm` (a lithophane relief is exempt),
+text within the family's `max_text_chars` counted without marks, never clamped: 422 `unsupported_feature`,
+`param_out_of_range` (with `params: ["features[i].field"]`) or `validation_failed`, worded with customer labels ("photo
+relief (Chhavi)"). Since the geometry service builds text (Naam) and motifs (Buti), PR 3b, the API also refuses at design time
+what it would refuse at build time:
+
+| Rule | Answer (422) |
+|---|---|
+| An anchor holds at most one photo or form, one text and one motif; a text and a motif share it side by side | `validation_failed`: "Only one text (Naam) can go on the Face; put the other one on another spot" |
+| A photo relief fills its spot: a text or a motif on the same anchor is crowded, whichever came first | `validation_failed`: "The Face is too crowded for a photo relief (Chhavi) and a motif (Buti) together; put the motif (Buti) on another spot" |
+| Texts and motifs are flat: `projection` `cylindrical` / `conformal`, or an anchor that is not `planar` | `unsupported_feature`: "Text (Naam) that wraps around a curved surface is not available yet; every spot today is flat" |
+| `height_mm` within the anchor's `max_text_height_mm` | `param_out_of_range` on `features[i].height_mm`: "Text (Naam) on the Front of the foot can be at most 8 mm tall; 10 mm was asked" |
+| A text is one line, in one of the seven launch scripts (Latin, Devanagari, Telugu, Tamil, Kannada, Bengali, Gujarati; by Unicode block, as `emboss_text.py` detects them), in one script, matching `script` when given | `validation_failed` on `features[i].text` / `.script`: "Please write the text (Naam) in one script: this mixes Latin and Devanagari letters. Each can go on its own spot" |
+| `font`, when given, names the bundled lettering: Noto Sans or the script's own Noto Sans, bold or not (case, spaces and punctuation ignored) | `unsupported_feature` on `features[i].font`: "The lettering style “Comic Sans” is not available yet; leave the font empty for our standard Latin lettering" |
+| `motif_id` is in the motif library | `validation_failed` on `features[i].motif_id`: "We don't have a motif (Buti) called “peacock”; choose one from the motif library" |
+| `scale` between the motif's `min_scale` and 1 (1 fills the spot; the contract caps it at 1) | `param_out_of_range` on `features[i].scale`: "The Paisley motif (Buti) can't be printed smaller than scale 0.3; choose a larger scale" |
+
+Left to the geometry service, which needs the font files and the anchor's size for them: characters the bundled fonts lack
+(an emoji, say), and whether a text or a motif fits its spot at a printable stroke. The detected script is not written into
+the stored spec; the geometry service detects it again for its build.
+
+Each `content_source.upload_id` must be the caller's upload (404), `ready` (409
 `upload_not_ready`, 422 `upload_rejected`) and of the right kind (422 `unsupported_format`); the API then writes the internal
 `url`, `format` and `origin` from the upload, whatever the request said. `POST /api/versions/{v}/params` takes the same
 `features` as a full replacement (`[]` clears; absent keeps the parent's); uploads already on the parent stay usable by
@@ -424,6 +447,7 @@ are de-duplicated on `event_id`, terminal jobs ignore late messages.
 | `AAKAR_ADMIN_TOKEN_TTL` | `aakar.admin.token-ttl` | `12h` | Staff-token lifetime |
 | `AAKAR_MEDIA_DIR` | `aakar.media.dir` | `./.aakar-media` | Local media store (QC photos, customer uploads), served at `/media/{key}` |
 | `AAKAR_MEDIA_INTERNAL_BASE_URL` | `aakar.media.internal-base-url` | blank = `aakar.api.public-url` | The API origin the geometry service fetches customer uploads from (`content_source.url`), e.g. `http://api:8080` in Compose while the public URL is the browser's |
+| `AAKAR_MOTIFS_DIR` | `aakar.motifs.dir` | blank = the first `packages/design-tokens/motifs` above the working directory | The motif library (Buti): `index.json` and the SVGs beside it, read once at start. The image sets `/design-tokens/motifs`. Missing or broken: `aakar.profile=production` refuses to start; locally a warning, `GET /api/motifs` is empty and motif ids and scales are left to the geometry service |
 | `AAKAR_UPLOADS_SCANNER` | `aakar.uploads.scanner` | `terms` | `terms` or `noop` (refused in production) |
 | `AAKAR_UPLOADS_FLAG_TERMS` | `aakar.uploads.flag-terms` | empty | Comma-separated words that send an upload whose file name mentions them to the review queue |
 | | `aakar.uploads.max-image-bytes` · `max-model-bytes` | `15MB` · `50MB` | Upload limits (`spring.servlet.multipart.max-file-size` / `max-request-size` are 52 MB) |
@@ -446,6 +470,8 @@ pricing_policy`, including `hardware-markup-pct` and `family-rules`, whose famil
 | GET | `/api/families?kind` | Outcome families (Avatars) that are `available` and `ready` (≥ 1 live template), in display order, each with its live template descriptors and hardware names; `kind` = carrier · object · raw (400 otherwise). Needs the geometry service, like `/api/templates` |
 | GET | `/api/families/{id}` | Any seeded family with its `available` / `ready` flags (a deep link can say "coming soon"); 404 `unknown_family` |
 | GET | `/api/templates` · `/api/templates/{id}` | Descriptors cached from geometry for 60 s; the list hides templates switched off in the portal |
+| GET | `/api/motifs` | The motif library (Buti) in index order: `[{id, label, tags, min_scale, svg_url}]`, `svg_url` = `{aakar.api.public-url}/api/motifs/{id}.svg`; empty when the library is not loaded (local runs only) |
+| GET | `/api/motifs/{id}.svg` | The motif's single-path SVG (`image/svg+xml`, `Cache-Control: max-age=86400, public`, ETag → 304, a restrictive CSP); 404 `unknown_motif`. The id is looked up in the index, never used as a path; encoded slashes and dot segments are refused before routing |
 | GET | `/media/{key}` | A stored media file (QC photos, customer uploads) |
 | POST | `/api/uploads` | Multipart `file` + `kind` (image · model) → 201 `Upload` (`ready`, or `pending_review` when flagged); 401 without an identity; 413 `payload_too_large`; 422 `unsupported_format`; 400 bad `kind` or empty file |
 | GET | `/api/uploads/{id}` | The caller's own upload (`message` explains a rejection); 404 for anybody else |
@@ -480,7 +506,8 @@ Errors are RFC 9457 Problem Details (`application/problem+json`) with a stable `
 `otp_expired`, `otp_rate_limited`, `not_printable`, `cart_empty`, `not_serviceable`, `payment_final`,
 `order_not_payable`, `invalid_transition`, `policy_version_exists`, `order_not_packed`, `material_exists`, `slug_exists`,
 `payload_too_large`, `unknown_family`, `family_not_available`, `family_exists`, `hardware_exists`, `unknown_hardware`,
-`unsupported_format`, `unsupported_feature`, `upload_not_ready`, `upload_rejected`, `review_already_decided`, `internal_error`;
+`unsupported_format`, `unsupported_feature`, `upload_not_ready`, `upload_rejected`, `review_already_decided`, `unknown_experience`,
+`experience_exists`, `unknown_motif`, `internal_error`;
 a job's `error_code` may also be `content_unusable` (the geometry service could not repair a customer's model).
 
 ## Modules (`studio.aakar.api.*`)
@@ -516,3 +543,6 @@ Flyway `V1` (catalog, materials, designs, versions, jobs, job events, outbox), `
 ```sh
 docker build -f services/api/Dockerfile -t aakar-api .     # from the monorepo root
 ```
+
+The image carries the motif library at `/design-tokens/motifs` (`AAKAR_MOTIFS_DIR`), the path the geometry image uses, so
+Compose needs no extra setting.
