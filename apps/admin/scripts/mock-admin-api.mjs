@@ -139,11 +139,11 @@ function priceWith(policy, policyVersion, material, extrudedVolumeCm3, printSeco
 // Templates and catalog
 // ---------------------------------------------------------------------------------------------------------
 // Rows carry the descriptor's family, features_supported (Chhaap types) and hardware so the portal can show them.
-const templates = [
-  { id: "jharokha_phone_stand", version: 1, family: "phone_stand", name: "Jharokha Phone Stand", live: true, features_supported: ["emboss_text"], hardware: [] },
-  { id: "keychain_tag", version: 1, family: "keychain", name: "Keychain Tag", live: true, features_supported: ["relief_image", "emboss_text", "motif"], hardware: [{ sku: "split_ring_25", qty: 1 }] },
-  { id: "raw_print", version: 1, family: "raw_print", name: "Raw Print · Swaroop", live: true, features_supported: ["hero_mesh"], hardware: [] },
-];
+// Derived from the live descriptors exported by the geometry service (`make descriptors`).
+const templates = JSON.parse(readFileSync(path.join(root, "packages/contracts/examples/template-descriptors.json"), "utf8")).map((d) => ({
+  id: d.id, version: d.version, family: d.family, name: d.name, live: true,
+  features_supported: d.features_supported ?? [], hardware: d.hardware ?? [],
+}));
 
 // ---------------------------------------------------------------------------------------------------------
 // Shelves, hardware and outcome families (Avatars) seeded from packages/design-tokens/families.json.

@@ -41,6 +41,19 @@ for (const [file, id] of examples) {
   }
 }
 
+// Live template descriptors exported from the geometry service (`make descriptors`); the mocks and API fixtures read them.
+{
+  const validate = ajv.getSchema("https://aakar.studio/schemas/template-descriptor.v1.json");
+  const descriptors = read("examples/template-descriptors.json");
+  for (const d of descriptors) {
+    if (!validate(d)) {
+      failed++;
+      console.error(`✗ examples/template-descriptors.json#${d.id}`, validate.errors);
+    }
+  }
+  console.log(`✓ examples/template-descriptors.json: ${descriptors.length} descriptors valid`);
+}
+
 for (const f of readdirSync(join(root, "openapi")).filter((f) => f.endsWith(".yaml"))) {
   const doc = YAML.parse(readFileSync(join(root, "openapi", f), "utf8"));
   if (!doc.openapi || !doc.paths) throw new Error(`${f} is not an OpenAPI document`);

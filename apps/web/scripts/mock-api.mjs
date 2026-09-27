@@ -42,64 +42,8 @@ const DEV_CODE = "123456";
 const OTP_TTL_S = 300;
 const STUDIO = "Bengaluru";
 
-const templates = [
-  {
-    id: "jharokha_phone_stand", version: 1, family: "phone_stand", name: "Jharokha Phone Stand",
-    description: "A cusped Rajasthani arch that holds a phone at a comfortable tilt.", environment: "desk_oak",
-    params: {
-      width_mm: { type: "number", label: "Width", unit: "mm", default: 92, min: 70, max: 120, step: 1, group: "Size" },
-      depth_mm: { type: "number", label: "Depth", unit: "mm", default: 78, min: 60, max: 110, step: 1, group: "Size" },
-      height_mm: { type: "number", label: "Height", unit: "mm", default: 120, min: 90, max: 160, step: 1, group: "Size" },
-      tilt_deg: { type: "number", label: "Tilt", unit: "deg", default: 70, min: 55, max: 80, step: 1, group: "Shape" },
-      lip_height_mm: { type: "number", label: "Lip", unit: "mm", default: 12, min: 6, max: 20, step: 0.5, group: "Shape" },
-      wall_mm: { type: "number", label: "Wall", unit: "mm", default: 3.2, min: 1.6, max: 4, step: 0.1, group: "Details" },
-      arch_cusps: { type: "integer", label: "Arch cusps", unit: "count", default: 5, min: 3, max: 9, step: 2, group: "Details" },
-    },
-    anchors: [{ id: "back_panel", label: "Back panel", projection: "planar", max_text_height_mm: 18 }],
-    constraints: { min_wall_mm: 1.2, max_overhang_deg: 55, bed_mm: [250, 250, 250] },
-    materials: ["basic_white", "terracotta_matte", "terracotta_silk", "polished_brass", "sandalwood_silk", "indigo_matte"],
-    style_variants: [], features_supported: ["emboss_text"],
-  },
-  {
-    id: "fluted_planter", version: 1, family: "planter", name: "Fluted Planter",
-    description: "Vertical flutes, a drainage tray, sized for nursery pots.", environment: "balcony_daylight",
-    params: {
-      diameter_mm: { type: "number", label: "Diameter", unit: "mm", default: 140, min: 100, max: 200, step: 5, group: "Size" },
-      height_mm: { type: "number", label: "Height", unit: "mm", default: 130, min: 90, max: 200, step: 5, group: "Size" },
-      flutes: { type: "integer", label: "Flutes", unit: "count", default: 24, min: 12, max: 48, step: 2, group: "Shape" },
-      tray: { type: "boolean", label: "Drainage tray", default: true, group: "Details" },
-    },
-    anchors: [], constraints: { min_wall_mm: 1.6, max_overhang_deg: 50, bed_mm: [250, 250, 250] },
-    materials: ["basic_white", "terracotta_matte", "sandalwood_silk", "indigo_matte"], style_variants: [], features_supported: [],
-  },
-  {
-    id: "keychain_tag", version: 1, family: "keychain", name: "Saathi Tag",
-    description: "A palm-sized plate with a ring loop; your photo or name sits in relief on the face.", environment: "studio",
-    params: {
-      shape: { type: "enum", label: "Shape", default: "rounded", options: ["rect", "rounded", "circle", "heart"], group: "Shape" },
-      width_mm: { type: "number", label: "Width", unit: "mm", default: 45, min: 30, max: 60, step: 1, group: "Size" },
-      thickness_mm: { type: "number", label: "Thickness", unit: "mm", default: 3, min: 2.4, max: 4, step: 0.1, group: "Size" },
-      hole_d_mm: { type: "number", label: "Ring hole", unit: "mm", default: 4.2, min: 4, max: 6, step: 0.1, group: "Details" },
-    },
-    anchors: [
-      { id: "face", label: "Face", kind: "surface", projection: "planar", size_mm: [36, 36], bleed_mm: 2, accepts: ["relief_image", "emboss_text", "motif"], max_relief_mm: 1.5, max_text_height_mm: 14 },
-      { id: "back", label: "Back", kind: "surface", projection: "planar", size_mm: [36, 36], bleed_mm: 2, accepts: ["emboss_text", "motif"], max_relief_mm: 1.0, max_text_height_mm: 12 },
-    ],
-    constraints: { min_wall_mm: 1.2, max_overhang_deg: 55, bed_mm: [250, 250, 250] },
-    materials: ["basic_white", "terracotta_matte", "terracotta_silk", "polished_brass", "sandalwood_silk", "indigo_matte"],
-    style_variants: [], features_supported: ["relief_image", "emboss_text", "motif"], hardware: [{ sku: "split_ring_25", qty: 1 }],
-  },
-  {
-    // Swaroop: no template params. Size (fit "longest" + longest_mm) and orientation live on the one hero_mesh feature.
-    id: "raw_print", version: 1, family: "raw_print", name: "Print as it is",
-    description: "Your own model file, checked, sized and printed as it is.", environment: "studio",
-    params: {},
-    anchors: [{ id: "body", label: "Body", kind: "volume", projection: "planar", bounds_mm: [240, 240, 240], accepts: ["hero_mesh"] }],
-    constraints: { min_wall_mm: 1.2, max_overhang_deg: 55, bed_mm: [250, 250, 250] },
-    materials: ["basic_white", "terracotta_matte", "terracotta_silk", "polished_brass", "sandalwood_silk", "indigo_matte"],
-    style_variants: [], features_supported: ["hero_mesh"], hardware: [],
-  },
-];
+// The live template descriptors exported from the geometry service (`make descriptors`), one source for every mock.
+const templates = JSON.parse(readFileSync(path.join(root, "packages/contracts/examples/template-descriptors.json"), "utf8"));
 
 // ---- Outcome families (Avatars) from the seed: shelves, hardware, families + their live templates ----
 const shelves = [...familiesSeed.shelves].sort((a, b) => (a.sort_order ?? 100) - (b.sort_order ?? 100));
