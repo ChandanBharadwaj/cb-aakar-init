@@ -40,8 +40,27 @@
     },
     "features_supported": {
       "type": "array",
-      "items": { "type": "string", "enum": ["emboss_text", "motif"] },
+      "items": { "type": "string", "enum": ["emboss_text", "motif", "relief_image", "hero_mesh"] },
       "default": []
+    },
+    "hardware": {
+      "type": "array",
+      "default": [],
+      "description": "Bought-in parts this template's pockets, holes and slots are cut for; authoritative over the family default.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sku", "qty"],
+        "properties": {
+          "sku": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "qty": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "min_feature_mm": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Smallest printable stroke or detail (0.8 mm for a 0.4 mm nozzle); text and silhouette checks use it."
     }
   },
   "$defs": {
@@ -70,11 +89,28 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["id", "label", "projection"],
+      "description": "A named place where content may land: a surface (text, motif, relief) or a volume (a customer's own 3D form). size_mm/bounds_mm are the 3D analogue of a print area; bleed_mm the safe margin inside it.",
       "properties": {
         "id": { "type": "string" },
         "label": { "type": "string" },
+        "kind": { "type": "string", "enum": ["surface", "volume"], "default": "surface" },
         "projection": { "type": "string", "enum": ["planar", "cylindrical", "conformal"] },
-        "max_text_height_mm": { "type": "number" }
+        "max_text_height_mm": { "type": "number" },
+        "size_mm": {
+          "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 2, "maxItems": 2,
+          "description": "Printable width and height of a surface anchor."
+        },
+        "bleed_mm": { "type": "number", "minimum": 0, "default": 0, "description": "Content stays inside size_mm minus twice the bleed." },
+        "bounds_mm": {
+          "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 3, "maxItems": 3,
+          "description": "Width, depth and height of a volume anchor; content is scaled to fit."
+        },
+        "accepts": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["emboss_text", "motif", "relief_image", "hero_mesh"] },
+          "description": "Feature types allowed on this anchor; defaults to the template's features_supported."
+        },
+        "max_relief_mm": { "type": "number", "exclusiveMinimum": 0, "description": "Cap for relief_image.relief_mm and emboss depth on this anchor." }
       }
     }
   }

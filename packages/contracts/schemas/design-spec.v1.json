@@ -56,8 +56,54 @@
     "feature": {
       "oneOf": [
         { "$ref": "#/$defs/emboss_text" },
-        { "$ref": "#/$defs/motif" }
+        { "$ref": "#/$defs/motif" },
+        { "$ref": "#/$defs/relief_image" },
+        { "$ref": "#/$defs/hero_mesh" }
       ]
+    },
+    "content_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["upload_id", "url"],
+      "description": "Customer content behind a relief_image or hero_mesh feature. The API resolves upload_id to a URL the geometry service can fetch; origin says whether the customer uploaded it or a generative provider produced it.",
+      "properties": {
+        "upload_id": { "type": "string", "format": "uuid" },
+        "url": { "type": "string" },
+        "format": { "type": "string", "enum": ["png", "jpg", "webp", "heic", "stl", "glb", "3mf", "obj", "ply", "off", "gltf"] },
+        "origin": { "type": "string", "enum": ["upload", "generated"], "default": "upload" },
+        "provider": { "type": "string", "description": "Generative provider id when origin is generated." }
+      }
+    },
+    "relief_image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "source", "anchor"],
+      "description": "Chhavi: a photo or image becomes a heightfield relief on a surface anchor (the MakerLab keychain and lithophane pattern).",
+      "properties": {
+        "type": { "const": "relief_image" },
+        "source": { "$ref": "#/$defs/content_source" },
+        "anchor": { "type": "string", "description": "A surface anchor id from the template descriptor." },
+        "mode": { "type": "string", "enum": ["emboss", "deboss", "lithophane"], "default": "emboss" },
+        "relief_mm": { "type": "number", "minimum": 0.2, "maximum": 3, "default": 0.6 },
+        "fit": { "type": "string", "enum": ["contain", "cover"], "default": "contain" },
+        "invert": { "type": "boolean", "default": false },
+        "cutout": { "type": "string", "enum": ["none", "silhouette"], "default": "none" }
+      }
+    },
+    "hero_mesh": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "source", "anchor"],
+      "description": "Roop: the customer's own 3D form (uploaded or generated), repaired, scaled into a volume anchor and fused onto the carrier body. The raw_print family carries exactly one hero_mesh and no body.",
+      "properties": {
+        "type": { "const": "hero_mesh" },
+        "source": { "$ref": "#/$defs/content_source" },
+        "anchor": { "type": "string", "description": "A volume anchor id from the template descriptor." },
+        "fit": { "type": "string", "enum": ["contain", "longest"], "default": "contain" },
+        "longest_mm": { "type": "number", "minimum": 5, "maximum": 250, "description": "Target longest dimension when fit is longest." },
+        "yaw_deg": { "type": "number", "minimum": 0, "maximum": 360, "default": 0 },
+        "orientation": { "type": "string", "enum": ["as_uploaded", "lay_flat"], "default": "as_uploaded" }
+      }
     },
     "emboss_text": {
       "type": "object",

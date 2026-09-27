@@ -118,6 +118,124 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/catalog/shelves": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Shop shelves (catalog categories) in display order */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Shelves */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Shelf"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/families": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Outcome categories (Avatars) that are available and have a live template
+         * @description Feeds the Create picker ("Give your idea an Avatar"). Each family carries its consumer copy, size
+         *     envelope, bought-in hardware, material rules and content slot (Chhaap), plus the live template
+         *     descriptors of that family. The raw family (`kind: raw`, Swaroop) is included; Shop shelves never list it.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    kind?: "carrier" | "object" | "raw";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Families */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Family"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/families/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Family */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Family"];
+                    };
+                };
+                /** @description unknown_family */
+                404: components["responses"]["Problem"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/templates": {
         parameters: {
             query?: never;
@@ -192,6 +310,99 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload customer content (an image for a relief, or a model file for Swaroop or a hero form)
+         * @description `multipart/form-data` with `file` and `kind` (`image` | `model`). Images: png, jpg, webp, heic up to
+         *     15 MB. Models: stl, glb, 3mf, obj, ply, off, gltf up to 50 MB. Requires a known identity (user or
+         *     guest header). Uploads the content scanner flags answer with `status: pending_review` and cannot be
+         *     placed on a design until a reviewer approves them (409 `upload_not_ready`, 422 `upload_rejected`).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "multipart/form-data": {
+                        /** Format: binary */
+                        file: string;
+                        /** @enum {string} */
+                        kind: "image" | "model";
+                    };
+                };
+            };
+            responses: {
+                /** @description Stored */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Upload"];
+                    };
+                };
+                /** @description payload_too_large */
+                413: components["responses"]["Problem"];
+                /** @description unsupported_format */
+                422: components["responses"]["Problem"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/uploads/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Upload */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Upload"];
+                    };
+                };
+                404: components["responses"]["Problem"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/designs": {
         parameters: {
             query?: never;
@@ -205,7 +416,10 @@ export interface paths {
          * Start a design
          * @description Shop path: `catalog_item_slug` (template and defaults come from the item).
          *     Remix-lite / direct path: `template_id` + optional `params`.
-         *     Create path: `prompt` → 422 until Phase 2.
+         *     Avatar path: `family_id` (+ optional `template_id`, else the family's default) + `features` (the Chhaap:
+         *     text, motif, a photo relief or the customer's own form referencing an upload).
+         *     Swaroop path: `source: upload`, `family_id: raw_print`, one `hero_mesh` feature.
+         *     Create path: `prompt` alone → 422 until Phase 2.
          *     Returns 202 with the design and the first generation job. Follow `/api/jobs/{id}/events`.
          */
         post: {
@@ -380,6 +594,10 @@ export interface paths {
                             [key: string]: number | boolean | string;
                         };
                         material?: string;
+                        /** @description Replaces the parent version's features when present (empty array clears them); omitted or null keeps them. Items follow schemas/design-spec.v1.json#/$defs/feature. */
+                        features?: {
+                            [key: string]: unknown;
+                        }[] | null;
                     };
                 };
             };
@@ -1736,8 +1954,10 @@ export interface components {
             /** @description False until the item's template exists in the geometry service; the Shop shows a 'Coming soon' ribbon and POST /api/designs answers 422 template_not_available. */
             available: boolean;
             name: string;
-            /** @enum {string} */
-            category: "home_decor" | "nameplates" | "kitchen" | "desk_tech" | "gifting";
+            /** @description A shelf id from GET /api/catalog/shelves */
+            category: string;
+            /** @description Outcome family (Avatar) of the item's template */
+            family_id?: string | null;
             description?: string;
             template_id: string;
             default_params: {
@@ -1773,15 +1993,90 @@ export interface components {
                 sheen_color?: string;
             };
         };
+        Shelf: {
+            id: string;
+            label: string;
+            sort_order: number;
+        };
+        HardwareRef: {
+            sku: string;
+            qty: number;
+            /** @description Customer-facing hardware name */
+            name?: string;
+        };
+        /** @description An outcome category (Avatar). Same fields as schemas/template-family.v1.json#/$defs/family plus read-only state. */
+        Family: {
+            id: string;
+            /** @description Brand name shown to customers */
+            codename: string;
+            /** @description Plain descriptor always shown with the codename */
+            name: string;
+            tagline?: string;
+            description?: string;
+            /** @enum {string} */
+            kind: "carrier" | "object" | "raw";
+            /** @enum {string} */
+            tier: "launch" | "next" | "later";
+            shelf: string;
+            demand_rank?: number;
+            default_template_id: string;
+            environment?: string;
+            size_envelope_mm?: {
+                min_longest_mm?: number;
+                max_longest_mm?: number;
+            };
+            hardware?: components["schemas"]["HardwareRef"][];
+            material_rules?: {
+                heat_safe_only?: boolean;
+                allowed?: string[] | null;
+                excluded_finish_classes?: string[];
+            };
+            /** @enum {string} */
+            shape_tolerance: "any" | "constrained" | "strict";
+            content_slot: {
+                accepts: ("emboss_text" | "motif" | "relief_image" | "hero_mesh")[];
+                anchors?: string[];
+                hero_volume?: boolean;
+                max_text_chars?: number;
+            };
+            available: boolean;
+            sort_order?: number;
+            /** @description True when at least one live template of this family exists in the geometry service */
+            ready: boolean;
+            templates: components["schemas"]["template-descriptor.v1"][];
+            /** @description Lowest computed price across live templates and materials */
+            price_from_paise?: number | null;
+        };
+        Upload: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "image" | "model";
+            format: string;
+            bytes: number;
+            sha256?: string;
+            /** @enum {string} */
+            status: "ready" | "pending_review" | "rejected";
+            /** @description Browser-fetchable URL when ready */
+            url?: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
         CreateDesignRequest: {
             /** @enum {string} */
-            source: "shop" | "create" | "remix";
+            source: "shop" | "create" | "remix" | "upload";
             catalog_item_slug?: string;
+            /** @description Outcome family (Avatar). Without template_id the family's default template is used. raw_print with source upload is the Swaroop path. */
+            family_id?: string;
             template_id?: string;
             params?: {
                 [key: string]: number | boolean | string;
             };
             material?: string;
+            /** @description Content features (Chhaap) following schemas/design-spec.v1.json#/$defs/feature. Content sources name an upload_id; the API fills the url. */
+            features?: {
+                [key: string]: unknown;
+            }[];
             prompt?: string;
             title?: string;
         };
@@ -1797,8 +2092,9 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            source: "shop" | "create" | "remix";
+            source: "shop" | "create" | "remix" | "upload";
             catalog_item_slug?: string | null;
+            family_id?: string | null;
             title: string;
             /** @enum {string} */
             status: "generating" | "ready" | "failed";
@@ -1833,6 +2129,9 @@ export interface components {
             print_estimate?: components["schemas"]["print-estimate.v1"];
             /** @description For spec.material */
             price?: components["schemas"]["price-breakdown.v1"];
+            family_id?: string | null;
+            /** @description Bought-in parts packed with this piece */
+            hardware?: components["schemas"]["HardwareRef"][];
             karigar_note?: string;
             /** Format: uuid */
             job_id?: string;
@@ -1899,12 +2198,31 @@ export interface components {
             /** @description UI grouping, e.g. Size, Shape, Details. */
             group?: string;
         };
+        /** @description A named place where content may land: a surface (text, motif, relief) or a volume (a customer's own 3D form). size_mm/bounds_mm are the 3D analogue of a print area; bleed_mm the safe margin inside it. */
         anchor: {
             id: string;
             label: string;
+            /**
+             * @default surface
+             * @enum {string}
+             */
+            kind: "surface" | "volume";
             /** @enum {string} */
             projection: "planar" | "cylindrical" | "conformal";
             max_text_height_mm?: number;
+            /** @description Printable width and height of a surface anchor. */
+            size_mm?: number[];
+            /**
+             * @description Content stays inside size_mm minus twice the bleed.
+             * @default 0
+             */
+            bleed_mm: number;
+            /** @description Width, depth and height of a volume anchor; content is scaled to fit. */
+            bounds_mm?: number[];
+            /** @description Feature types allowed on this anchor; defaults to the template's features_supported. */
+            accepts?: ("emboss_text" | "motif" | "relief_image" | "hero_mesh")[];
+            /** @description Cap for relief_image.relief_mm and emboss depth on this anchor. */
+            max_relief_mm?: number;
         };
         /**
          * Aakar Template Descriptor v1
@@ -1934,7 +2252,17 @@ export interface components {
             /** @default [] */
             style_variants: ("jaipur_heritage" | "modern_zen" | "cyber_desi" | "warli_line")[];
             /** @default [] */
-            features_supported: ("emboss_text" | "motif")[];
+            features_supported: ("emboss_text" | "motif" | "relief_image" | "hero_mesh")[];
+            /**
+             * @description Bought-in parts this template's pockets, holes and slots are cut for; authoritative over the family default.
+             * @default []
+             */
+            hardware: {
+                sku: string;
+                qty: number;
+            }[];
+            /** @description Smallest printable stroke or detail (0.8 mm for a 0.4 mm nozzle); text and silhouette checks use it. */
+            min_feature_mm?: number;
             $defs: {
                 param: {
                     /** @enum {string} */
@@ -1956,12 +2284,31 @@ export interface components {
                     /** @description UI grouping, e.g. Size, Shape, Details. */
                     group?: string;
                 };
+                /** @description A named place where content may land: a surface (text, motif, relief) or a volume (a customer's own 3D form). size_mm/bounds_mm are the 3D analogue of a print area; bleed_mm the safe margin inside it. */
                 anchor: {
                     id: string;
                     label: string;
+                    /**
+                     * @default surface
+                     * @enum {string}
+                     */
+                    kind: "surface" | "volume";
                     /** @enum {string} */
                     projection: "planar" | "cylindrical" | "conformal";
                     max_text_height_mm?: number;
+                    /** @description Printable width and height of a surface anchor. */
+                    size_mm?: number[];
+                    /**
+                     * @description Content stays inside size_mm minus twice the bleed.
+                     * @default 0
+                     */
+                    bleed_mm: number;
+                    /** @description Width, depth and height of a volume anchor; content is scaled to fit. */
+                    bounds_mm?: number[];
+                    /** @description Feature types allowed on this anchor; defaults to the template's features_supported. */
+                    accepts?: ("emboss_text" | "motif" | "relief_image" | "hero_mesh")[];
+                    /** @description Cap for relief_image.relief_mm and emboss depth on this anchor. */
+                    max_relief_mm?: number;
                 };
             };
         };
@@ -2006,7 +2353,71 @@ export interface components {
              */
             mode: "emboss" | "deboss";
         };
-        feature: components["schemas"]["emboss_text"] | components["schemas"]["motif"];
+        /** @description Customer content behind a relief_image or hero_mesh feature. The API resolves upload_id to a URL the geometry service can fetch; origin says whether the customer uploaded it or a generative provider produced it. */
+        content_source: {
+            /** Format: uuid */
+            upload_id: string;
+            url: string;
+            /** @enum {string} */
+            format?: "png" | "jpg" | "webp" | "heic" | "stl" | "glb" | "3mf" | "obj" | "ply" | "off" | "gltf";
+            /**
+             * @default upload
+             * @enum {string}
+             */
+            origin: "upload" | "generated";
+            /** @description Generative provider id when origin is generated. */
+            provider?: string;
+        };
+        /** @description Chhavi: a photo or image becomes a heightfield relief on a surface anchor (the MakerLab keychain and lithophane pattern). */
+        relief_image: {
+            /** @constant */
+            type: "relief_image";
+            source: components["schemas"]["content_source"];
+            /** @description A surface anchor id from the template descriptor. */
+            anchor: string;
+            /**
+             * @default emboss
+             * @enum {string}
+             */
+            mode: "emboss" | "deboss" | "lithophane";
+            /** @default 0.6 */
+            relief_mm: number;
+            /**
+             * @default contain
+             * @enum {string}
+             */
+            fit: "contain" | "cover";
+            /** @default false */
+            invert: boolean;
+            /**
+             * @default none
+             * @enum {string}
+             */
+            cutout: "none" | "silhouette";
+        };
+        /** @description Roop: the customer's own 3D form (uploaded or generated), repaired, scaled into a volume anchor and fused onto the carrier body. The raw_print family carries exactly one hero_mesh and no body. */
+        hero_mesh: {
+            /** @constant */
+            type: "hero_mesh";
+            source: components["schemas"]["content_source"];
+            /** @description A volume anchor id from the template descriptor. */
+            anchor: string;
+            /**
+             * @default contain
+             * @enum {string}
+             */
+            fit: "contain" | "longest";
+            /** @description Target longest dimension when fit is longest. */
+            longest_mm?: number;
+            /** @default 0 */
+            yaw_deg: number;
+            /**
+             * @default as_uploaded
+             * @enum {string}
+             */
+            orientation: "as_uploaded" | "lay_flat";
+        };
+        feature: components["schemas"]["emboss_text"] | components["schemas"]["motif"] | components["schemas"]["relief_image"] | components["schemas"]["hero_mesh"];
         constraints: {
             /** @default 1.2 */
             min_wall_mm: number;
@@ -2061,7 +2472,71 @@ export interface components {
                      */
                     bed_mm: number[];
                 };
-                feature: components["schemas"]["emboss_text"] | components["schemas"]["motif"];
+                feature: components["schemas"]["emboss_text"] | components["schemas"]["motif"] | components["schemas"]["relief_image"] | components["schemas"]["hero_mesh"];
+                /** @description Customer content behind a relief_image or hero_mesh feature. The API resolves upload_id to a URL the geometry service can fetch; origin says whether the customer uploaded it or a generative provider produced it. */
+                content_source: {
+                    /** Format: uuid */
+                    upload_id: string;
+                    url: string;
+                    /** @enum {string} */
+                    format?: "png" | "jpg" | "webp" | "heic" | "stl" | "glb" | "3mf" | "obj" | "ply" | "off" | "gltf";
+                    /**
+                     * @default upload
+                     * @enum {string}
+                     */
+                    origin: "upload" | "generated";
+                    /** @description Generative provider id when origin is generated. */
+                    provider?: string;
+                };
+                /** @description Chhavi: a photo or image becomes a heightfield relief on a surface anchor (the MakerLab keychain and lithophane pattern). */
+                relief_image: {
+                    /** @constant */
+                    type: "relief_image";
+                    source: components["schemas"]["content_source"];
+                    /** @description A surface anchor id from the template descriptor. */
+                    anchor: string;
+                    /**
+                     * @default emboss
+                     * @enum {string}
+                     */
+                    mode: "emboss" | "deboss" | "lithophane";
+                    /** @default 0.6 */
+                    relief_mm: number;
+                    /**
+                     * @default contain
+                     * @enum {string}
+                     */
+                    fit: "contain" | "cover";
+                    /** @default false */
+                    invert: boolean;
+                    /**
+                     * @default none
+                     * @enum {string}
+                     */
+                    cutout: "none" | "silhouette";
+                };
+                /** @description Roop: the customer's own 3D form (uploaded or generated), repaired, scaled into a volume anchor and fused onto the carrier body. The raw_print family carries exactly one hero_mesh and no body. */
+                hero_mesh: {
+                    /** @constant */
+                    type: "hero_mesh";
+                    source: components["schemas"]["content_source"];
+                    /** @description A volume anchor id from the template descriptor. */
+                    anchor: string;
+                    /**
+                     * @default contain
+                     * @enum {string}
+                     */
+                    fit: "contain" | "longest";
+                    /** @description Target longest dimension when fit is longest. */
+                    longest_mm?: number;
+                    /** @default 0 */
+                    yaw_deg: number;
+                    /**
+                     * @default as_uploaded
+                     * @enum {string}
+                     */
+                    orientation: "as_uploaded" | "lay_flat";
+                };
                 emboss_text: {
                     /** @constant */
                     type: "emboss_text";
@@ -2186,7 +2661,7 @@ export interface components {
             print_seconds: number;
             lines: {
                 /** @enum {string} */
-                code: "material" | "machine_time" | "finishing" | "packaging";
+                code: "material" | "machine_time" | "finishing" | "packaging" | "hardware" | "setup";
                 /** @description Customer-facing, e.g. 'Material · 84 g' or 'Print time · 3 h 40 m'. */
                 label: string;
                 detail?: string;
@@ -2199,6 +2674,10 @@ export interface components {
             shipping_label?: string;
             total_paise: number;
             policy_version: string;
+            /** @description Outcome family the piece belongs to, when known; drives hardware, setup and minimum rules. */
+            family_id?: string;
+            /** @description Present when the family's minimum lifted the subtotal above the computed lines. */
+            minimum_subtotal_paise?: number;
         };
         /**
          * Aakar Event Envelope v1

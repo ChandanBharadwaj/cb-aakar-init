@@ -5,7 +5,8 @@ Contract-first definitions shared by every Aakar service. Change a contract here
 | Path | What |
 |---|---|
 | `schemas/design-spec.v1.json` | The Design Spec: the only thing the agent or a viewer control may hand to the geometry service |
-| `schemas/template-descriptor.v1.json` | What a parametric template publishes (params, ranges, anchors, handles, constraints, materials) |
+| `schemas/template-descriptor.v1.json` | What a parametric template publishes (params, ranges, anchors incl. surface/volume content slots, handles, constraints, materials, hardware) |
+| `schemas/template-family.v1.json` | The outcome-category catalogue (Avatars): shelves, bought-in hardware and families with copy, tier, envelope, material rules, shape tolerance and content slot. Instance: `packages/design-tokens/families.json` |
 | `schemas/printability-report.v1.json` | Stability and wall report rendered on the checkout stability card |
 | `schemas/print-estimate.v1.json` | Material-independent slicing estimate; mass per material is derived by the API |
 | `schemas/price-breakdown.v1.json` | Price lines in integer paise, snapshotted into cart and order |
@@ -22,6 +23,8 @@ Contract-first definitions shared by every Aakar service. Change a contract here
 - IDs are UUIDs. Enum values are `snake_case`.
 - `design.generate` payload == request body of `POST /v1/build`; `design.completed` payload == its response body. One shape whether the call goes over RabbitMQ or HTTP.
 - Out-of-range parameters are rejected (`param_out_of_range`), never silently clamped.
+- Code identifiers (family ids, feature types, line codes) are English `snake_case` and never change; brand names (Avatar codenames such as `Saathi`, the Chhaap content types Naam / Buti / Chhavi / Roop) are data fields edited in the portal.
+- Content features (`relief_image`, `hero_mesh`) reference customer uploads by `upload_id`; the API fills the fetchable `url` before the spec reaches the geometry service.
 
 ## Validate
 

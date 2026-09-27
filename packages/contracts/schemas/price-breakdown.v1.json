@@ -18,7 +18,7 @@
         "additionalProperties": false,
         "required": ["code", "label", "amount_paise"],
         "properties": {
-          "code": { "type": "string", "enum": ["material", "machine_time", "finishing", "packaging"] },
+          "code": { "type": "string", "enum": ["material", "machine_time", "finishing", "packaging", "hardware", "setup"] },
           "label": { "type": "string", "description": "Customer-facing, e.g. 'Material · 84 g' or 'Print time · 3 h 40 m'." },
           "detail": { "type": "string" },
           "amount_paise": { "type": "integer", "minimum": 0 }
@@ -29,6 +29,8 @@
     "shipping_paise": { "type": "integer", "description": "0 when free." },
     "shipping_label": { "type": "string" },
     "total_paise": { "type": "integer" },
-    "policy_version": { "type": "string" }
+    "policy_version": { "type": "string" },
+    "family_id": { "type": "string", "description": "Outcome family the piece belongs to, when known; drives hardware, setup and minimum rules." },
+    "minimum_subtotal_paise": { "type": "integer", "minimum": 0, "description": "Present when the family's minimum lifted the subtotal above the computed lines." }
   }
 }

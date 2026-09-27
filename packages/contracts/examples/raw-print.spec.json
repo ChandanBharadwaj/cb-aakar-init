@@ -1,0 +1,28 @@
+{
+  "spec_version": "1.0",
+  "family": "raw_print",
+  "template": "raw_print@1",
+  "params": {
+    "longest_mm": 80,
+    "orientation": "as_uploaded"
+  },
+  "features": [
+    {
+      "type": "hero_mesh",
+      "source": {
+        "upload_id": "9d8c7b6a-5f4e-4d3c-8b2a-1f0e9d8c7b6a",
+        "url": "http://api:8080/media/uploads/9d8c7b6a-5f4e-4d3c-8b2a-1f0e9d8c7b6a.stl",
+        "format": "stl",
+        "origin": "upload"
+      },
+      "anchor": "body",
+      "fit": "longest",
+      "longest_mm": 80,
+      "yaw_deg": 0,
+      "orientation": "as_uploaded"
+    }
+  ],
+  "style": "none",
+  "material": "basic_white",
+  "constraints": { "min_wall_mm": 1.2, "max_overhang_deg": 55, "bed_mm": [250, 250, 250] }
+}

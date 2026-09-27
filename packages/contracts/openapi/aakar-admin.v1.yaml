@@ -199,6 +199,7 @@ paths:
                 material: { type: string }
                 extruded_volume_cm3: { type: number }
                 print_seconds: { type: integer }
+                family_id: { type: string, description: Applies the family's hardware default, setup fee and minimum }
       responses:
         '200': { description: Breakdown, content: { application/json: { schema: { $ref: '../schemas/price-breakdown.v1.json' } } } }
         '422': { $ref: '#/components/responses/Problem' }
@@ -244,6 +245,103 @@ paths:
         '200': { description: Updated, content: { application/json: { schema: { $ref: 'aakar-api.v1.yaml#/components/schemas/CatalogItem' } } } }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /admin/api/catalog/shelves:
+    get:
+      summary: Shop shelves in display order
+      tags: [catalog]
+      responses:
+        '200': { description: Shelves, content: { application/json: { schema: { type: array, items: { $ref: 'aakar-api.v1.yaml#/components/schemas/Shelf' } } } } }
+  /admin/api/families:
+    get:
+      summary: Every outcome family (Avatar), available or not, with readiness
+      tags: [families]
+      responses:
+        '200': { description: Families, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AdminFamily' } } } } }
+    post:
+      summary: Create a family (owner only, audited as family.create)
+      tags: [families]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminFamilyInput' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/AdminFamily' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { description: family_exists, $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /admin/api/families/{familyId}:
+    put:
+      summary: Update a family's copy, tier, shelf, envelope, hardware, rules, content slot or availability (owner only, audited as family.update)
+      tags: [families]
+      parameters: [{ name: familyId, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminFamilyInput' }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/AdminFamily' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { description: unknown_family, $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /admin/api/hardware:
+    get:
+      summary: Bought-in hardware items
+      tags: [hardware]
+      responses:
+        '200': { description: Hardware, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AdminHardware' } } } } }
+    post:
+      summary: Create a hardware item (owner only, audited as hardware.create)
+      tags: [hardware]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminHardwareInput' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/AdminHardware' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { description: hardware_exists, $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /admin/api/hardware/{sku}:
+    put:
+      summary: Update a hardware item (owner only, audited as hardware.update)
+      tags: [hardware]
+      parameters: [{ name: sku, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminHardwareInput' }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/AdminHardware' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /admin/api/uploads:
+    get:
+      summary: Customer uploads, newest first (filter by status for the review queue)
+      tags: [reviews]
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [ready, pending_review, rejected] } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        '200': { description: Uploads, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AdminUpload' } } } } }
+  /admin/api/content-reviews/{reviewId}:
+    post:
+      summary: Decide a flagged upload (studio or owner, audited as review.decide)
+      tags: [reviews]
+      parameters: [{ name: reviewId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContentReviewDecision' }
+      responses:
+        '200': { description: Decided, content: { application/json: { schema: { $ref: '#/components/schemas/AdminUpload' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { description: review_already_decided, $ref: '#/components/responses/Problem' }
   /admin/api/templates:
     get:
       summary: Templates known to the geometry service with their live flag
@@ -397,6 +495,24 @@ components:
         shipping_flat_paise: { type: integer, minimum: 0 }
         free_shipping_above_paise: { type: integer, minimum: 0 }
         shipping_label: { type: string, maxLength: 60 }
+        hardware_markup_pct: { type: number, minimum: 0, maximum: 500, description: Applied to bought-in hardware unit costs; 0 when absent }
+        family_rules:
+          type: object
+          description: Per-outcome rules keyed by family id
+          additionalProperties:
+            type: object
+            additionalProperties: false
+            properties:
+              minimum_subtotal_paise: { type: integer, minimum: 0, description: Lifts the subtotal to at least this (rounded to the policy ending) }
+              setup_fee_paise: { type: integer, minimum: 0, description: Studio setup line, e.g. repair and orientation labour for raw prints }
+              qty_breaks:
+                type: array
+                items:
+                  type: object
+                  required: [min_qty, discount_pct]
+                  properties:
+                    min_qty: { type: integer, minimum: 2 }
+                    discount_pct: { type: number, minimum: 0, maximum: 90 }
     PricingPolicyVersion:
       type: object
       required: [version, active, policy, created_at, created_by]
@@ -435,7 +551,8 @@ components:
       properties:
         slug: { type: string, pattern: '^[a-z0-9-]{3,60}$' }
         name: { type: string, maxLength: 80 }
-        category: { type: string, enum: [home_decor, nameplates, kitchen, desk_tech, gifting] }
+        category: { type: string, description: A shelf id from GET /admin/api/catalog/shelves; 422 validation_failed otherwise }
+        family_id: { type: [string, 'null'], description: Outcome family (Avatar); 422 unknown_family when not seeded }
         description: { type: string, maxLength: 500 }
         template_id: { type: string }
         default_params: { type: object, additionalProperties: true }
@@ -445,6 +562,90 @@ components:
         environment: { type: string }
         available: { type: boolean }
         media: { type: array, items: { type: object, properties: { kind: { type: string }, url: { type: string } } } }
+    AdminFamilyInput:
+      type: object
+      description: Same fields as schemas/template-family.v1.json#/$defs/family. On PUT the id in the path wins.
+      additionalProperties: false
+      required: [id, codename, name, kind, tier, shelf, default_template_id, shape_tolerance, content_slot, available]
+      properties:
+        id: { type: string, pattern: '^[a-z][a-z0-9_]*$', maxLength: 40 }
+        codename: { type: string, maxLength: 40 }
+        name: { type: string, maxLength: 80 }
+        tagline: { type: string, maxLength: 120 }
+        description: { type: string, maxLength: 500 }
+        kind: { type: string, enum: [carrier, object, raw] }
+        tier: { type: string, enum: [launch, next, later] }
+        shelf: { type: string }
+        demand_rank: { type: integer, minimum: 1 }
+        default_template_id: { type: string, pattern: '^[a-z][a-z0-9_]*$' }
+        environment: { type: string }
+        size_envelope_mm:
+          type: object
+          required: [min_longest_mm, max_longest_mm]
+          properties:
+            min_longest_mm: { type: number, exclusiveMinimum: 0 }
+            max_longest_mm: { type: number, exclusiveMinimum: 0 }
+        hardware: { type: array, items: { type: object, required: [sku, qty], properties: { sku: { type: string }, qty: { type: integer, minimum: 1 } } } }
+        material_rules:
+          type: object
+          properties:
+            heat_safe_only: { type: boolean }
+            allowed: { type: [array, 'null'], items: { type: string } }
+            excluded_finish_classes: { type: array, items: { type: string, enum: [matte, silk] } }
+        shape_tolerance: { type: string, enum: [any, constrained, strict] }
+        content_slot:
+          type: object
+          required: [accepts]
+          properties:
+            accepts: { type: array, items: { type: string, enum: [emboss_text, motif, relief_image, hero_mesh] } }
+            anchors: { type: array, items: { type: string } }
+            hero_volume: { type: boolean }
+            max_text_chars: { type: integer, minimum: 1, maximum: 40 }
+        available: { type: boolean }
+        sort_order: { type: integer, default: 100 }
+    AdminFamily:
+      allOf:
+        - $ref: '#/components/schemas/AdminFamilyInput'
+        - type: object
+          required: [ready]
+          properties:
+            ready: { type: boolean, description: At least one live template of this family exists }
+            template_ids: { type: array, items: { type: string } }
+            updated_at: { type: string, format: date-time }
+    AdminHardwareInput:
+      type: object
+      additionalProperties: false
+      required: [sku, name, unit_cost_paise]
+      properties:
+        sku: { type: string, pattern: '^[a-z][a-z0-9_]*$', maxLength: 40 }
+        name: { type: string, maxLength: 120 }
+        unit_cost_paise: { type: integer, minimum: 0 }
+        weight_g: { type: number, minimum: 0 }
+        supplier: { type: string, maxLength: 120 }
+        url: { type: string, maxLength: 500 }
+        notes: { type: string, maxLength: 200 }
+        available: { type: boolean, default: true }
+    AdminHardware:
+      allOf:
+        - $ref: '#/components/schemas/AdminHardwareInput'
+        - type: object
+          properties:
+            updated_at: { type: string, format: date-time }
+    AdminUpload:
+      allOf:
+        - $ref: 'aakar-api.v1.yaml#/components/schemas/Upload'
+        - type: object
+          properties:
+            owner: { type: object, properties: { user_id: { type: [string, 'null'], format: uuid }, guest_id: { type: [string, 'null'], format: uuid }, phone: { type: [string, 'null'] } } }
+            origin: { type: string, enum: [upload, generated] }
+            review: { type: [object, 'null'], properties: { id: { type: string, format: uuid }, reason: { type: string }, status: { type: string, enum: [pending, approved, rejected] }, decision_note: { type: [string, 'null'] }, reviewer_email: { type: [string, 'null'] }, decided_at: { type: [string, 'null'], format: date-time } } }
+    ContentReviewDecision:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision: { type: string, enum: [approved, rejected] }
+        note: { type: string, maxLength: 200 }
     NotificationRecord:
       type: object
       required: [id, channel, template, to, status, created_at]
@@ -466,7 +667,7 @@ components:
         id: { type: integer }
         at: { type: string, format: date-time }
         staff_email: { type: string }
-        action: { type: string, description: order.advance, pricing.publish, material.update, catalog.update, template.live }
-        target: { type: string, description: Order number, policy version, material id, slug or template id }
+        action: { type: string, description: order.advance, pricing.publish, material.update, catalog.update, template.live, family.create, family.update, hardware.create, hardware.update, review.decide }
+        target: { type: string, description: Order number, policy version, material id, slug, template id, family id, hardware sku or review id }
         before: { type: [object, 'null'], additionalProperties: true }
         after: { type: [object, 'null'], additionalProperties: true }

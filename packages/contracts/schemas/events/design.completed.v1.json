@@ -15,7 +15,16 @@
     },
     "spec": {
       "$ref": "https://aakar.studio/schemas/design-spec.v1.json",
-      "description": "Normalised spec: defaults filled, params clamped to template ranges."
+      "description": "Normalised spec: defaults filled; out-of-range params are rejected, never clamped."
+    },
+    "hardware": {
+      "type": "array",
+      "default": [],
+      "description": "Bought-in parts the template reports for this piece (from its descriptor), packed with the print.",
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["sku", "qty"],
+        "properties": { "sku": { "type": "string" }, "qty": { "type": "integer", "minimum": 1 } }
+      }
     },
     "assets": {
       "type": "object",

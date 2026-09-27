@@ -1,0 +1,40 @@
+{
+  "spec_version": "1.0",
+  "family": "keychain",
+  "template": "keychain_tag@1",
+  "params": {
+    "shape": "rounded",
+    "width_mm": 45,
+    "thickness_mm": 3,
+    "hole_d_mm": 4.2
+  },
+  "features": [
+    {
+      "type": "relief_image",
+      "source": {
+        "upload_id": "3f2b6a1e-8c4d-4e5f-9a0b-1c2d3e4f5a6b",
+        "url": "http://api:8080/media/uploads/3f2b6a1e-8c4d-4e5f-9a0b-1c2d3e4f5a6b.png",
+        "format": "png",
+        "origin": "upload"
+      },
+      "anchor": "face",
+      "mode": "emboss",
+      "relief_mm": 0.6,
+      "fit": "contain",
+      "invert": false,
+      "cutout": "none"
+    },
+    {
+      "type": "emboss_text",
+      "text": "Asha",
+      "script": "latin",
+      "depth_mm": 0.6,
+      "anchor": "back",
+      "projection": "planar",
+      "mode": "emboss"
+    }
+  ],
+  "style": "none",
+  "material": "indigo_matte",
+  "constraints": { "min_wall_mm": 1.2, "max_overhang_deg": 55, "bed_mm": [250, 250, 250] }
+}

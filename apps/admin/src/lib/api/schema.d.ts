@@ -534,6 +534,8 @@ export interface paths {
                         material: string;
                         extruded_volume_cm3: number;
                         print_seconds: number;
+                        /** @description Applies the family's hardware default */
+                        family_id?: string;
                     };
                 };
             };
@@ -758,6 +760,345 @@ export interface paths {
             };
         };
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/api/catalog/shelves": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Shop shelves in display order */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Shelves */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Shelf"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/api/families": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every outcome family (Avatar), available or not, with readiness */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Families */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminFamily"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create a family (owner only, audited as family.create) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AdminFamilyInput"];
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminFamily"];
+                    };
+                };
+                403: components["responses"]["Problem"];
+                /** @description family_exists */
+                409: components["responses"]["Problem"];
+                422: components["responses"]["Problem"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/api/families/{familyId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update a family's copy, tier, shelf, envelope, hardware, rules, content slot or availability (owner only, audited as family.update) */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    familyId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AdminFamilyInput"];
+                };
+            };
+            responses: {
+                /** @description Updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminFamily"];
+                    };
+                };
+                403: components["responses"]["Problem"];
+                /** @description unknown_family */
+                404: components["responses"]["Problem"];
+                422: components["responses"]["Problem"];
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/api/hardware": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bought-in hardware items */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Hardware */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminHardware"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create a hardware item (owner only, audited as hardware.create) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AdminHardwareInput"];
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminHardware"];
+                    };
+                };
+                403: components["responses"]["Problem"];
+                /** @description hardware_exists */
+                409: components["responses"]["Problem"];
+                422: components["responses"]["Problem"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/api/hardware/{sku}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update a hardware item (owner only, audited as hardware.update) */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    sku: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AdminHardwareInput"];
+                };
+            };
+            responses: {
+                /** @description Updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminHardware"];
+                    };
+                };
+                403: components["responses"]["Problem"];
+                404: components["responses"]["Problem"];
+                422: components["responses"]["Problem"];
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/api/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Customer uploads, newest first (filter by status for the review queue) */
+        get: {
+            parameters: {
+                query?: {
+                    status?: "ready" | "pending_review" | "rejected";
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Uploads */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminUpload"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/api/content-reviews/{reviewId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decide a flagged upload (studio or owner, audited as review.decide) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    reviewId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ContentReviewDecision"];
+                };
+            };
+            responses: {
+                /** @description Decided */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminUpload"];
+                    };
+                };
+                404: components["responses"]["Problem"];
+                /** @description review_already_decided */
+                409: components["responses"]["Problem"];
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -1007,6 +1348,21 @@ export interface components {
             shipping_flat_paise: number;
             free_shipping_above_paise: number;
             shipping_label: string;
+            /** @description Applied to bought-in hardware unit costs; 0 when absent */
+            hardware_markup_pct?: number;
+            /** @description Per-outcome rules keyed by family id */
+            family_rules?: {
+                [key: string]: {
+                    /** @description Lifts the subtotal to at least this (rounded to the policy ending) */
+                    minimum_subtotal_paise?: number;
+                    /** @description Studio setup line */
+                    setup_fee_paise?: number;
+                    qty_breaks?: {
+                        min_qty: number;
+                        discount_pct: number;
+                    }[];
+                };
+            };
         };
         PricingPolicyVersion: {
             version: string;
@@ -1041,8 +1397,10 @@ export interface components {
         CatalogItemInput: {
             slug: string;
             name: string;
-            /** @enum {string} */
-            category: "home_decor" | "nameplates" | "kitchen" | "desk_tech" | "gifting";
+            /** @description A shelf id from GET /admin/api/catalog/shelves; 422 validation_failed otherwise */
+            category: string;
+            /** @description Outcome family (Avatar); 422 unknown_family when not seeded */
+            family_id?: string | null;
             description?: string;
             template_id: string;
             default_params: {
@@ -1057,6 +1415,95 @@ export interface components {
                 kind?: string;
                 url?: string;
             }[];
+        };
+        /** @description Same fields as schemas/template-family.v1.json#/$defs/family. On PUT the id in the path wins. */
+        AdminFamilyInput: {
+            id: string;
+            codename: string;
+            name: string;
+            tagline?: string;
+            description?: string;
+            /** @enum {string} */
+            kind: "carrier" | "object" | "raw";
+            /** @enum {string} */
+            tier: "launch" | "next" | "later";
+            shelf: string;
+            demand_rank?: number;
+            default_template_id: string;
+            environment?: string;
+            size_envelope_mm?: {
+                min_longest_mm: number;
+                max_longest_mm: number;
+            };
+            hardware?: {
+                sku: string;
+                qty: number;
+            }[];
+            material_rules?: {
+                heat_safe_only?: boolean;
+                allowed?: string[] | null;
+                excluded_finish_classes?: ("matte" | "silk")[];
+            };
+            /** @enum {string} */
+            shape_tolerance: "any" | "constrained" | "strict";
+            content_slot: {
+                accepts: ("emboss_text" | "motif" | "relief_image" | "hero_mesh")[];
+                anchors?: string[];
+                hero_volume?: boolean;
+                max_text_chars?: number;
+            };
+            available: boolean;
+            /** @default 100 */
+            sort_order: number;
+        };
+        AdminFamily: components["schemas"]["AdminFamilyInput"] & {
+            /** @description At least one live template of this family exists */
+            ready: boolean;
+            template_ids?: string[];
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        AdminHardwareInput: {
+            sku: string;
+            name: string;
+            unit_cost_paise: number;
+            weight_g?: number;
+            supplier?: string;
+            url?: string;
+            notes?: string;
+            /** @default true */
+            available: boolean;
+        };
+        AdminHardware: components["schemas"]["AdminHardwareInput"] & {
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        AdminUpload: components["schemas"]["Upload"] & {
+            owner?: {
+                /** Format: uuid */
+                user_id?: string | null;
+                /** Format: uuid */
+                guest_id?: string | null;
+                phone?: string | null;
+            };
+            /** @enum {string} */
+            origin?: "upload" | "generated";
+            review?: {
+                /** Format: uuid */
+                id?: string;
+                reason?: string;
+                /** @enum {string} */
+                status?: "pending" | "approved" | "rejected";
+                decision_note?: string | null;
+                reviewer_email?: string | null;
+                /** Format: date-time */
+                decided_at?: string | null;
+            } | null;
+        };
+        ContentReviewDecision: {
+            /** @enum {string} */
+            decision: "approved" | "rejected";
+            note?: string;
         };
         NotificationRecord: {
             /** Format: uuid */
@@ -1134,7 +1581,7 @@ export interface components {
             print_seconds: number;
             lines: {
                 /** @enum {string} */
-                code: "material" | "machine_time" | "finishing" | "packaging";
+                code: "material" | "machine_time" | "finishing" | "packaging" | "hardware" | "setup";
                 /** @description Customer-facing, e.g. 'Material · 84 g' or 'Print time · 3 h 40 m'. */
                 label: string;
                 detail?: string;
@@ -1147,6 +1594,10 @@ export interface components {
             shipping_label?: string;
             total_paise: number;
             policy_version: string;
+            /** @description Outcome family the piece belongs to, when known; drives hardware, setup and minimum rules. */
+            family_id?: string;
+            /** @description Present when the family's minimum lifted the subtotal above the computed lines. */
+            minimum_subtotal_paise?: number;
         };
         OrderItem: {
             /** Format: uuid */
@@ -1265,8 +1716,10 @@ export interface components {
             /** @description False until the item's template exists in the geometry service; the Shop shows a 'Coming soon' ribbon and POST /api/designs answers 422 template_not_available. */
             available: boolean;
             name: string;
-            /** @enum {string} */
-            category: "home_decor" | "nameplates" | "kitchen" | "desk_tech" | "gifting";
+            /** @description A shelf id from GET /api/catalog/shelves */
+            category: string;
+            /** @description Outcome family (Avatar) of the item's template */
+            family_id?: string | null;
             description?: string;
             template_id: string;
             default_params: {
@@ -1281,6 +1734,26 @@ export interface components {
                 kind?: string;
                 url?: string;
             }[];
+        };
+        Shelf: {
+            id: string;
+            label: string;
+            sort_order: number;
+        };
+        Upload: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "image" | "model";
+            format: string;
+            bytes: number;
+            sha256?: string;
+            /** @enum {string} */
+            status: "ready" | "pending_review" | "rejected";
+            /** @description Browser-fetchable URL when ready */
+            url?: string | null;
+            /** Format: date-time */
+            created_at: string;
         };
     };
     responses: {

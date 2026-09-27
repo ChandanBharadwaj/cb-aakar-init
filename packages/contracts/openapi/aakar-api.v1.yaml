@@ -52,6 +52,39 @@ paths:
           content:
             application/json:
               schema: { type: array, items: { $ref: '#/components/schemas/Material' } }
+  /api/catalog/shelves:
+    get:
+      summary: Shop shelves (catalog categories) in display order
+      tags: [catalog]
+      responses:
+        '200':
+          description: Shelves
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Shelf' } }
+  /api/families:
+    get:
+      summary: Outcome categories (Avatars) that are available and have a live template
+      description: |
+        Feeds the Create picker ("Give your idea an Avatar"). Each family carries its consumer copy, size
+        envelope, bought-in hardware, material rules and content slot (Chhaap), plus the live template
+        descriptors of that family. The raw family (`kind: raw`, Swaroop) is included; Shop shelves never list it.
+      tags: [families]
+      parameters:
+        - { name: kind, in: query, schema: { type: string, enum: [carrier, object, raw] } }
+      responses:
+        '200':
+          description: Families
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Family' } }
+  /api/families/{id}:
+    get:
+      tags: [families]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: Family, content: { application/json: { schema: { $ref: '#/components/schemas/Family' } } } }
+        '404': { description: unknown_family, $ref: '#/components/responses/Problem' }
   /api/templates:
     get:
       summary: Template descriptors (cached from the geometry service)
@@ -69,13 +102,46 @@ paths:
       responses:
         '200': { description: Descriptor, content: { application/json: { schema: { $ref: '../schemas/template-descriptor.v1.json' } } } }
         '404': { $ref: '#/components/responses/Problem' }
+  /api/uploads:
+    post:
+      summary: Upload customer content (an image for a relief, or a model file for Swaroop or a hero form)
+      description: |
+        `multipart/form-data` with `file` and `kind` (`image` | `model`). Images: png, jpg, webp, heic up to
+        15 MB. Models: stl, glb, 3mf, obj, ply, off, gltf up to 50 MB. Requires a known identity (user or
+        guest header). Uploads the content scanner flags answer with `status: pending_review` and cannot be
+        placed on a design until a reviewer approves them (409 `upload_not_ready`, 422 `upload_rejected`).
+      tags: [uploads]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, kind]
+              properties:
+                file: { type: string, format: binary }
+                kind: { type: string, enum: [image, model] }
+      responses:
+        '201': { description: Stored, content: { application/json: { schema: { $ref: '#/components/schemas/Upload' } } } }
+        '413': { description: payload_too_large, $ref: '#/components/responses/Problem' }
+        '422': { description: unsupported_format, $ref: '#/components/responses/Problem' }
+  /api/uploads/{id}:
+    get:
+      tags: [uploads]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Upload, content: { application/json: { schema: { $ref: '#/components/schemas/Upload' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
   /api/designs:
     post:
       summary: Start a design
       description: |
         Shop path: `catalog_item_slug` (template and defaults come from the item).
         Remix-lite / direct path: `template_id` + optional `params`.
-        Create path: `prompt` → 422 until Phase 2.
+        Avatar path: `family_id` (+ optional `template_id`, else the family's default) + `features` (the Chhaap:
+        text, motif, a photo relief or the customer's own form referencing an upload).
+        Swaroop path: `source: upload`, `family_id: raw_print`, one `hero_mesh` feature.
+        Create path: `prompt` alone → 422 until Phase 2.
         Returns 202 with the design and the first generation job. Follow `/api/jobs/{id}/events`.
       tags: [designs]
       requestBody:
@@ -128,6 +194,11 @@ paths:
               properties:
                 params: { type: object, additionalProperties: { type: [number, integer, boolean, string] } }
                 material: { type: string }
+                features:
+                  type: [array, 'null']
+                  maxItems: 8
+                  description: Replaces the parent version's features when present (empty array clears them); omitted or null keeps them. Items follow schemas/design-spec.v1.json#/$defs/feature.
+                  items: { type: object, additionalProperties: true }
       responses:
         '202': { description: Accepted, content: { application/json: { schema: { $ref: '#/components/schemas/DesignAccepted' } } } }
         '404': { $ref: '#/components/responses/Problem' }
@@ -706,7 +777,8 @@ components:
         slug: { type: string }
         available: { type: boolean, description: "False until the item's template exists in the geometry service; the Shop shows a 'Coming soon' ribbon and POST /api/designs answers 422 template_not_available." }
         name: { type: string }
-        category: { type: string, enum: [home_decor, nameplates, kitchen, desk_tech, gifting] }
+        category: { type: string, description: A shelf id from GET /api/catalog/shelves }
+        family_id: { type: [string, 'null'], description: Outcome family (Avatar) of the item's template, when known }
         description: { type: string }
         template_id: { type: string }
         default_params: { type: object, additionalProperties: true }
@@ -737,16 +809,90 @@ components:
             clearcoat_roughness: { type: number }
             sheen: { type: number }
             sheen_color: { type: string }
+    Shelf:
+      type: object
+      required: [id, label, sort_order]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        sort_order: { type: integer }
+    HardwareRef:
+      type: object
+      required: [sku, qty]
+      properties:
+        sku: { type: string }
+        qty: { type: integer }
+        name: { type: string, description: Customer-facing hardware name, filled by the API from hardware_items }
+    Family:
+      type: object
+      description: An outcome category (Avatar). Same fields as schemas/template-family.v1.json#/$defs/family plus read-only state.
+      required: [id, codename, name, kind, tier, shelf, default_template_id, shape_tolerance, content_slot, available, ready, templates]
+      properties:
+        id: { type: string }
+        codename: { type: string, description: Brand name shown to customers, e.g. Saathi }
+        name: { type: string, description: Plain descriptor always shown with the codename, e.g. Keychain & bag charm }
+        tagline: { type: string }
+        description: { type: string }
+        kind: { type: string, enum: [carrier, object, raw] }
+        tier: { type: string, enum: [launch, next, later] }
+        shelf: { type: string }
+        demand_rank: { type: integer }
+        default_template_id: { type: string }
+        environment: { type: string }
+        size_envelope_mm:
+          type: object
+          properties:
+            min_longest_mm: { type: number }
+            max_longest_mm: { type: number }
+        hardware: { type: array, items: { $ref: '#/components/schemas/HardwareRef' } }
+        material_rules:
+          type: object
+          properties:
+            heat_safe_only: { type: boolean }
+            allowed: { type: [array, 'null'], items: { type: string } }
+            excluded_finish_classes: { type: array, items: { type: string } }
+        shape_tolerance: { type: string, enum: [any, constrained, strict] }
+        content_slot:
+          type: object
+          required: [accepts]
+          properties:
+            accepts: { type: array, items: { type: string, enum: [emboss_text, motif, relief_image, hero_mesh] } }
+            anchors: { type: array, items: { type: string } }
+            hero_volume: { type: boolean }
+            max_text_chars: { type: integer }
+        available: { type: boolean }
+        sort_order: { type: integer }
+        ready: { type: boolean, description: True when at least one live template of this family exists in the geometry service }
+        templates: { type: array, items: { $ref: '../schemas/template-descriptor.v1.json' } }
+        price_from_paise: { type: [integer, 'null'], description: Lowest computed price across live templates and materials, when known }
+    Upload:
+      type: object
+      required: [id, kind, format, bytes, status, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: [image, model] }
+        format: { type: string }
+        bytes: { type: integer }
+        sha256: { type: string }
+        status: { type: string, enum: [ready, pending_review, rejected] }
+        url: { type: [string, 'null'], description: Browser-fetchable URL when ready }
+        created_at: { type: string, format: date-time }
     CreateDesignRequest:
       type: object
       additionalProperties: false
       required: [source]
       properties:
-        source: { type: string, enum: [shop, create, remix] }
+        source: { type: string, enum: [shop, create, remix, upload] }
         catalog_item_slug: { type: string }
+        family_id: { type: string, description: "Outcome family (Avatar). Without template_id the family's default template is used. raw_print with source upload is the Swaroop path." }
         template_id: { type: string }
         params: { type: object, additionalProperties: { type: [number, integer, boolean, string] } }
         material: { type: string }
+        features:
+          type: array
+          maxItems: 8
+          description: Content features (Chhaap) following schemas/design-spec.v1.json#/$defs/feature. Content sources name an upload_id; the API fills the url.
+          items: { type: object, additionalProperties: true }
         prompt: { type: string, maxLength: 500 }
         title: { type: string, maxLength: 80 }
     DesignAccepted:
@@ -762,8 +908,9 @@ components:
       required: [id, source, title, status, created_at, versions_count]
       properties:
         id: { type: string, format: uuid }
-        source: { type: string, enum: [shop, create, remix] }
+        source: { type: string, enum: [shop, create, remix, upload] }
         catalog_item_slug: { type: [string, 'null'] }
+        family_id: { type: [string, 'null'] }
         title: { type: string }
         status: { type: string, enum: [generating, ready, failed] }
         created_at: { type: string, format: date-time }
@@ -785,6 +932,8 @@ components:
         printability: { $ref: '../schemas/printability-report.v1.json' }
         print_estimate: { $ref: '../schemas/print-estimate.v1.json' }
         price: { $ref: '../schemas/price-breakdown.v1.json', description: For spec.material }
+        family_id: { type: [string, 'null'] }
+        hardware: { type: array, items: { $ref: '#/components/schemas/HardwareRef' }, description: Bought-in parts packed with this piece }
         karigar_note: { type: string }
         job_id: { type: string, format: uuid }
         created_by: { type: string, enum: [user, agent, system] }
