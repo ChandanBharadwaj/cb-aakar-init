@@ -30,7 +30,7 @@ import type {
   Session,
   TemplateDescriptor,
   User,
-} from "./types";
+ SharedPiece } from "./types";
 
 const PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
@@ -163,6 +163,10 @@ export const api = {
     get: (jobId: string) => request<Job>(`/api/jobs/${encodeURIComponent(jobId)}`),
     /** SSE endpoint: `event: stage`, JSON data shaped like JobStageEvent. */
     eventsUrl: (jobId: string) => apiUrl(`/api/jobs/${encodeURIComponent(jobId)}/events`),
+  },
+  share: {
+    /** Public: what the unboxing card's /k/{code} link points to. */
+    get: (code: string) => request<SharedPiece>(`/api/share/${encodeURIComponent(code)}`),
   },
   auth: {
     /** `phone` is E.164, e.g. +919876543210. The local profile returns `dev_code`. */

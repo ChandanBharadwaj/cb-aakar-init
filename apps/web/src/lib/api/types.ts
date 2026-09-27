@@ -95,3 +95,4 @@ export function boundsMm(version: DesignVersion | undefined): [number, number, n
 export function isAvailable(item: CatalogItem): boolean {
   return (item as CatalogItem & { available?: boolean }).available !== false;
 }
+export type SharedPiece = paths["/api/share/{code}"]["get"]["responses"][200]["content"]["application/json"];
