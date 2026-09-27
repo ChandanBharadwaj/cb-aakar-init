@@ -12,7 +12,7 @@ import { FALLBACK_MATERIALS } from "@/lib/viewer/materials";
 import { Dropzone } from "@/components/ui/Dropzone";
 import { FinishChips } from "@/components/ui/FinishChips";
 import { RangeField } from "@/components/ui/RangeField";
-import { Segmented } from "@/components/ui/Segmented";
+import { Segmented, type SegmentedOption } from "@/components/ui/Segmented";
 
 export interface RawPrintComposerProps {
   family: Family;
@@ -22,10 +22,10 @@ export interface RawPrintComposerProps {
 
 type Orientation = NonNullable<HeroMesh["orientation"]>;
 
-const ORIENTATIONS = [
+const ORIENTATIONS: readonly SegmentedOption<Orientation>[] = [
   { value: "as_uploaded", label: "As uploaded", description: "Keep the file's own orientation" },
   { value: "lay_flat", label: "Lay flat", description: "Turn it to rest on its flattest face" },
-] as const;
+];
 
 /**
  * Swaroop, "Print as it is": a model-file dropzone, a size slider inside the family's envelope, an
@@ -141,7 +141,7 @@ export function RawPrintComposer({ family, materials: materialsProp, prompt }: R
                 onChange={setLongest}
                 disabled={busy}
               />
-              <Segmented label="Orientation" options={ORIENTATIONS} value={orientation} onChange={setOrientation} disabled={busy} />
+              <Segmented label="Orientation" options={ORIENTATIONS} value={orientation} onChange={(v) => setOrientation(v)} disabled={busy} />
             </div>
 
             <div className="grid gap-2">
