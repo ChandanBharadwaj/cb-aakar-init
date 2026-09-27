@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import studio.aakar.api.shared.ApiProblemException;
+import studio.aakar.api.shared.SseHub;
 import studio.aakar.api.studio.GenerationJobs;
 import studio.aakar.api.studio.JobDto;
 import studio.aakar.api.studio.JobStageEvent;
@@ -22,9 +23,9 @@ import studio.aakar.api.studio.JobStageEvent;
 class JobsController {
 
     private final GenerationJobs jobs;
-    private final JobEventStream stream;
+    private final SseHub<JobStageEvent> stream;
 
-    JobsController(GenerationJobs jobs, JobEventStream stream) {
+    JobsController(GenerationJobs jobs, SseHub<JobStageEvent> stream) {
         this.jobs = jobs;
         this.stream = stream;
     }
@@ -43,7 +44,7 @@ class JobsController {
         JobDto job = jobs.find(jobId).orElseThrow(() -> ApiProblemException.notFound("Job", jobId));
         int lastSeen = parseSequence(lastEventId);
 
-        JobEventStream.Subscription subscription = stream.subscribe(jobId, lastSeen);
+        SseHub<JobStageEvent>.Subscription subscription = stream.subscribe(jobId, lastSeen);
         List<JobStageEvent> history = jobs.events(jobId, lastSeen);
         subscription.replayThenGoLive(history);
         if (job.status().terminal()) {

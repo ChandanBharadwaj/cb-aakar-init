@@ -12,6 +12,8 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -55,6 +57,21 @@ public class ProblemDetailsAdvice extends ResponseEntityExceptionHandler {
                 .map(v -> Map.of("field", v.getPropertyPath().toString(), "message", String.valueOf(v.getMessage())))
                 .toList());
         return respond(problem, ProblemCodes.VALIDATION_FAILED);
+    }
+
+    /** Security exceptions that escape the filter chain (thrown from inside a handler). */
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ProblemDetail> handleAuthentication(AuthenticationException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "Sign in to continue");
+        problem.setTitle("Unauthenticated");
+        return respond(problem, ProblemCodes.UNAUTHENTICATED);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ProblemDetail> handleAccessDenied(AccessDeniedException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, "You are not allowed to do that");
+        problem.setTitle("Forbidden");
+        return respond(problem, ProblemCodes.FORBIDDEN);
     }
 
     @ExceptionHandler(Exception.class)
@@ -103,6 +120,8 @@ public class ProblemDetailsAdvice extends ResponseEntityExceptionHandler {
     private static String codeFor(HttpStatusCode status) {
         return switch (HttpStatus.valueOf(status.value())) {
             case NOT_FOUND -> ProblemCodes.NOT_FOUND;
+            case UNAUTHORIZED -> ProblemCodes.UNAUTHENTICATED;
+            case FORBIDDEN -> ProblemCodes.FORBIDDEN;
             case BAD_REQUEST, UNSUPPORTED_MEDIA_TYPE, NOT_ACCEPTABLE, PAYLOAD_TOO_LARGE -> ProblemCodes.VALIDATION_FAILED;
             case METHOD_NOT_ALLOWED -> "method_not_allowed";
             case UNPROCESSABLE_ENTITY -> ProblemCodes.VALIDATION_FAILED;

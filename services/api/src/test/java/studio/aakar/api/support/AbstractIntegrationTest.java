@@ -9,6 +9,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
+import java.util.UUID;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -56,12 +58,48 @@ public abstract class AbstractIntegrationTest {
         return client;
     }
 
-    protected ResponseEntity<String> get(String path) {
-        return api().get().uri(path).retrieve().toEntity(String.class);
+    protected ResponseEntity<String> get(String path, String... headers) {
+        return send(HttpMethod.GET, path, null, headers);
     }
 
-    protected ResponseEntity<String> post(String path, String body) {
-        return api().post().uri(path).contentType(MediaType.APPLICATION_JSON).body(body).retrieve().toEntity(String.class);
+    protected ResponseEntity<String> post(String path, String body, String... headers) {
+        return send(HttpMethod.POST, path, body, headers);
+    }
+
+    protected ResponseEntity<String> patch(String path, String body, String... headers) {
+        return send(HttpMethod.PATCH, path, body, headers);
+    }
+
+    protected ResponseEntity<String> put(String path, String body, String... headers) {
+        return send(HttpMethod.PUT, path, body, headers);
+    }
+
+    protected ResponseEntity<String> delete(String path, String... headers) {
+        return send(HttpMethod.DELETE, path, null, headers);
+    }
+
+    /** @param headers alternating name/value pairs, e.g. from {@link #bearer(String)} or {@link #guest(UUID)} */
+    protected ResponseEntity<String> send(HttpMethod method, String path, String body, String... headers) {
+        if (headers.length % 2 != 0) {
+            throw new IllegalArgumentException("headers must be name/value pairs");
+        }
+        RestClient.RequestBodySpec request = api().method(method).uri(path);
+        for (int i = 0; i < headers.length; i += 2) {
+            request = request.header(headers[i], headers[i + 1]);
+        }
+        if (body != null) {
+            request = request.contentType(MediaType.APPLICATION_JSON);
+            return request.body(body).retrieve().toEntity(String.class);
+        }
+        return request.retrieve().toEntity(String.class);
+    }
+
+    protected static String[] bearer(String token) {
+        return new String[] {"Authorization", "Bearer " + token};
+    }
+
+    protected static String[] guest(UUID guestId) {
+        return new String[] {"X-Aakar-Guest", guestId.toString()};
     }
 
     protected JsonNode body(ResponseEntity<String> response) {

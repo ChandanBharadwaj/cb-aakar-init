@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import studio.aakar.api.shared.ApiProblemException;
+import studio.aakar.api.shared.SseHub;
 import studio.aakar.api.studio.DesignCompletedPayload;
 import studio.aakar.api.studio.DesignFailedPayload;
 import studio.aakar.api.studio.DesignProgressPayload;
@@ -36,10 +37,10 @@ public class GenerationResultApplier {
     private final JobEventRepository events;
     private final EnvelopeMapper mapper;
     private final ApplicationEventPublisher publisher;
-    private final JobEventStream stream;
+    private final SseHub<JobStageEvent> stream;
 
     GenerationResultApplier(GenerationJobRepository jobs, JobEventRepository events, EnvelopeMapper mapper,
-            ApplicationEventPublisher publisher, JobEventStream stream) {
+            ApplicationEventPublisher publisher, SseHub<JobStageEvent> stream) {
         this.jobs = jobs;
         this.events = events;
         this.mapper = mapper;
@@ -154,11 +155,11 @@ public class GenerationResultApplier {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    emitted.forEach(stream::publish);
+                    emitted.forEach(e -> stream.publish(e.jobId(), e));
                 }
             });
         } else {
-            emitted.forEach(stream::publish);
+            emitted.forEach(e -> stream.publish(e.jobId(), e));
         }
     }
 }

@@ -21,6 +21,7 @@ import studio.aakar.api.design.DesignResponse;
 import studio.aakar.api.design.DesignVersionResponse;
 import studio.aakar.api.design.EditParamsRequest;
 import studio.aakar.api.pricing.PriceBreakdown;
+import studio.aakar.api.shared.Identity;
 
 @RestController
 @RequestMapping("/api")
@@ -38,9 +39,10 @@ class DesignController {
             Shop path: `catalog_item_slug` (template and defaults come from the item). \
             Remix-lite / direct path: `template_id` + optional `params`. \
             Create path: `prompt` → 422 `not_yet_available` until Phase 2. \
-            Returns 202 with the design and the first generation job; follow `events_url`.""")
-    ResponseEntity<DesignAccepted> create(@Valid @RequestBody CreateDesignRequest request) {
-        return ResponseEntity.status(HttpStatus.ACCEPTED).body(designs.create(request));
+            Returns 202 with the design and the first generation job; follow `events_url`. \
+            The design belongs to the bearer token's user or to the `X-Aakar-Guest` identity.""")
+    ResponseEntity<DesignAccepted> create(@Valid @RequestBody CreateDesignRequest request, Identity identity) {
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(designs.create(request, identity));
     }
 
     @GetMapping("/designs/{id}")

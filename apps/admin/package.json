@@ -1,0 +1,35 @@
+{
+  "name": "@aakar/admin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Aakar management portal (staff only): orders queue, stage advancement, pricing policies, materials, catalog, templates, messages log, audit (Next.js App Router).",
+  "scripts": {
+    "dev": "next dev -p 3100",
+    "build": "next build",
+    "start": "next start -p 3100",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "gen:api": "openapi-typescript ../../packages/contracts/openapi/aakar-admin.v1.yaml -o src/lib/api/schema.d.ts",
+    "mock:api": "node scripts/mock-admin-api.mjs 8080"
+  },
+  "dependencies": {
+    "@aakar/design-tokens": "workspace:*",
+    "next": "^15.5.26",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.7",
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^9",
+    "eslint-config-next": "^15.5.26",
+    "openapi-typescript": "^7.13.0",
+    "postcss": "^8.5",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^5.9"
+  }
+}

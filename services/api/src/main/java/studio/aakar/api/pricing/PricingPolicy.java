@@ -1,36 +1,41 @@
 package studio.aakar.api.pricing;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.Map;
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.validation.annotation.Validated;
 
 /**
- * Pricing inputs (PLAN §7.10), copied from {@code packages/design-tokens/materials.json → pricing_policy}.
- * Money is integer paise.
+ * Pricing inputs (PLAN §7.10, ADR-0008): one immutable, versioned policy. Stored as JSON in
+ * {@code pricing_policies}; the active version is served by {@link PricingPolicyStore}. Money is integer paise.
  */
-@Validated
-@ConfigurationProperties(prefix = "aakar.pricing")
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record PricingPolicy(
-        @NotBlank String version,
+        String version,
         long machineRatePaisePerHour,
-        @NotNull Map<String, Long> finishingFeePaise,
+        Map<String, Long> finishingFeePaise,
         long packagingFeePaise,
         double marginPct,
         int roundToRupeesEndingIn,
         long shippingFlatPaise,
         long freeShippingAbovePaise,
-        @NotBlank String shippingLabel) {
+        String shippingLabel) {
 
     public PricingPolicy {
         finishingFeePaise = finishingFeePaise == null ? Map.of() : Map.copyOf(finishingFeePaise);
         if (roundToRupeesEndingIn < 0 || roundToRupeesEndingIn > 9) {
-            throw new IllegalArgumentException("aakar.pricing.round-to-rupees-ending-in must be a digit 0-9");
+            throw new IllegalArgumentException("round_to_rupees_ending_in must be a digit 0-9");
+        }
+        if (version == null || version.isBlank()) {
+            throw new IllegalArgumentException("A pricing policy needs a version");
         }
     }
 
     public long finishingFeeFor(String finishClass) {
         return finishingFeePaise.getOrDefault(finishClass, 0L);
+    }
+
+    /** A copy of this policy under a new version label. */
+    public PricingPolicy withVersion(String newVersion) {
+        return new PricingPolicy(newVersion, machineRatePaisePerHour, finishingFeePaise, packagingFeePaise, marginPct,
+                roundToRupeesEndingIn, shippingFlatPaise, freeShippingAbovePaise, shippingLabel);
     }
 }

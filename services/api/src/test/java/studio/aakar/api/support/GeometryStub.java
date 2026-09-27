@@ -29,6 +29,8 @@ public final class GeometryStub {
     public static final int SLOW_BUILD_MS = 2500;
     /** Builds asking for this many cusps fail with {@code not_printable}. */
     public static final int FAILING_CUSPS = 7;
+    /** Builds asking for this many cusps succeed but the printability report has {@code passed: false}. */
+    public static final int UNSTABLE_CUSPS = 4;
 
     private GeometryStub() {
     }
@@ -53,6 +55,11 @@ public final class GeometryStub {
                 .atPriority(1)
                 .withRequestBody(matchingJsonPath("$.spec.params[?(@.arch_cusps == " + SLOW_BUILD_CUSPS + ")]"))
                 .willReturn(aResponse().withStatus(200).withFixedDelay(SLOW_BUILD_MS).withHeader("Content-Type", "application/json").withBody(completed)));
+        server.stubFor(post(urlEqualTo("/v1/build"))
+                .atPriority(1)
+                .withRequestBody(matchingJsonPath("$.spec.params[?(@.arch_cusps == " + UNSTABLE_CUSPS + ")]"))
+                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json")
+                        .withBody(completed.replace("\"passed\": true", "\"passed\": false"))));
         server.stubFor(post(urlEqualTo("/v1/build"))
                 .atPriority(1)
                 .withRequestBody(matchingJsonPath("$.spec.params[?(@.arch_cusps == " + FAILING_CUSPS + ")]"))

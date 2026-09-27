@@ -13,7 +13,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import studio.aakar.api.support.AbstractIntegrationTest;
 import studio.aakar.api.support.Contracts;
 
-/** {@code V3__seed_materials.sql} must not drift from {@code packages/design-tokens/materials.json}. */
+/**
+ * {@code V3__seed_materials.sql}, the {@code aakar.pricing} seed and the {@code V4__pricing_policies.sql} row must
+ * not drift from {@code packages/design-tokens/materials.json} (ADR-0008: the tokens file is the seed).
+ */
 class MaterialsSeedTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -54,30 +57,34 @@ class MaterialsSeedTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void pricingPolicyMatchesDesignTokens() {
+    void pricingPolicySeedMatchesDesignTokens() {
         Path file = Contracts.require(Contracts.designTokens("materials.json"));
         JsonNode policy = Contracts.readJson(file).get("pricing_policy");
         JsonNode api = body(get("/actuator/health"));
         assertThat(api.get("status").asText()).isEqualTo("UP");
 
-        var bound = calculatorPolicy();
-        assertThat(bound.version()).isEqualTo(policy.get("version").asText());
-        assertThat(bound.machineRatePaisePerHour()).isEqualTo(policy.get("machine_rate_paise_per_hour").asLong());
-        assertThat(bound.finishingFeeFor("matte")).isEqualTo(policy.get("finishing_fee_paise").get("matte").asLong());
-        assertThat(bound.finishingFeeFor("silk")).isEqualTo(policy.get("finishing_fee_paise").get("silk").asLong());
-        assertThat(bound.packagingFeePaise()).isEqualTo(policy.get("packaging_fee_paise").asLong());
-        assertThat(bound.marginPct()).isEqualTo(policy.get("margin_pct").asDouble());
-        assertThat(bound.roundToRupeesEndingIn()).isEqualTo(policy.get("round_to_rupees_ending_in").asInt());
-        assertThat(bound.shippingFlatPaise()).isEqualTo(policy.get("shipping_flat_paise").asLong());
-        assertThat(bound.freeShippingAbovePaise()).isEqualTo(policy.get("free_shipping_above_paise").asLong());
-        assertThat(bound.shippingLabel()).isEqualTo(policy.get("shipping_label").asText());
+        assertMatches("aakar.pricing", seed.toPolicy(), policy);
+        var seeded = policies.byVersion(policy.get("version").asText());
+        assertThat(seeded).as("V4 seed row for %s", policy.get("version").asText()).isPresent();
+        assertMatches("pricing_policies seed row", seeded.get(), policy);
     }
 
     @Autowired
-    studio.aakar.api.pricing.PricingPolicy pricingPolicy;
+    studio.aakar.api.pricing.PricingPolicyProperties seed;
+    @Autowired
+    studio.aakar.api.pricing.PricingPolicyStore policies;
 
-    private studio.aakar.api.pricing.PricingPolicy calculatorPolicy() {
-        return pricingPolicy;
+    private static void assertMatches(String what, studio.aakar.api.pricing.PricingPolicy bound, JsonNode policy) {
+        assertThat(bound.version()).as(what).isEqualTo(policy.get("version").asText());
+        assertThat(bound.machineRatePaisePerHour()).as(what).isEqualTo(policy.get("machine_rate_paise_per_hour").asLong());
+        assertThat(bound.finishingFeeFor("matte")).as(what).isEqualTo(policy.get("finishing_fee_paise").get("matte").asLong());
+        assertThat(bound.finishingFeeFor("silk")).as(what).isEqualTo(policy.get("finishing_fee_paise").get("silk").asLong());
+        assertThat(bound.packagingFeePaise()).as(what).isEqualTo(policy.get("packaging_fee_paise").asLong());
+        assertThat(bound.marginPct()).as(what).isEqualTo(policy.get("margin_pct").asDouble());
+        assertThat(bound.roundToRupeesEndingIn()).as(what).isEqualTo(policy.get("round_to_rupees_ending_in").asInt());
+        assertThat(bound.shippingFlatPaise()).as(what).isEqualTo(policy.get("shipping_flat_paise").asLong());
+        assertThat(bound.freeShippingAbovePaise()).as(what).isEqualTo(policy.get("free_shipping_above_paise").asLong());
+        assertThat(bound.shippingLabel()).as(what).isEqualTo(policy.get("shipping_label").asText());
     }
 
     private JsonNode readJson(String text) {

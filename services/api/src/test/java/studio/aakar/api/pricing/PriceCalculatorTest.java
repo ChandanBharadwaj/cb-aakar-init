@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Assumptions;
@@ -26,7 +27,7 @@ class PriceCalculatorTest {
     /** 84 g at 1.24 g/cm³ needs 67.74 cm³ of extruded filament (the 41.6 cm³ in the brief is the part's solid volume, not the extruded one). */
     static final PriceInputs.PrintEstimate BOARD_EXAMPLE = new PriceInputs.PrintEstimate(13_200, 67.74);
 
-    private final PriceCalculator calculator = new PriceCalculator(POLICY);
+    private final PriceCalculator calculator = new PriceCalculator(fixed(POLICY));
 
     @Test
     void boardExample_terracottaSilk_84g_3h40m_isRupees1249() {
@@ -94,7 +95,7 @@ class PriceCalculatorTest {
     @Test
     void shippingIsFreeAtExactlyTheThreshold() {
         PricingPolicy exact = new PricingPolicy("t", 20000, Map.of("silk", 12000L), 0, 0, 9, 7900, 124_900, "Shipping · Delhivery, 4 days");
-        PriceBreakdown price = new PriceCalculator(exact).price(BOARD_EXAMPLE, TERRACOTTA_SILK);
+        PriceBreakdown price = new PriceCalculator(fixed(exact)).price(BOARD_EXAMPLE, TERRACOTTA_SILK);
 
         assertThat(price.subtotalPaise()).isEqualTo(124_900);
         assertThat(price.shippingPaise()).isZero();
@@ -117,7 +118,7 @@ class PriceCalculatorTest {
     @Test
     void packagingLineOnlyWhenTheFeeIsPositive() {
         PricingPolicy withPackaging = new PricingPolicy("t", 20000, Map.of("silk", 12000L), 4900, 0, 9, 7900, 99900, "Shipping · Delhivery, 4 days");
-        PriceBreakdown price = new PriceCalculator(withPackaging).price(BOARD_EXAMPLE, TERRACOTTA_SILK);
+        PriceBreakdown price = new PriceCalculator(fixed(withPackaging)).price(BOARD_EXAMPLE, TERRACOTTA_SILK);
 
         assertThat(line(price, "packaging").amountPaise()).isEqualTo(4_900);
         assertThat(price.subtotalPaise()).isEqualTo(129_900); // 389 + 733 + 120 + 49 = 1291 → 1299
@@ -126,7 +127,7 @@ class PriceCalculatorTest {
     @Test
     void marginIsAppliedBeforeRounding() {
         PricingPolicy tenPercent = new PricingPolicy("t", 20000, Map.of("silk", 12000L), 0, 10, 9, 7900, 99900, "Shipping · Delhivery, 4 days");
-        PriceBreakdown price = new PriceCalculator(tenPercent).price(BOARD_EXAMPLE, TERRACOTTA_SILK);
+        PriceBreakdown price = new PriceCalculator(fixed(tenPercent)).price(BOARD_EXAMPLE, TERRACOTTA_SILK);
 
         assertThat(price.subtotalPaise()).isEqualTo(136_900); // 1242 × 1.1 = 1366.2 → 1369
     }
@@ -149,6 +150,44 @@ class PriceCalculatorTest {
         assertThat(Contracts.validate(schema, document)).isEmpty();
         assertThat(document.get("subtotal_paise").asLong()).isEqualTo(124_900);
         assertThat(document.get("lines").get(0).get("code").asText()).isEqualTo("material");
+    }
+
+    @Test
+    void shippingForACartSubtotalFollowsThePolicy() {
+        assertThat(PriceCalculator.shipping(99_900, POLICY)).isEqualTo(new PriceCalculator.Shipping(0, "Shipping · Delhivery, 4 days · Free"));
+        assertThat(PriceCalculator.shipping(99_800, POLICY)).isEqualTo(new PriceCalculator.Shipping(7_900, "Shipping · Delhivery, 4 days"));
+    }
+
+    @Test
+    void explicitPolicyOverridesTheStoresActiveOne() {
+        PricingPolicy other = POLICY.withVersion("2027-01-test");
+        assertThat(calculator.price(BOARD_EXAMPLE, TERRACOTTA_SILK, other).policyVersion()).isEqualTo("2027-01-test");
+        assertThat(calculator.price(BOARD_EXAMPLE, TERRACOTTA_SILK).policyVersion()).isEqualTo("2026-09-phase0");
+    }
+
+    /** A store pinned to one policy, for pure calculator tests. */
+    static PricingPolicyStore fixed(PricingPolicy policy) {
+        return new PricingPolicyStore() {
+            @Override
+            public PricingPolicy active() {
+                return policy;
+            }
+
+            @Override
+            public Optional<PricingPolicy> byVersion(String version) {
+                return policy.version().equals(version) ? Optional.of(policy) : Optional.empty();
+            }
+
+            @Override
+            public List<PricingPolicyInfo> history() {
+                return List.of();
+            }
+
+            @Override
+            public PricingPolicy publish(PricingPolicy p, String createdBy) {
+                throw new UnsupportedOperationException("fixed policy");
+            }
+        };
     }
 
     private static PriceBreakdown.Line line(PriceBreakdown price, String code) {

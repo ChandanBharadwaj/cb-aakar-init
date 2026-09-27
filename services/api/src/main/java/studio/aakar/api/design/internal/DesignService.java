@@ -3,6 +3,7 @@ package studio.aakar.api.design.internal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,10 +17,12 @@ import studio.aakar.api.design.DesignAccepted;
 import studio.aakar.api.design.DesignResponse;
 import studio.aakar.api.design.DesignSource;
 import studio.aakar.api.design.DesignVersionResponse;
+import studio.aakar.api.design.Designs;
 import studio.aakar.api.design.EditParamsRequest;
 import studio.aakar.api.design.VersionStatus;
 import studio.aakar.api.pricing.PriceBreakdown;
 import studio.aakar.api.shared.ApiProblemException;
+import studio.aakar.api.shared.Identity;
 import studio.aakar.api.shared.ProblemCodes;
 import studio.aakar.api.studio.GenerationJobs;
 import studio.aakar.api.studio.GenerationRequest;
@@ -27,7 +30,7 @@ import studio.aakar.api.templates.TemplateDescriptor;
 import studio.aakar.api.templates.Templates;
 
 @Service
-class DesignService {
+class DesignService implements Designs {
 
     static final String NOT_YET_AVAILABLE_DETAIL =
             "Create from a description arrives in Phase 2; start from a template or a Shop piece instead.";
@@ -51,7 +54,7 @@ class DesignService {
     }
 
     @Transactional
-    public DesignAccepted create(CreateDesignRequest request) {
+    public DesignAccepted create(CreateDesignRequest request, Identity owner) {
         if (request.hasPrompt()) {
             throw ApiProblemException.unprocessable(ProblemCodes.NOT_YET_AVAILABLE, "Not yet available", NOT_YET_AVAILABLE_DETAIL);
         }
@@ -60,13 +63,13 @@ class DesignService {
         requireMaterial(draft.descriptor(), draft.material(), HttpStatus.UNPROCESSABLE_ENTITY);
 
         Instant now = Instant.now();
-        DesignEntity design = designs.save(new DesignEntity(request.source(), draft.catalogItemSlug(), draft.title(), now));
+        DesignEntity design = designs.save(new DesignEntity(request.source(), draft.catalogItemSlug(), draft.title(), owner, now));
         Map<String, Object> spec = DesignSpecs.build(draft.descriptor(), draft.params(), draft.material());
         DesignVersionEntity version = versions.save(new DesignVersionEntity(design.id(), 1, null, spec,
                 DesignSpecs.templateRef(draft.descriptor()), DesignVersionEntity.CREATED_BY_USER, now));
         UUID jobId = jobs.start(new GenerationRequest(design.id(), version.id(), 1, null, spec));
         version.attachJob(jobId);
-        log.info("Design {} created from {} ({}); job {}", design.id(), request.source(), draft.descriptor().ref(), jobId);
+        log.info("Design {} created from {} ({}) by {}; job {}", design.id(), request.source(), draft.descriptor().ref(), owner, jobId);
         return new DesignAccepted(design.id(), 1, jobId, GenerationJobs.eventsPath(jobId));
     }
 
@@ -93,6 +96,29 @@ class DesignService {
         version.attachJob(jobId);
         design.touch(now);
         return new DesignAccepted(design.id(), versionNo, jobId, GenerationJobs.eventsPath(jobId));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<DesignResponse> find(UUID designId) {
+        return designs.findById(designId).map(design -> mapper.toResponse(design,
+                versions.findFirstByDesignIdOrderByVersionNoDesc(designId).orElse(null), versions.countByDesignId(designId)));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<DesignVersionResponse> findVersion(UUID versionId) {
+        return versions.findById(versionId).map(mapper::toResponse);
+    }
+
+    @Override
+    @Transactional
+    public int attachGuest(UUID guestId, UUID userId) {
+        int moved = designs.attachGuest(guestId, userId, Instant.now());
+        if (moved > 0) {
+            log.info("{} guest designs of {} now belong to user {}", moved, guestId, userId);
+        }
+        return moved;
     }
 
     @Transactional(readOnly = true)

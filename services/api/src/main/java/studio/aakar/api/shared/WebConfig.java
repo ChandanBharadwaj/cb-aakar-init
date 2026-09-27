@@ -5,10 +5,16 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
-import org.springframework.web.servlet.config.annotation.CorsRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-/** CORS for the Next.js storefront (dev origin {@code http://localhost:3000}, extend via {@code aakar.cors.allowed-origins}). */
+/**
+ * CORS for the Next.js storefront (dev origin {@code http://localhost:3000}, extend via
+ * {@code aakar.cors.allowed-origins}). The source is consumed by the Spring Security filter chain, so
+ * pre-flight requests are answered before authentication; {@code Authorization} and {@code X-Aakar-Guest}
+ * are explicitly allowed request headers.
+ */
 @Configuration
 public class WebConfig {
 
@@ -20,17 +26,16 @@ public class WebConfig {
     }
 
     @Bean
-    WebMvcConfigurer corsConfigurer(CorsProperties cors) {
-        return new WebMvcConfigurer() {
-            @Override
-            public void addCorsMappings(CorsRegistry registry) {
-                registry.addMapping("/api/**")
-                        .allowedOrigins(cors.allowedOrigins().toArray(String[]::new))
-                        .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
-                        .allowedHeaders("*")
-                        .exposedHeaders(HttpHeaders.LOCATION, "Last-Event-ID")
-                        .maxAge(3600);
-            }
-        };
+    CorsConfigurationSource corsConfigurationSource(CorsProperties cors) {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(cors.allowedOrigins());
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of(HttpHeaders.AUTHORIZATION, Identity.GUEST_HEADER, HttpHeaders.CONTENT_TYPE,
+                HttpHeaders.ACCEPT, HttpHeaders.CACHE_CONTROL, "Last-Event-ID", "X-Requested-With"));
+        config.setExposedHeaders(List.of(HttpHeaders.LOCATION, "Last-Event-ID"));
+        config.setMaxAge(3600L);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/api/**", config);
+        return source;
     }
 }

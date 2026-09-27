@@ -15,7 +15,8 @@ import org.springframework.stereotype.Component;
  * shipping = 0 when subtotal ≥ free_shipping_above, else the flat rate
  * total    = subtotal + shipping
  * </pre>
- * Every line is rounded to a whole rupee. Pure and deterministic; the same inputs always price the same.
+ * Every line is rounded to a whole rupee. Pure and deterministic given a policy; the two-argument
+ * {@link #price(PriceInputs.PrintEstimate, PriceInputs.Material)} uses the store's active policy (ADR-0008).
  */
 @Component
 public class PriceCalculator {
@@ -23,17 +24,22 @@ public class PriceCalculator {
     static final String CURRENCY = "INR";
     private static final long PAISE_PER_RUPEE = 100;
 
-    private final PricingPolicy policy;
+    private final PricingPolicyStore policies;
 
-    public PriceCalculator(PricingPolicy policy) {
-        this.policy = policy;
+    public PriceCalculator(PricingPolicyStore policies) {
+        this.policies = policies;
     }
 
+    /** The policy every new price is computed with. */
     public PricingPolicy policy() {
-        return policy;
+        return policies.active();
     }
 
     public PriceBreakdown price(PriceInputs.PrintEstimate estimate, PriceInputs.Material material) {
+        return price(estimate, material, policies.active());
+    }
+
+    public PriceBreakdown price(PriceInputs.PrintEstimate estimate, PriceInputs.Material material, PricingPolicy policy) {
         double massG = estimate.extrudedVolumeCm3() * material.densityGCm3();
         long materialPaise = wholeRupees(massG * material.ratePerGPaise());
         long machinePaise = wholeRupees(estimate.printSeconds() / 3600.0 * policy.machineRatePaisePerHour());
@@ -52,12 +58,20 @@ public class PriceCalculator {
         long sum = lines.stream().mapToLong(PriceBreakdown.Line::amountPaise).sum();
         double withMargin = sum * (1 + policy.marginPct() / 100.0);
         long subtotal = roundUpToRupeeEndingIn(withMargin, policy.roundToRupeesEndingIn());
-        boolean freeShipping = subtotal >= policy.freeShippingAbovePaise();
-        long shipping = freeShipping ? 0 : policy.shippingFlatPaise();
-        String shippingLabel = freeShipping ? policy.shippingLabel() + " · Free" : policy.shippingLabel();
+        Shipping shipping = shipping(subtotal, policy);
 
         return new PriceBreakdown(CURRENCY, material.id(), round2(massG), estimate.printSeconds(), List.copyOf(lines),
-                subtotal, shipping, shippingLabel, subtotal + shipping, policy.version());
+                subtotal, shipping.paise(), shipping.label(), subtotal + shipping.paise(), policy.version());
+    }
+
+    /** Shipping for an order subtotal: free at or above the policy threshold, otherwise the flat rate. */
+    public static Shipping shipping(long subtotalPaise, PricingPolicy policy) {
+        boolean free = subtotalPaise >= policy.freeShippingAbovePaise();
+        return new Shipping(free ? 0 : policy.shippingFlatPaise(), free ? policy.shippingLabel() + " · Free" : policy.shippingLabel());
+    }
+
+    /** Shipping charge and its customer-facing label. */
+    public record Shipping(long paise, String label) {
     }
 
     /** Nearest whole rupee, as paise. */

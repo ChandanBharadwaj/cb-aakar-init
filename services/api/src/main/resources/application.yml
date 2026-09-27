@@ -55,14 +55,38 @@ springdoc:
     tags-sorter: alpha
 
 aakar:
+  # `local` (default) or `production`. In production the startup guard refuses every mock adapter below,
+  # the exposed OTP dev code and the default JWT secret (ADR-0013).
+  profile: ${AAKAR_PROFILE:local}
   geometry:
     url: ${AAKAR_GEOMETRY_URL:http://localhost:8081}
   api:
     public-url: ${AAKAR_API_PUBLIC_URL:http://localhost:8080}
+  web:
+    # The storefront; the mock gateway's pay_url points at {web.url}/checkout/pay/{paymentId}.
+    url: ${AAKAR_WEB_URL:http://localhost:3000}
   cors:
     allowed-origins:
       - http://localhost:3000
-  # PLAN §7.10 · copied from packages/design-tokens/materials.json → pricing_policy
+  identity:
+    # HS256 key, at least 32 characters. The default is a dev-only string.
+    jwt-secret: ${AAKAR_JWT_SECRET:aakar-local-dev-secret-do-not-use-in-production-0123456789}
+    token-ttl: ${AAKAR_TOKEN_TTL:7d}
+    otp:
+      sender: ${AAKAR_OTP_SENDER:mock}            # mock logs the code; a real SMS sender is a drop-in OtpSender
+      expose-dev-code: ${AAKAR_OTP_EXPOSE_DEV_CODE:true}   # return the code as dev_code (never in production)
+      ttl: 5m
+      max-requests-per-window: 5
+      window: 15m
+      max-attempts: 5
+  payments:
+    gateway: ${AAKAR_PAYMENTS_GATEWAY:mock}       # mock | razorpay (later)
+  shipping:
+    carrier: ${AAKAR_SHIPPING_CARRIER:mock}       # mock | delhivery (later)
+  messaging:
+    sender: ${AAKAR_MESSAGING_SENDER:log}         # log | whatsapp (later)
+  # PLAN §7.10 · the SEED pricing policy (ADR-0008): V4__pricing_policies.sql inserts the same values as the
+  # first active row; from then on the active policy lives in the pricing_policies table.
   pricing:
     version: 2026-09-phase0
     machine-rate-paise-per-hour: 20000

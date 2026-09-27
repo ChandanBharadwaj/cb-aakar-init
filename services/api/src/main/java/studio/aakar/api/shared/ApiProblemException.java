@@ -47,6 +47,20 @@ public class ApiProblemException extends RuntimeException {
         return new ApiProblemException(HttpStatus.CONFLICT, code, title, detail);
     }
 
+    /** 401 {@code unauthenticated}: no usable bearer token (or guest header) on a request that needs one. */
+    public static ApiProblemException unauthenticated(String detail) {
+        return new ApiProblemException(HttpStatus.UNAUTHORIZED, ProblemCodes.UNAUTHENTICATED, "Unauthenticated", detail);
+    }
+
+    /** 401 with a domain code, e.g. {@code otp_invalid}. */
+    public static ApiProblemException unauthorized(String code, String title, String detail) {
+        return new ApiProblemException(HttpStatus.UNAUTHORIZED, code, title, detail);
+    }
+
+    public static ApiProblemException tooManyRequests(String code, String title, String detail) {
+        return new ApiProblemException(HttpStatus.TOO_MANY_REQUESTS, code, title, detail);
+    }
+
     public HttpStatus status() {
         return status;
     }

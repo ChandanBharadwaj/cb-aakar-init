@@ -11,6 +11,7 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
 import studio.aakar.api.design.DesignSource;
+import studio.aakar.api.shared.Identity;
 
 @Entity
 @Table(name = "designs")
@@ -21,6 +22,8 @@ class DesignEntity {
     private UUID id;
     @Column(name = "owner_id")
     private UUID ownerId;
+    @Column(name = "guest_id")
+    private UUID guestId;
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private DesignSource source;
@@ -36,8 +39,10 @@ class DesignEntity {
     protected DesignEntity() {
     }
 
-    DesignEntity(DesignSource source, String catalogItemSlug, String title, Instant now) {
+    DesignEntity(DesignSource source, String catalogItemSlug, String title, Identity owner, Instant now) {
         this.source = source;
+        this.ownerId = owner.isUser() ? owner.id() : null;
+        this.guestId = owner.isGuest() ? owner.id() : null;
         this.catalogItemSlug = catalogItemSlug;
         this.title = title;
         this.createdAt = now;
@@ -46,6 +51,14 @@ class DesignEntity {
 
     UUID id() {
         return id;
+    }
+
+    UUID ownerId() {
+        return ownerId;
+    }
+
+    UUID guestId() {
+        return guestId;
     }
 
     DesignSource source() {
