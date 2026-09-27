@@ -110,7 +110,7 @@
           "items": { "type": "string", "enum": ["emboss_text", "motif", "relief_image", "hero_mesh"] },
           "description": "Feature types allowed on this anchor; defaults to the template's features_supported."
         },
-        "max_relief_mm": { "type": "number", "exclusiveMinimum": 0, "description": "Cap for relief_image.relief_mm and emboss depth on this anchor." }
+        "max_relief_mm": { "type": "number", "exclusiveMinimum": 0, "description": "Cap for relief_image.relief_mm (emboss and deboss) and emboss depth on this anchor. relief_image in lithophane mode is exempt: the plate itself is the relief and the template's lithophane hook owns its thickness range." }
       }
     }
   }
