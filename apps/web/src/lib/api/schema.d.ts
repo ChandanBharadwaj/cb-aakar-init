@@ -369,6 +369,87 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/motifs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The Buti motif library (packages/design-tokens/motifs/index.json) with preview URLs
+         * @description Motifs a customer can place with a `motif` feature. `min_scale` is the smallest scale that still prints
+         *     (strokes and openings stay at least 0.8 mm); scale 1 fills the anchor's spot. Preview artwork is served at
+         *     `svg_url`.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Motifs */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Motif"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/motifs/{id}.svg": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Motif artwork (single-path SVG) for previews */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description SVG */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/svg+xml": string;
+                    };
+                };
+                /** @description unknown_motif */
+                404: components["responses"]["Problem"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/templates": {
         parameters: {
             query?: never;
@@ -2144,6 +2225,17 @@ export interface components {
                 sheen_color?: string;
             };
         };
+        Motif: {
+            /** @description motif_id for a motif feature, e.g. paisley */
+            id: string;
+            /** @description Plain name shown with the Buti label, e.g. Paisley */
+            label: string;
+            tags: string[];
+            /** @description Smallest scale that still prints (strokes and openings at least 0.8 mm) */
+            min_scale: number;
+            /** @description Browser URL of the motif artwork */
+            svg_url: string;
+        };
         Shelf: {
             id: string;
             label: string;
@@ -2580,7 +2672,10 @@ export interface components {
             type: "motif";
             motif_id: string;
             anchor: string;
-            /** @default 1 */
+            /**
+             * @description 1 fills the anchor's spot; smaller scales shrink the motif, down to the library's min_scale for that motif.
+             * @default 1
+             */
             scale: number;
             /** @default 1 */
             depth_mm: number;
@@ -2806,7 +2901,10 @@ export interface components {
                     type: "motif";
                     motif_id: string;
                     anchor: string;
-                    /** @default 1 */
+                    /**
+                     * @description 1 fills the anchor's spot; smaller scales shrink the motif, down to the library's min_scale for that motif.
+                     * @default 1
+                     */
                     scale: number;
                     /** @default 1 */
                     depth_mm: number;

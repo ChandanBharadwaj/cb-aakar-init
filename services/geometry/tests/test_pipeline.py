@@ -59,7 +59,9 @@ def test_glb_asset_reloads_y_up_metres(generate_request, local_storage):
         (lambda s: s.update(features=[{"type": "emboss_text", "text": "Asha आशा", "anchor": "back"}]), "invalid_spec"),
         (lambda s: s.update(features=[{"type": "emboss_text", "text": "Asha", "anchor": "side_left", "height_mm": 30}]), "param_out_of_range"),
         (lambda s: s.update(features=[{"type": "motif", "motif_id": "warli_dancers_01", "anchor": "back"}]), "invalid_spec"),
-        (lambda s: s.update(features=[{"type": "motif", "motif_id": "lotus", "anchor": "back", "scale": 2}]), "param_out_of_range"),
+        # beyond the contract (scale ≤ 1) is an invalid spec; inside it but under the motif's min_scale is out of range
+        (lambda s: s.update(features=[{"type": "motif", "motif_id": "lotus", "anchor": "back", "scale": 2}]), "invalid_spec"),
+        (lambda s: s.update(features=[{"type": "motif", "motif_id": "lotus", "anchor": "back", "scale": 0.21}]), "param_out_of_range"),
         (lambda s: s.update(style="jaipur_heritage"), "unsupported_feature"),
         (lambda s: s.update(family="table_lamp"), "invalid_spec"),
         (lambda s: s.update(material="gold_leaf"), "invalid_spec"),

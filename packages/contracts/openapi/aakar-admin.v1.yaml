@@ -391,6 +391,12 @@ paths:
         '200': { description: Decided, content: { application/json: { schema: { $ref: '#/components/schemas/AdminUpload' } } } }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { description: review_already_decided, $ref: '#/components/responses/Problem' }
+  /admin/api/motifs:
+    get:
+      summary: The Buti motif library, for experience motif packs and template previews
+      tags: [motifs]
+      responses:
+        '200': { description: Motifs, content: { application/json: { schema: { type: array, items: { $ref: 'aakar-api.v1.yaml#/components/schemas/Motif' } } } } }
   /admin/api/templates:
     get:
       summary: Templates known to the geometry service with their live flag

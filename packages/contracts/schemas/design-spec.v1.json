@@ -134,7 +134,7 @@
         "type": { "const": "motif" },
         "motif_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
         "anchor": { "type": "string" },
-        "scale": { "type": "number", "minimum": 0.2, "maximum": 3, "default": 1 },
+        "scale": { "type": "number", "minimum": 0.2, "maximum": 1, "default": 1, "description": "1 fills the anchor's spot; smaller scales shrink the motif, down to the library's min_scale for that motif." },
         "depth_mm": { "type": "number", "minimum": 0.4, "maximum": 3, "default": 1.0 },
         "mode": { "type": "string", "enum": ["emboss", "deboss"], "default": "deboss" }
       }

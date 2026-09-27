@@ -129,6 +129,28 @@ paths:
           content:
             application/json:
               schema: { type: array, items: { $ref: '#/components/schemas/Environment' } }
+  /api/motifs:
+    get:
+      summary: The Buti motif library (packages/design-tokens/motifs/index.json) with preview URLs
+      description: |
+        Motifs a customer can place with a `motif` feature. `min_scale` is the smallest scale that still prints
+        (strokes and openings stay at least 0.8 mm); scale 1 fills the anchor's spot. Preview artwork is served at
+        `svg_url`.
+      tags: [motifs]
+      responses:
+        '200':
+          description: Motifs
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Motif' } }
+  /api/motifs/{id}.svg:
+    get:
+      summary: Motif artwork (single-path SVG) for previews
+      tags: [motifs]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: SVG, content: { image/svg+xml: { schema: { type: string } } } }
+        '404': { description: unknown_motif, $ref: '#/components/responses/Problem' }
   /api/templates:
     get:
       summary: Template descriptors (cached from the geometry service)
@@ -860,6 +882,15 @@ components:
             clearcoat_roughness: { type: number }
             sheen: { type: number }
             sheen_color: { type: string }
+    Motif:
+      type: object
+      required: [id, label, tags, min_scale, svg_url]
+      properties:
+        id: { type: string, description: "motif_id for a motif feature, e.g. paisley" }
+        label: { type: string, description: "Plain name shown with the Buti label, e.g. Paisley" }
+        tags: { type: array, items: { type: string } }
+        min_scale: { type: number, description: "Smallest scale that still prints (strokes and openings at least 0.8 mm)" }
+        svg_url: { type: string, description: Browser URL of the motif artwork }
     Shelf:
       type: object
       required: [id, label, sort_order]

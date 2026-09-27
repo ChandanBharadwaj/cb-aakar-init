@@ -1270,6 +1270,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/api/motifs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The Buti motif library, for experience motif packs and template previews */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Motifs */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Motif"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/api/templates": {
         parameters: {
             query?: never;
@@ -2007,6 +2043,17 @@ export interface components {
             message?: string | null;
             /** Format: date-time */
             created_at: string;
+        };
+        Motif: {
+            /** @description motif_id for a motif feature, e.g. paisley */
+            id: string;
+            /** @description Plain name shown with the Buti label, e.g. Paisley */
+            label: string;
+            tags: string[];
+            /** @description Smallest scale that still prints (strokes and openings at least 0.8 mm) */
+            min_scale: number;
+            /** @description Browser URL of the motif artwork */
+            svg_url: string;
         };
         HardwareRef: {
             sku: string;
