@@ -171,7 +171,7 @@ paths:
         '401': { description: No known identity (neither a signed-in user nor a guest header), $ref: '#/components/responses/Problem' }
         '413': { description: payload_too_large, $ref: '#/components/responses/Problem' }
         '415': { description: Not a multipart request, $ref: '#/components/responses/Problem' }
-        '422': { description: unsupported_format, or upload_rejected when the scanner refuses the file outright, $ref: '#/components/responses/Problem' }
+        '422': { description: "unsupported_format, or upload_rejected when the scanner refuses the file outright, $ref: '#/components/responses/Problem'" }
   /api/uploads/{id}:
     get:
       tags: [uploads]
@@ -829,7 +829,7 @@ components:
         available: { type: boolean, description: "False until the item's template exists in the geometry service; the Shop shows a 'Coming soon' ribbon and POST /api/designs answers 422 template_not_available." }
         name: { type: string }
         category: { type: string, description: A shelf id from GET /api/catalog/shelves }
-        family_id: { type: [string, 'null'], description: Outcome family (Avatar) of the item's template, when known }
+        family_id: { type: [string, 'null'], description: "Outcome family (Avatar) of the item's template, when known" }
         description: { type: string }
         template_id: { type: string }
         default_params: { type: object, additionalProperties: true }
@@ -873,15 +873,15 @@ components:
       properties:
         sku: { type: string }
         qty: { type: integer }
-        name: { type: string, description: Customer-facing hardware name, filled by the API from hardware_items }
+        name: { type: string, description: "Customer-facing hardware name, filled by the API from hardware_items" }
     Family:
       type: object
       description: An outcome category (Avatar). Same fields as schemas/template-family.v1.json#/$defs/family plus read-only state.
       required: [id, codename, name, kind, tier, shelf, default_template_id, shape_tolerance, content_slot, available, ready, templates]
       properties:
         id: { type: string }
-        codename: { type: string, description: Brand name shown to customers, e.g. Saathi }
-        name: { type: string, description: Plain descriptor always shown with the codename, e.g. Keychain & bag charm }
+        codename: { type: string, description: "Brand name shown to customers, e.g. Saathi" }
+        name: { type: string, description: "Plain descriptor always shown with the codename, e.g. Keychain & bag charm" }
         tagline: { type: string }
         description: { type: string }
         kind: { type: string, enum: [carrier, object, raw] }

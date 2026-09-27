@@ -58,7 +58,7 @@ paths:
                   orders_today: { type: integer }
                   revenue_today_paise: { type: integer }
                   revenue_month_paise: { type: integer }
-                  awaiting_action: { type: integer, description: Orders in queued, finishing or qc that need a staff step }
+                  awaiting_action: { type: integer, description: "Orders in queued, finishing or qc that need a staff step" }
   /admin/api/orders:
     get:
       summary: Orders queue
@@ -199,7 +199,7 @@ paths:
                 material: { type: string }
                 extruded_volume_cm3: { type: number }
                 print_seconds: { type: integer }
-                family_id: { type: string, description: Applies the family's hardware default, setup fee and minimum }
+                family_id: { type: string, description: "Applies the family's hardware default, setup fee and minimum" }
       responses:
         '200': { description: Breakdown, content: { application/json: { schema: { $ref: '../schemas/price-breakdown.v1.json' } } } }
         '422': { $ref: '#/components/responses/Problem' }
@@ -555,7 +555,7 @@ components:
             additionalProperties: false
             properties:
               minimum_subtotal_paise: { type: integer, minimum: 0, description: Lifts the subtotal to at least this (rounded to the policy ending) }
-              setup_fee_paise: { type: integer, minimum: 0, description: Studio setup line, e.g. repair and orientation labour for raw prints }
+              setup_fee_paise: { type: integer, minimum: 0, description: "Studio setup line, e.g. repair and orientation labour for raw prints" }
               qty_breaks:
                 type: array
                 items:

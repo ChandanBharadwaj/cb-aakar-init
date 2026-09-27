@@ -494,8 +494,13 @@ export interface paths {
                 413: components["responses"]["Problem"];
                 /** @description Not a multipart request */
                 415: components["responses"]["Problem"];
-                /** @description unsupported_format */
-                422: components["responses"]["Problem"];
+                /** @description unsupported_format, or upload_rejected when the scanner refuses the file outright, $ref: '#/components/responses/Problem' */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
             };
         };
         delete?: never;
@@ -2101,7 +2106,7 @@ export interface components {
             name: string;
             /** @description A shelf id from GET /api/catalog/shelves */
             category: string;
-            /** @description Outcome family (Avatar) of the item's template */
+            /** @description Outcome family (Avatar) of the item's template, when known */
             family_id?: string | null;
             description?: string;
             template_id: string;
@@ -2147,15 +2152,15 @@ export interface components {
         HardwareRef: {
             sku: string;
             qty: number;
-            /** @description Customer-facing hardware name */
+            /** @description Customer-facing hardware name, filled by the API from hardware_items */
             name?: string;
         };
         /** @description An outcome category (Avatar). Same fields as schemas/template-family.v1.json#/$defs/family plus read-only state. */
         Family: {
             id: string;
-            /** @description Brand name shown to customers */
+            /** @description Brand name shown to customers, e.g. Saathi */
             codename: string;
-            /** @description Plain descriptor always shown with the codename */
+            /** @description Plain descriptor always shown with the codename, e.g. Keychain & bag charm */
             name: string;
             tagline?: string;
             description?: string;

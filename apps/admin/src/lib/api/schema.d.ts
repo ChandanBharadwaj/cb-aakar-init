@@ -115,7 +115,7 @@ export interface paths {
                             orders_today: number;
                             revenue_today_paise: number;
                             revenue_month_paise: number;
-                            /** @description Orders in queued */
+                            /** @description Orders in queued, finishing or qc that need a staff step */
                             awaiting_action: number;
                         };
                     };
@@ -534,7 +534,7 @@ export interface paths {
                         material: string;
                         extruded_volume_cm3: number;
                         print_seconds: number;
-                        /** @description Applies the family's hardware default */
+                        /** @description Applies the family's hardware default, setup fee and minimum */
                         family_id?: string;
                     };
                 };
@@ -1524,7 +1524,7 @@ export interface components {
                 [key: string]: {
                     /** @description Lifts the subtotal to at least this (rounded to the policy ending) */
                     minimum_subtotal_paise?: number;
-                    /** @description Studio setup line */
+                    /** @description Studio setup line, e.g. repair and orientation labour for raw prints */
                     setup_fee_paise?: number;
                     qty_breaks?: {
                         min_qty: number;
@@ -1927,7 +1927,7 @@ export interface components {
             name: string;
             /** @description A shelf id from GET /api/catalog/shelves */
             category: string;
-            /** @description Outcome family (Avatar) of the item's template */
+            /** @description Outcome family (Avatar) of the item's template, when known */
             family_id?: string | null;
             description?: string;
             template_id: string;
@@ -2011,7 +2011,7 @@ export interface components {
         HardwareRef: {
             sku: string;
             qty: number;
-            /** @description Customer-facing hardware name */
+            /** @description Customer-facing hardware name, filled by the API from hardware_items */
             name?: string;
         };
     };
