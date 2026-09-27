@@ -18,7 +18,7 @@ import studio.aakar.api.shared.ProblemCodes;
 import studio.aakar.api.shared.ProblemResponses;
 
 /**
- * Stateless resource-server style chain. Public: catalog, templates, designs (unguessable ids), versions,
+ * Stateless resource-server style chain. Public: catalog (items, shelves, materials), families, templates, designs (unguessable ids), versions,
  * jobs, cart (guest or user), auth, shipping serviceability, the geometry callback, actuator and docs.
  * Signed-in only: profile, addresses, checkout, orders, payments. Unauthenticated calls to those answer
  * 401 {@code unauthenticated} as Problem Details. Unknown routes stay public so they 404 like before.
@@ -35,9 +35,9 @@ class SecurityConfig {
         "/api/auth/me", "/api/auth/logout", "/api/me/**", "/api/checkout", "/api/orders/**", "/api/payments/**"
     };
     static final String[] PUBLIC = {
-        "/api/catalog/**", "/api/templates/**", "/api/designs/**", "/api/versions/**", "/api/jobs/**", "/api/cart/**",
-        "/api/auth/**", "/api/shipping/**", "/internal/**", "/media/**", "/actuator/**", "/swagger-ui/**", "/swagger-ui.html",
-        "/v3/api-docs/**", "/error"
+        "/api/catalog/**", "/api/families/**", "/api/templates/**", "/api/designs/**", "/api/versions/**", "/api/jobs/**",
+        "/api/cart/**", "/api/auth/**", "/api/shipping/**", "/internal/**", "/media/**", "/actuator/**", "/swagger-ui/**",
+        "/swagger-ui.html", "/v3/api-docs/**", "/error"
     };
 
     /**

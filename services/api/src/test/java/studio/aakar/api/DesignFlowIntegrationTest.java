@@ -66,12 +66,12 @@ class DesignFlowIntegrationTest extends AbstractIntegrationTest {
     @Test
     void templatesComeFromTheGeometryService() {
         JsonNode all = body(get("/api/templates"));
-        assertThat(all).singleElement().satisfies(d -> {
-            assertThat(d.get("id").asText()).isEqualTo("jharokha_phone_stand");
-            assertThat(d.get("params").get("width_mm").get("default").asInt()).isEqualTo(92);
-            assertThat(d.get("anchors")).hasSize(3);
-            assertThat(d.get("constraints").get("bed_mm")).hasSize(3);
-        });
+        // the stub publishes the Jharokha stand plus the first carrier (keychain_tag) and the raw-print template
+        assertThat(all).extracting(d -> d.get("id").asText()).containsExactly("jharokha_phone_stand", "keychain_tag", "raw_print");
+        JsonNode d = all.get(0);
+        assertThat(d.get("params").get("width_mm").get("default").asInt()).isEqualTo(92);
+        assertThat(d.get("anchors")).hasSize(3);
+        assertThat(d.get("constraints").get("bed_mm")).hasSize(3);
         assertThat(body(get("/api/templates/jharokha_phone_stand")).get("family").asText()).isEqualTo("phone_stand");
         assertProblem(get("/api/templates/nope"), HttpStatus.NOT_FOUND, "not_found");
     }

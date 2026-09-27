@@ -36,6 +36,13 @@ public final class ProblemCodes {
     public static final String PAYLOAD_TOO_LARGE = "payload_too_large";
     public static final String RATE_LIMITED = "rate_limited";
 
+    // Outcome families (Avatars), shelves and bought-in hardware (docs/research/outcome-categories/implementation-plan.md §1)
+    public static final String UNKNOWN_FAMILY = "unknown_family";
+    public static final String FAMILY_NOT_AVAILABLE = "family_not_available";
+    public static final String FAMILY_EXISTS = "family_exists";
+    public static final String HARDWARE_EXISTS = "hardware_exists";
+    public static final String UNKNOWN_HARDWARE = "unknown_hardware";
+
     private ProblemCodes() {
     }
 }

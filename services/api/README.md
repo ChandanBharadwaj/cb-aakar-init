@@ -20,7 +20,8 @@ cd services/api
 ```
 
 Needs a PostgreSQL 16 with database `aakar` (user/password `aakar`) — `docker compose -f infra/docker-compose.yml up postgres`
-or a local server. Flyway creates the schema and seeds the six Shop items, six materials and the first pricing policy on start.
+or a local server. Flyway creates the schema and seeds the six Shop items on their six shelves, six materials, the 25 outcome
+families (Avatars) with their seven bought-in hardware items, and the pricing policy on start.
 Point `AAKAR_GEOMETRY_URL` at a running geometry service (`services/geometry`, default `http://localhost:8081`);
 the catalog, sign-in, cart, addresses, serviceability and everything except templates/generation works without it.
 
@@ -96,11 +97,12 @@ curl -s -OJ $API/admin/api/orders/<order_id>/packaging-card.pdf -H "$STAFF"     
 
 Integration tests run against a real PostgreSQL database **`aakar_test`** (no Docker/Testcontainers):
 the schema is dropped and re-migrated when the test context starts (`TestFlywayConfig`). The geometry
-service is stubbed with WireMock (`support/GeometryStub`): one `jharokha_phone_stand` descriptor and a
-`POST /v1/build` that answers with `packages/contracts/examples/design.completed.example.json`
+service is stubbed with WireMock (`support/GeometryStub`): three descriptors from `fixtures/templates.json`
+(`jharokha_phone_stand`, the first carrier `keychain_tag` with surface anchors and a split ring, and `raw_print` with a
+volume anchor) and a `POST /v1/build` that answers with `packages/contracts/examples/design.completed.example.json`
 (ids rewritten from the request; `arch_cusps` 3 = slow build, 4 = ready but `printability.passed=false`, 7 = failed build).
-Tests that read monorepo files (`packages/contracts`, `packages/design-tokens/materials.json`) skip with a message
-when those files are missing; `-Daakar.repo.root=…` overrides the monorepo location.
+Tests that read monorepo files (`packages/contracts`, `packages/design-tokens/materials.json` and `families.json`) skip with
+a message when those files are missing; `-Daakar.repo.root=…` overrides the monorepo location.
 
 | Test | Covers |
 |---|---|
@@ -122,7 +124,10 @@ when those files are missing; `-Daakar.repo.root=…` overrides the monorepo loc
 | `AdminLoopIntegrationTest` | Management API (ADR-0012): seeded owner sign-in, staff vs customer tokens (401 both ways), dashboard, queue filters and `next_actions`, queued → delivered with events, messages (`printing_timelapse`, `shipped`, `delivered`) and audit, print pack zip (WireMock serves the model files), QC photo upload (+ 413), packaging card 409 → `%PDF` and the share code, pricing publish (409 / 422) and preview, materials (hidden from the storefront), catalog, template live switch (422 `template_not_available`), messages and audit pages, `studio` role 403 on configuration |
 | `admin/internal/StaffTokensTest` · `identity/internal/JwtTokensTest` | Staff tokens are `typ: staff`; the customer parser refuses them and the staff parser refuses customer tokens |
 | `admin/internal/StaffPrincipalTest` · `DashboardServiceTest` · `PrintSheetTest` · `PrintPackTest` · `ShareCodesTest` · `PackagingCardTest` | Owner-only gating (403), studio-day windows and `awaiting_action`, print-sheet text, zip contents and missing-file notes, 8-char base32 codes with collision retry, PDF bytes start with `%PDF` |
-| `MaterialsSeedTest` | `V3__seed_materials.sql`, `aakar.pricing` and the `V4` policy row match `packages/design-tokens/materials.json` |
+| `MaterialsSeedTest` | `V3__seed_materials.sql`, `aakar.pricing` (incl. `hardware_markup_pct`, `family_rules`) and the seeded policy row (`2026-10-carriers`, `V9`) match `packages/design-tokens/materials.json`; the `V4` row reads back without rules |
+| `FamiliesSeedTest` | `V9__families_hardware_uploads.sql`: `shelves`, `hardware_items`, every `template_families` row (JSONB columns included) and the Shop items' `family_id` backfill match `packages/design-tokens/families.json` |
+| `CatalogFamiliesIntegrationTest` | Shelves in order (storefront and portal), `GET /api/families` lists only available + ready families (`kind` filter, 400), family detail with hardware names and live descriptors (anchor `kind`/`size_mm`/`bounds_mm`/`accepts`, `hardware`, `min_feature_mm` round-trip; old fixtures unchanged), unavailable families resolve by id but are flagged, 404 `unknown_family`, responses validate against `template-family.v1.json` and `template-descriptor.v1.json`, Shop items refuse an unknown shelf (422 listing the shelves) and an unknown family (422 `unknown_family`) |
+| `AdminFamiliesIntegrationTest` | Owner creates and updates hardware and families (201/200; 409 `hardware_exists` / `family_exists`; 422 for an unknown shelf, hardware SKU or allowed material, a `min > max` envelope, bad enums), the path id wins on PUT, an available family without a live template stays off the storefront, pricing preview / publish `family_id` and `family_rules` checks, `studio` role 403, audit `family.create|update` and `hardware.create|update` with before/after |
 
 ## Identity
 
@@ -162,7 +167,7 @@ before the customer chain); `GET /admin/api/auth/me` returns the account. Furthe
 (no endpoint yet).
 
 **Roles.** `owner` may do everything; `studio` runs fulfilment (orders, advance, print pack, QC photos, packaging card,
-preview) and reads configuration — writes to pricing, materials, catalog and templates answer 403 `forbidden`.
+preview) and reads configuration — writes to pricing, materials, catalog, families, hardware and templates answer 403 `forbidden`.
 
 **Endpoints.**
 
@@ -177,20 +182,26 @@ preview) and reads configuration — writes to pricing, materials, catalog and t
 | GET | `/admin/api/orders/{orderId}/print-pack` | `application/zip`, `Content-Disposition: attachment; filename="AK-000001-print-pack.zip"`; per item `item-<n>/print-sheet.txt` + `model.3mf` + `model.stl` |
 | POST | `/admin/api/orders/{orderId}/qc-photos` | multipart `file` (≤ 10 MB, else 413 `payload_too_large`) + `note` → 201 `MediaAsset`; audit `order.qc_photo` |
 | GET | `/admin/api/orders/{orderId}/packaging-card.pdf` | One-page A6 PDF; 409 `order_not_packed` before `packed` |
-| GET · POST | `/admin/api/pricing/policies` | History (newest first, with policy body and note); publish `{version, policy, note?}` → 201 (owner; 409 `policy_version_exists`, 422 `validation_failed`); audit `pricing.publish` (before = previous active) |
+| GET · POST | `/admin/api/pricing/policies` | History (newest first, with policy body and note); publish `{version, policy, note?}` → 201 (owner; 409 `policy_version_exists`, 422 `validation_failed`, 422 `unknown_family` when `policy.family_rules` names a family that is not in the catalog); audit `pricing.publish` (before = previous active). The policy body may carry `hardware_markup_pct` and `family_rules` |
 | GET | `/admin/api/pricing/policies/active` | The active version |
-| POST | `/admin/api/pricing/preview` | `{policy, material, extruded_volume_cm3, print_seconds}` → `PriceBreakdown` with `policy_version: preview` |
+| POST | `/admin/api/pricing/preview` | `{policy, material, extruded_volume_cm3, print_seconds, family_id?}` → `PriceBreakdown` with `policy_version: preview`; `family_id` must be a seeded family (422 `unknown_family`) and is otherwise ignored until PR 5 adds the hardware, setup and minimum lines |
 | GET · POST | `/admin/api/materials` | All incl. unavailable; create (owner; 409 `material_exists`) |
 | PUT | `/admin/api/materials/{materialId}` | Replace (owner; 404); `available: false` hides it from `GET /api/catalog/materials` (existing carts and orders keep pricing) |
-| GET · POST | `/admin/api/catalog/items` | All items; create (owner; 409 `slug_exists`, 422 `unknown_material`) |
+| GET · POST | `/admin/api/catalog/items` | All items; create (owner; 409 `slug_exists`, 422 `validation_failed` for a `category` that is not a shelf, 422 `unknown_family` / `unknown_material`) |
 | PUT | `/admin/api/catalog/items/{slug}` | Replace (owner; 404) |
+| GET | `/admin/api/catalog/shelves` | Shelves in display order: the valid `category` (items) and `shelf` (families) values |
+| GET · POST | `/admin/api/families` | Every outcome family (Avatar) with `ready` and `template_ids`; create (owner; 409 `family_exists`; 422 `validation_failed` for an unknown shelf or a `min > max` envelope; 422 `unknown_hardware` / `unknown_material` for unknown SKUs or `material_rules.allowed` ids); audit `family.create` |
+| PUT | `/admin/api/families/{familyId}` | Replace copy, tier, shelf, envelope, hardware, rules, content slot, availability (owner; the path id wins; 404 `unknown_family`); audit `family.update` |
+| GET · POST | `/admin/api/hardware` | Bought-in hardware items with cost and weight; create (owner; 409 `hardware_exists`); audit `hardware.create` |
+| PUT | `/admin/api/hardware/{sku}` | Replace (owner; 404); audit `hardware.update` |
 | GET | `/admin/api/templates` | Geometry descriptors merged with `template_flags` (`live` default true) and the slugs using each |
 | PUT | `/admin/api/templates/{templateId}` | `{live}` (owner; 404); `live: false` hides it from `GET /api/templates` and makes `POST /api/designs` answer 422 `template_not_available` |
 | GET | `/admin/api/notifications?order_id&page&size` | Messages log (`NotificationRecord` with `order_id`, `rendered_text`), newest first, `size` ≤ 200 |
 | GET | `/admin/api/audit?page&size` | `AuditEntry` rows (`staff_email`, `action`, `target`, `before`, `after`), newest first |
 
 Schema violations on admin bodies answer **422** `validation_failed` (the storefront API uses 400). Every write records an
-`audit_log` row (`order.advance`, `order.qc_photo`, `pricing.publish`, `material.create|update`, `catalog.create|update`, `template.live`).
+`audit_log` row (`order.advance`, `order.qc_photo`, `pricing.publish`, `material.create|update`, `catalog.create|update`, `family.create|update`,
+`hardware.create|update`, `template.live`).
 
 **Print pack.** Built in memory: for each order item a `print-sheet.txt` (order number, piece and version, template `id@version`
 and params from the version spec, material and filament, finish class, quantity, bounds, mass and estimated time from the
@@ -227,11 +238,41 @@ and the default is the mock. A real adapter is a new `@Component` implementing t
 (`shared/ProductionGuard`) while any adapter above is `mock`/`log`, `expose-dev-code` is `true`, the JWT secret is the
 dev default, or the staff seed password is the default `aakar-studio` — the message names every offending property.
 
+## Outcome families (Avatars)
+
+The outcome a customer's idea becomes — a keychain, a fridge magnet, a nameplate, a phone stand, or their own model printed
+as it is — is a **template family** promoted to data (`docs/research/outcome-categories/implementation-plan.md` §1). The
+`catalog` module owns three tables seeded from [`packages/design-tokens/families.json`](../../packages/design-tokens/families.json)
+(contract `packages/contracts/schemas/template-family.v1.json`; `FamiliesSeedTest` fails on drift):
+
+| Table | Holds |
+|---|---|
+| `shelves` | Shop shelves (`id`, `label`, `sort_order`); `catalog_items.category` and `template_families.shelf` reference them, so `category` is validated against the table instead of a regex |
+| `hardware_items` | Bought-in parts by `sku` (`name`, `unit_cost_paise`, `weight_g`, `supplier`, `url`, `notes`, `available`) |
+| `template_families` | One row per family: `id` (= `family` in specs and descriptors, never renamed), brand copy (`codename` "Saathi", `name` "Keychain & bag charm", `tagline`, `description`), `kind` carrier · object · raw, `tier` launch · next · later, `shelf`, `demand_rank`, `default_template_id`, `environment`, and JSONB `size_envelope`, `hardware` (`[{sku, qty}]`), `material_rules`, `content_slot` (the Chhaap: `accepts`, `anchors`, `hero_volume`, `max_text_chars`), `shape_tolerance`, `available`, `sort_order` |
+
+`Catalog.families()`/`family()` merge each row with the **live** descriptors of the templates module: `ready` is true when at
+least one live template names the family, `templates[]` are those descriptors (the storefront picker) and `template_ids[]`
+their ids (the portal); `hardware[].name` is filled from `hardware_items`. `GET /api/families` lists only families that are
+`available` **and** `ready`, so switching a family on in the portal shows nothing until the geometry service publishes its
+template (and hiding a template in the portal takes its family off the picker). Because readiness needs the descriptors, the
+family endpoints answer 503 `geometry_unavailable` like `/api/templates` when the geometry service is down. `price_from_paise`
+stays null until PR 5 prices families. `TemplateDescriptor` mirrors the descriptor contract's new fields: anchor `kind`
+(surface | volume), `size_mm`, `bleed_mm`, `bounds_mm`, `accepts`, `max_relief_mm`, plus `hardware[]` and `min_feature_mm`.
+`catalog → templates` is the one new module edge; `catalog.internal` stays private (`ModularityTests`).
+
+The migration also prepares the next steps without wiring them yet: `catalog_items.family_id` (backfilled for the six seeded
+items), `designs.source` accepts `upload` and `designs.family_id`, `design_versions.hardware`, and the `uploads` /
+`content_reviews` tables for customer photos and model files (entities and endpoints arrive with the upload path, PR 5).
+
 ## Pricing policies (ADR-0008)
 
 `pricing_policies` holds versioned policies; exactly one is active. `V4__pricing_policies.sql` seeds version
 `2026-09-phase0` from the same figures as `aakar.pricing.*` (which is now only the seed and a fallback when the table
-has no active row). `PricingPolicyStore.active()` (Caffeine, 30 s) feeds `PriceCalculator`; `publish(policy, createdBy)`
+has no active row); `V9` deactivates it and seeds `2026-10-carriers`, which adds `hardware_markup_pct` (applied to
+bought-in hardware unit costs) and `family_rules` (per family id: `minimum_subtotal_paise`, `setup_fee_paise`,
+`qty_breaks`) — data only until PR 5 teaches `PriceCalculator` the hardware, setup and minimum lines; policies published
+before those fields read back with a 0 markup and no rules (`PricingPolicy.familyRuleFor(id)` returns an empty rule). `PricingPolicyStore.active()` (Caffeine, 30 s) feeds `PriceCalculator`; `publish(policy, createdBy)`
 activates a new version (409 `policy_version_exists` for a reused version) and is what the admin module's endpoints will
 call. Every price breakdown, cart line and order carries its `policy_version`; `GET /api/cart` re-prices lines whose
 snapshot is older than the active policy and marks them `repriced: true` once.
@@ -292,7 +333,7 @@ are de-duplicated on `event_id`, terminal jobs ignore late messages.
 | `SPRING_PROFILES_ACTIVE` | | `direct` | `direct` or `rabbit` |
 
 `aakar.pricing.*` in `application.yml` is the pricing-policy **seed** (copied from `packages/design-tokens/materials.json →
-pricing_policy`).
+pricing_policy`, including `hardware-markup-pct` and `family-rules`, whose family keys are bracketed so Boot keeps their underscores).
 
 ## Endpoints
 
@@ -301,6 +342,9 @@ pricing_policy`).
 | GET | `/api/catalog/items?category&q` | Shop items (available first) |
 | GET | `/api/catalog/items/{slug}` | 404 `not_found` |
 | GET | `/api/catalog/materials` | Available digital materials with PBR presets and rates (materials paused in the portal are hidden) |
+| GET | `/api/catalog/shelves` | Shop shelves (catalog categories) in display order; the valid `category` values |
+| GET | `/api/families?kind` | Outcome families (Avatars) that are `available` and `ready` (≥ 1 live template), in display order, each with its live template descriptors and hardware names; `kind` = carrier · object · raw (400 otherwise). Needs the geometry service, like `/api/templates` |
+| GET | `/api/families/{id}` | Any seeded family with its `available` / `ready` flags (a deep link can say "coming soon"); 404 `unknown_family` |
 | GET | `/api/templates` · `/api/templates/{id}` | Descriptors cached from geometry for 60 s; the list hides templates switched off in the portal |
 | GET | `/media/{key}` | A stored media file (QC photos) |
 | POST | `/api/designs` | 202 `DesignAccepted`; owned by the bearer's user or the `X-Aakar-Guest` id. `source=shop` + `catalog_item_slug`; `source=create|remix` + `template_id` (+ `params`, `material`); any `prompt` → 422 `not_yet_available` |
@@ -333,7 +377,8 @@ Errors are RFC 9457 Problem Details (`application/problem+json`) with a stable `
 `version_not_ready`, `unknown_material`, `geometry_unavailable`, `unauthenticated`, `forbidden`, `otp_invalid`,
 `otp_expired`, `otp_rate_limited`, `not_printable`, `cart_empty`, `not_serviceable`, `payment_final`,
 `order_not_payable`, `invalid_transition`, `policy_version_exists`, `order_not_packed`, `material_exists`, `slug_exists`,
-`payload_too_large`, `internal_error`.
+`payload_too_large`, `unknown_family`, `family_not_available`, `family_exists`, `hardware_exists`, `unknown_hardware`,
+`internal_error`.
 
 ## Modules (`studio.aakar.api.*`)
 
@@ -346,6 +391,7 @@ Errors are RFC 9457 Problem Details (`application/problem+json`) with a stable `
 - `design → studio` starts jobs; `studio` publishes `GenerationCompleted` / `GenerationFailed` which `design` applies in the same transaction.
 - `identity → design, cart` for the sign-in hand-over (`Designs.attachGuest`, `Carts.mergeGuestCart`).
 - `cart → design, catalog, pricing`; it empties itself on `payment.PaymentSucceeded`.
+- `catalog → templates` for family readiness (the live descriptors); `templates` depends on nothing above `shared`.
 - `order → cart, identity, design, payment, shipping, notification`; it listens for `PaymentSucceeded` / `PaymentFailed` from `payment`, which depends on nothing above `shared`.
 - `admin → order, design, payment, shipping, notification, pricing, catalog, templates, media, identity`; nothing depends on `admin`.
 - `shared` holds the per-request `Identity`, the generic `SseHub<E>` behind both the job and the order streams, Problem Details (and the filter-chain `ProblemResponses`), CORS, the clock and the production guard.
@@ -356,7 +402,10 @@ Flyway `V1` (catalog, materials, designs, versions, jobs, job events, outbox), `
 (+ seed row), `V5` `users`, `otp_requests`, `sessions`, `addresses`, `designs.guest_id`, `V6` `carts`, `cart_items`,
 `V7` `orders`, `order_items`, `order_events`, `payments`, `shipments`, `notifications` and the `order_number_seq` /
 `invoice_number_seq` sequences, `V8` `staff_accounts`, `audit_log`, `media_assets`, `template_flags`, `share_codes`,
-`materials.available` / `updated_at`, `notifications.order_id` / `rendered_text`, `pricing_policies.note`.
+`materials.available` / `updated_at`, `notifications.order_id` / `rendered_text`, `pricing_policies.note`, `V9` `shelves`
+(+ `catalog_items.category` FK), `hardware_items`, `template_families` (all seeded from `families.json`),
+`catalog_items.family_id` (backfilled), `designs.source` gains `upload` + `designs.family_id`, `design_versions.hardware`,
+`uploads`, `content_reviews`, and the active pricing policy `2026-10-carriers`.
 
 ## Docker
 

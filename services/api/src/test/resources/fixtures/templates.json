@@ -24,5 +24,201 @@
     "materials": ["basic_white", "terracotta_matte", "terracotta_silk", "polished_brass", "sandalwood_silk", "indigo_matte"],
     "style_variants": [],
     "features_supported": ["emboss_text"]
+  },
+  {
+    "id": "keychain_tag",
+    "version": 1,
+    "family": "keychain",
+    "name": "Saathi Keychain Tag",
+    "description": "A palm-sized tag with a loop for a steel split ring; your photo, name or motif sits in relief on the face.",
+    "environment": "studio",
+    "params": {
+      "shape": {
+        "type": "enum",
+        "label": "Shape",
+        "unit": "",
+        "default": "rounded",
+        "options": [
+          "rect",
+          "rounded",
+          "circle",
+          "heart"
+        ],
+        "handle": false,
+        "group": "Shape"
+      },
+      "width_mm": {
+        "type": "number",
+        "label": "Width",
+        "unit": "mm",
+        "default": 45,
+        "min": 30,
+        "max": 60,
+        "step": 1,
+        "handle": true,
+        "group": "Size"
+      },
+      "thickness_mm": {
+        "type": "number",
+        "label": "Thickness",
+        "unit": "mm",
+        "default": 3,
+        "min": 2.4,
+        "max": 4,
+        "step": 0.1,
+        "handle": false,
+        "group": "Size"
+      },
+      "hole_d_mm": {
+        "type": "number",
+        "label": "Ring hole",
+        "unit": "mm",
+        "default": 4.2,
+        "min": 4,
+        "max": 6,
+        "step": 0.1,
+        "handle": false,
+        "group": "Details"
+      }
+    },
+    "anchors": [
+      {
+        "id": "face",
+        "label": "Face",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          40,
+          30
+        ],
+        "bleed_mm": 2,
+        "accepts": [
+          "relief_image",
+          "emboss_text",
+          "motif"
+        ],
+        "max_relief_mm": 1.2,
+        "max_text_height_mm": 12
+      },
+      {
+        "id": "back",
+        "label": "Back",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          40,
+          30
+        ],
+        "bleed_mm": 2,
+        "accepts": [
+          "emboss_text",
+          "motif"
+        ],
+        "max_relief_mm": 0.8,
+        "max_text_height_mm": 10
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 1.2,
+      "max_overhang_deg": 55,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "basic_white",
+      "terracotta_matte",
+      "terracotta_silk",
+      "polished_brass",
+      "sandalwood_silk",
+      "indigo_matte"
+    ],
+    "style_variants": [],
+    "features_supported": [
+      "relief_image",
+      "emboss_text",
+      "motif"
+    ],
+    "hardware": [
+      {
+        "sku": "split_ring_25",
+        "qty": 1
+      }
+    ],
+    "min_feature_mm": 0.8
+  },
+  {
+    "id": "raw_print",
+    "version": 1,
+    "family": "raw_print",
+    "name": "Swaroop · Print as it is",
+    "description": "Your own 3D model file, checked, sized and printed as it is.",
+    "environment": "studio",
+    "params": {
+      "longest_mm": {
+        "type": "number",
+        "label": "Longest side",
+        "unit": "mm",
+        "default": 80,
+        "min": 20,
+        "max": 240,
+        "step": 1,
+        "handle": true,
+        "group": "Size"
+      },
+      "orientation": {
+        "type": "enum",
+        "label": "Orientation",
+        "unit": "",
+        "default": "as_uploaded",
+        "options": [
+          "as_uploaded",
+          "lay_flat"
+        ],
+        "handle": false,
+        "group": "Shape"
+      }
+    },
+    "anchors": [
+      {
+        "id": "body",
+        "label": "Your model",
+        "kind": "volume",
+        "projection": "planar",
+        "bounds_mm": [
+          240,
+          240,
+          240
+        ],
+        "accepts": [
+          "hero_mesh"
+        ]
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 1.2,
+      "max_overhang_deg": 55,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "basic_white",
+      "terracotta_matte",
+      "terracotta_silk",
+      "polished_brass",
+      "sandalwood_silk",
+      "indigo_matte"
+    ],
+    "style_variants": [],
+    "features_supported": [
+      "hero_mesh"
+    ],
+    "hardware": [],
+    "min_feature_mm": 0.8
   }
 ]

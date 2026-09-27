@@ -10,6 +10,9 @@ import java.util.Map;
 /**
  * {@code template-descriptor.v1.json}: what a parametric template publishes about itself. Returned
  * verbatim by {@code GET /api/templates}; {@code null} members are omitted so the JSON round-trips.
+ * Since the outcome-category work a descriptor also names the bought-in {@link #hardware()} its pockets and
+ * slots are cut for (authoritative over the family default) and its smallest printable detail
+ * ({@link #minFeatureMm()}); anchors say what content they take and how large it may be (the Chhaap).
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -25,12 +28,15 @@ public record TemplateDescriptor(
         Constraints constraints,
         List<String> materials,
         List<String> styleVariants,
-        List<String> featuresSupported) {
+        List<String> featuresSupported,
+        List<Hardware> hardware,
+        Double minFeatureMm) {
 
     public TemplateDescriptor {
         params = params == null ? Map.of() : Map.copyOf(params);
         anchors = anchors == null ? List.of() : List.copyOf(anchors);
         materials = materials == null ? List.of() : List.copyOf(materials);
+        hardware = hardware == null ? List.of() : List.copyOf(hardware);
     }
 
     /** {@code id@version}, the form used in a Design Spec. */
@@ -43,6 +49,11 @@ public record TemplateDescriptor(
         Map<String, Object> defaults = new LinkedHashMap<>();
         params.forEach((key, p) -> defaults.put(key, p.defaultValue()));
         return defaults;
+    }
+
+    /** Feature types the template supports; an absent {@code features_supported} means none. */
+    public List<String> featuresSupportedOrEmpty() {
+        return featuresSupported == null ? List.of() : featuresSupported;
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -61,9 +72,37 @@ public record TemplateDescriptor(
             String group) {
     }
 
+    /**
+     * A named place where content may land: a {@code surface} (text, motif, relief) with a printable
+     * {@code size_mm} {@code [w, h]} and a {@code bleed_mm} safe margin, or a {@code volume} (a customer's own 3D form)
+     * with {@code bounds_mm} {@code [w, d, h]}. {@code accepts} narrows the template's {@code features_supported} for
+     * this anchor; {@code max_relief_mm} caps relief and emboss depth. {@code kind} defaults to {@code surface}.
+     */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Anchor(String id, String label, String projection, Double maxTextHeightMm) {
+    public record Anchor(
+            String id,
+            String label,
+            String kind,
+            String projection,
+            Double maxTextHeightMm,
+            List<Double> sizeMm,
+            Double bleedMm,
+            List<Double> boundsMm,
+            List<String> accepts,
+            Double maxReliefMm) {
+
+        public static final String SURFACE = "surface";
+        public static final String VOLUME = "volume";
+
+        public boolean isVolume() {
+            return VOLUME.equals(kind);
+        }
+    }
+
+    /** A bought-in part ({@code hardware_items.sku}) packed with every piece made from this template. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Hardware(String sku, int qty) {
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)

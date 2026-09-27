@@ -24,6 +24,10 @@ class AuditLog {
     static final String CATALOG_CREATE = "catalog.create";
     static final String CATALOG_UPDATE = "catalog.update";
     static final String TEMPLATE_LIVE = "template.live";
+    static final String FAMILY_CREATE = "family.create";
+    static final String FAMILY_UPDATE = "family.update";
+    static final String HARDWARE_CREATE = "hardware.create";
+    static final String HARDWARE_UPDATE = "hardware.update";
     static final int MAX_PAGE_SIZE = 200;
     private static final TypeReference<Map<String, Object>> MAP = new TypeReference<>() { };
     private static final Logger log = LoggerFactory.getLogger(AuditLog.class);

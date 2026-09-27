@@ -14,8 +14,9 @@ import studio.aakar.api.support.AbstractIntegrationTest;
 import studio.aakar.api.support.Contracts;
 
 /**
- * {@code V3__seed_materials.sql}, the {@code aakar.pricing} seed and the {@code V4__pricing_policies.sql} row must
- * not drift from {@code packages/design-tokens/materials.json} (ADR-0008: the tokens file is the seed).
+ * {@code V3__seed_materials.sql}, the {@code aakar.pricing} seed and the seeded {@code pricing_policies} row for the tokens'
+ * policy version ({@code V4} first, {@code V9} since the outcome families) must not drift from
+ * {@code packages/design-tokens/materials.json} (ADR-0008: the tokens file is the seed).
  */
 class MaterialsSeedTest extends AbstractIntegrationTest {
 
@@ -65,8 +66,12 @@ class MaterialsSeedTest extends AbstractIntegrationTest {
 
         assertMatches("aakar.pricing", seed.toPolicy(), policy);
         var seeded = policies.byVersion(policy.get("version").asText());
-        assertThat(seeded).as("V4 seed row for %s", policy.get("version").asText()).isPresent();
+        assertThat(seeded).as("seed row for %s", policy.get("version").asText()).isPresent();
         assertMatches("pricing_policies seed row", seeded.get(), policy);
+        // The first seed (V4) stays in the history, deactivated by V9; policies published by other tests may be active now.
+        assertThat(policies.byVersion("2026-09-phase0")).as("V4 seed row").isPresent();
+        assertThat(policies.byVersion("2026-09-phase0").get().familyRules()).as("pre-Avatar policies read back without rules").isEmpty();
+        assertThat(policies.byVersion("2026-09-phase0").get().hardwareMarkupPct()).isZero();
     }
 
     @Autowired
@@ -85,6 +90,18 @@ class MaterialsSeedTest extends AbstractIntegrationTest {
         assertThat(bound.shippingFlatPaise()).as(what).isEqualTo(policy.get("shipping_flat_paise").asLong());
         assertThat(bound.freeShippingAbovePaise()).as(what).isEqualTo(policy.get("free_shipping_above_paise").asLong());
         assertThat(bound.shippingLabel()).as(what).isEqualTo(policy.get("shipping_label").asText());
+        assertThat(bound.hardwareMarkupPct()).as("%s hardware_markup_pct", what).isEqualTo(policy.path("hardware_markup_pct").asDouble(0));
+        JsonNode rules = policy.path("family_rules");
+        assertThat(bound.familyRules().keySet()).as("%s family_rules", what).containsExactlyInAnyOrderElementsOf(fieldNames(rules));
+        rules.properties().forEach(f -> {
+            studio.aakar.api.pricing.PricingPolicy.FamilyRule rule = bound.familyRuleFor(f.getKey());
+            assertThat(rule.minimumSubtotalPaise()).as("%s family_rules.%s.minimum_subtotal_paise", what, f.getKey())
+                    .isEqualTo(f.getValue().path("minimum_subtotal_paise").asLong(0));
+            assertThat(rule.setupFeePaise()).as("%s family_rules.%s.setup_fee_paise", what, f.getKey())
+                    .isEqualTo(f.getValue().path("setup_fee_paise").asLong(0));
+            assertThat(rule.qtyBreaks()).as("%s family_rules.%s.qty_breaks", what, f.getKey()).hasSize(f.getValue().path("qty_breaks").size());
+        });
+        assertThat(bound.familyRuleFor("no_such_family").isEmpty()).as("%s unknown family rule", what).isTrue();
     }
 
     private JsonNode readJson(String text) {

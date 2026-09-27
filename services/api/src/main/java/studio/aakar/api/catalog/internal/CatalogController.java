@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 import studio.aakar.api.catalog.Catalog;
 import studio.aakar.api.catalog.CatalogItemDto;
 import studio.aakar.api.catalog.MaterialDto;
+import studio.aakar.api.catalog.ShelfDto;
 import studio.aakar.api.shared.ApiProblemException;
 
 @RestController
@@ -25,7 +26,7 @@ class CatalogController {
     }
 
     @GetMapping("/items")
-    @Operation(summary = "List Shop items", description = "Optional filters: `category` (home_decor, nameplates, kitchen, desk_tech, gifting) and free-text `q`.")
+    @Operation(summary = "List Shop items", description = "Optional filters: `category` (a shelf id from `GET /api/catalog/shelves`) and free-text `q`.")
     List<CatalogItemDto> items(@RequestParam(required = false) String category, @RequestParam(required = false) String q) {
         return catalog.items(category, q);
     }
@@ -34,6 +35,12 @@ class CatalogController {
     @Operation(summary = "Shop item by slug")
     CatalogItemDto item(@PathVariable String slug) {
         return catalog.item(slug).orElseThrow(() -> ApiProblemException.notFound("Catalog item", slug));
+    }
+
+    @GetMapping("/shelves")
+    @Operation(summary = "Shop shelves (catalog categories) in display order")
+    List<ShelfDto> shelves() {
+        return catalog.shelves();
     }
 
     @GetMapping("/materials")

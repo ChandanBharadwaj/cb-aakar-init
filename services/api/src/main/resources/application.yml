@@ -98,10 +98,12 @@ aakar:
     # the production guard refuses the default. Staff tokens are HS256 with the identity secret and typ=staff.
     seed-password: ${AAKAR_ADMIN_SEED_PASSWORD:aakar-studio}
     token-ttl: ${AAKAR_ADMIN_TOKEN_TTL:12h}
-  # PLAN §7.10 · the SEED pricing policy (ADR-0008): V4__pricing_policies.sql inserts the same values as the
-  # first active row; from then on the active policy lives in the pricing_policies table.
+  # PLAN §7.10 · the SEED pricing policy (ADR-0008): V4__pricing_policies.sql inserted the first active row and
+  # V9__families_hardware_uploads.sql the current one (2026-10-carriers) with the same values as below; from then on
+  # the active policy lives in the pricing_policies table. Copied from packages/design-tokens/materials.json →
+  # pricing_policy (MaterialsSeedTest fails on drift). Family keys are bracketed so Boot keeps the underscores.
   pricing:
-    version: 2026-09-phase0
+    version: 2026-10-carriers
     machine-rate-paise-per-hour: 20000
     finishing-fee-paise:
       matte: 8000
@@ -112,6 +114,21 @@ aakar:
     shipping-flat-paise: 7900
     free-shipping-above-paise: 99900
     shipping-label: "Shipping · Delhivery, 4 days"
+    # Applied to bought-in hardware unit costs (split rings, magnets, LED bases); placeholder until supplier quotes land.
+    hardware-markup-pct: 30
+    # Per-outcome rules keyed by family id: minimum subtotals and the raw-print setup (repair and orientation) fee.
+    family-rules:
+      "[keychain]":
+        minimum-subtotal-paise: 24900
+      "[fridge_magnet]":
+        minimum-subtotal-paise: 29900
+      "[ornament]":
+        minimum-subtotal-paise: 34900
+      "[nameplate]":
+        minimum-subtotal-paise: 59900
+      "[raw_print]":
+        minimum-subtotal-paise: 34900
+        setup-fee-paise: 9900
 
 logging:
   level:
