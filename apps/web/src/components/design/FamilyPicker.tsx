@@ -4,7 +4,7 @@ import Link from "next/link";
 import { formatPaise } from "@aakar/design-tokens";
 import type { Family } from "@/lib/api/types";
 import { envelopeLine, hardwareSentence, isRawFamily, priceFromLabel, sortFamilies } from "@/lib/families";
-import { featureLabel } from "@/lib/features";
+import { familyTakes, featurePhrase } from "@/lib/features";
 
 export interface FamilyPickerProps {
   families: Family[];
@@ -14,9 +14,10 @@ export interface FamilyPickerProps {
 }
 
 /**
- * "Give your idea an Avatar": one card per outcome family from `GET /api/families` — codename large,
- * plain name, tagline, what comes in the box, how big it gets — and a quiet "Print as it is" card
- * (Swaroop) last. Cards open `/create/[family]`.
+ * "Give your idea an Avatar": one card per outcome family from `GET /api/families` — codename large with its
+ * plain name, tagline, what comes in the box, how big it gets, what its live templates take today ("Takes
+ * text (Naam) · photo relief (Chhavi)"; Buti only once motifs are live) — and a quiet "Swaroop · Print as it is"
+ * card last. Cards open `/create/[family]`.
  */
 export function FamilyPicker({ families, prompt, className }: FamilyPickerProps) {
   const sorted = sortFamilies(families.filter((f) => f.available !== false));
@@ -25,13 +26,13 @@ export function FamilyPicker({ families, prompt, className }: FamilyPickerProps)
   const href = (f: Family) => `/create/${encodeURIComponent(f.id)}${prompt ? `?prompt=${encodeURIComponent(prompt)}` : ""}`;
 
   if (avatars.length === 0 && !raw) {
-    return <p className={["ak-card p-6 text-sm text-surface-muted", className].filter(Boolean).join(" ")}>No Avatars are open yet. New ones land every few weeks.</p>;
+    return <p className={["ak-card p-6 text-sm text-surface-muted", className].filter(Boolean).join(" ")}>Nothing is open to create just yet. New forms land every few weeks.</p>;
   }
 
   return (
     <div className={["grid gap-4", className].filter(Boolean).join(" ")}>
       {avatars.length > 0 && (
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Avatars">
+        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Avatars · forms your idea can take">
           {avatars.map((f) => (
             <li key={f.id} className="min-h-0">
               <AvatarCard family={f} href={href(f)} />
@@ -47,19 +48,22 @@ export function FamilyPicker({ families, prompt, className }: FamilyPickerProps)
 function AvatarCard({ family, href }: { family: Family; href: string }) {
   const ready = family.ready !== false && family.templates.length > 0;
   const lines = [hardwareSentence(family.hardware), envelopeLine(family)].filter((x): x is string => Boolean(x));
-  const takes = family.content_slot.accepts.map(featureLabel).join(" · ");
+  // Only what the live templates take today, never the family's aspirational content_slot.accepts.
+  const takes = familyTakes(family).map(featurePhrase).join(" · ");
   const from = priceFromLabel(family, formatPaise);
   const body = (
     <>
       <div className="flex items-baseline justify-between gap-3">
-        <span className="ak-label">{family.kind === "object" ? "Object" : "Avatar"}</span>
-        {from && <span className="text-[11px] font-semibold text-surface-muted">{from}</span>}
+        {family.kind === "object" && <span className="ak-label">Object</span>}
+        {from && <span className="ml-auto text-[11px] font-semibold text-surface-muted">{from}</span>}
       </div>
       <div className="grid gap-1">
-        <h2 id={`avatar-${family.id}`} className="font-display text-3xl font-semibold leading-none group-hover:text-surface-accent">
-          {family.codename}
+        {/* The codename never travels alone: the plain name is part of the heading (and the card's accessible name). */}
+        <h2 id={`avatar-${family.id}`} className="grid gap-1">
+          <span className="font-display text-3xl font-semibold leading-none group-hover:text-surface-accent">{family.codename}</span>
+          <span className="sr-only"> · </span>
+          <span className="text-sm font-semibold">{family.name}</span>
         </h2>
-        <p className="text-sm font-semibold">{family.name}</p>
         {family.tagline && <p className="text-sm text-surface-muted">{family.tagline}</p>}
       </div>
       <ul className="grid gap-1 text-[12px] text-surface-muted">

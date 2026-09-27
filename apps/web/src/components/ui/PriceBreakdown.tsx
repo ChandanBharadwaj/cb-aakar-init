@@ -28,7 +28,7 @@ export function PriceBreakdown({ price, loading, error, className }: PriceBreakd
           ))}
           {typeof price.minimum_subtotal_paise === "number" && (
             <p className="text-[11px] leading-snug text-surface-muted">
-              Studio minimum for this Avatar applies · {formatPaise(price.minimum_subtotal_paise)}
+              Studio minimum for this piece applies · {formatPaise(price.minimum_subtotal_paise)}
             </p>
           )}
           <div className="flex justify-between gap-3">

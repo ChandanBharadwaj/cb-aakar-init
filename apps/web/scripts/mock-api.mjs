@@ -12,9 +12,13 @@
 //   --fail                    every third generation job fails
 //   AAKAR_WEB_URL             where pay_url points (default http://localhost:3000)
 //   AAKAR_ORDER_STAGE_MS      ms between order stages after payment (default 8000)
+//   AAKAR_REVIEW_MS           ms before a file held for review is decided (default 10000)
 //   Dev OTP code is always 123456. Pincodes starting with 9 are not serviceable.
-//   Uploads whose file name contains "review" answer pending_review; a model file named "*broken*" fails its job
-//   with content_unusable; a raw print under 30 mm completes with printability.passed=false (thin walls).
+//   Uploads whose file name contains "review" answer pending_review and are cleared after AAKAR_REVIEW_MS; "reject"
+//   ones are held the same way and then turned down with a reviewer's message. GET /api/uploads/{id} answers only the
+//   identity that uploaded the file (a guest's uploads move to the user on sign-in). A model file named "*broken*"
+//   fails its job with content_unusable; a raw print under 30 mm completes with printability.passed=false (thin walls).
+//   Swaroop (raw_print@1) has no template params: its size and orientation come from its one hero_mesh feature.
 import http from "node:http";
 import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -33,6 +37,7 @@ const FAIL_EVERY_THIRD = process.argv.includes("--fail");
 const STAGE_MS = 700;
 const WEB_URL = (process.env.AAKAR_WEB_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const ORDER_STAGE_MS = Number(process.env.AAKAR_ORDER_STAGE_MS ?? 8000);
+const REVIEW_MS = Number(process.env.AAKAR_REVIEW_MS ?? 10000);
 const DEV_CODE = "123456";
 const OTP_TTL_S = 300;
 const STUDIO = "Bengaluru";
@@ -85,12 +90,10 @@ const templates = [
     style_variants: [], features_supported: ["relief_image", "emboss_text", "motif"], hardware: [{ sku: "split_ring_25", qty: 1 }],
   },
   {
+    // Swaroop: no template params. Size (fit "longest" + longest_mm) and orientation live on the one hero_mesh feature.
     id: "raw_print", version: 1, family: "raw_print", name: "Print as it is",
     description: "Your own model file, checked, sized and printed as it is.", environment: "studio",
-    params: {
-      longest_mm: { type: "number", label: "Longest side", unit: "mm", default: 80, min: 20, max: 240, step: 1, group: "Size" },
-      orientation: { type: "enum", label: "Orientation", default: "as_uploaded", options: ["as_uploaded", "lay_flat"], group: "Shape" },
-    },
+    params: {},
     anchors: [{ id: "body", label: "Body", kind: "volume", projection: "planar", bounds_mm: [240, 240, 240], accepts: ["hero_mesh"] }],
     constraints: { min_wall_mm: 1.2, max_overhang_deg: 55, bed_mm: [250, 250, 250] },
     materials: ["basic_white", "terracotta_matte", "terracotta_silk", "polished_brass", "sandalwood_silk", "indigo_matte"],
@@ -101,6 +104,8 @@ const templates = [
 // ---- Outcome families (Avatars) from the seed: shelves, hardware, families + their live templates ----
 const shelves = [...familiesSeed.shelves].sort((a, b) => (a.sort_order ?? 100) - (b.sort_order ?? 100));
 const familyById = (id) => familiesSeed.families.find((f) => f.id === id);
+/** Customer copy never shows a codename alone: "Saathi · Keychain & bag charm". */
+const familyLabel = (f) => `${f.codename} · ${f.name}`;
 /** Placeholder price rules from the plan (open decision 3): family minimums, a setup fee for raw prints, hardware markup. */
 const FAMILY_RULES = {
   keychain: { minimum_subtotal_paise: 24900 },
@@ -294,6 +299,7 @@ function cartFrom(req) {
 function attachGuest(guestKey, userKey) {
   let designsMoved = 0;
   for (const d of designs.values()) if (d.owner === guestKey) { d.owner = userKey; designsMoved += 1; }
+  for (const up of uploads.values()) if (up.owner === guestKey) up.owner = userKey;
   let itemsMoved = 0;
   const guestCart = carts.get(guestKey);
   if (guestCart && guestCart.items.length > 0) {
@@ -410,7 +416,10 @@ function startJob(design, spec, parentVersionId) {
   const heroFile = hero ? uploads.get(hero.source?.upload_id)?.filename ?? "" : "";
   const contentUnusable = hero && /broken/i.test(heroFile);
   const failThis = (FAIL_EVERY_THIRD && jobCount % 3 === 0) || contentUnusable;
-  const longest = hero ? Number(hero.longest_mm ?? spec.params.longest_mm ?? 80) : undefined;
+  // The hero form carries its own size: `longest` scales to longest_mm, `contain` fills the volume anchor.
+  const heroBounds = hero ? template.anchors.find((a) => a.id === hero.anchor)?.bounds_mm : undefined;
+  const longest = hero ? Number(hero.fit === "longest" && hero.longest_mm ? hero.longest_mm : Math.min(...(heroBounds ?? [80]))) : undefined;
+  const orientation = hero?.orientation ?? "as_uploaded";
 
   const scale = hero ? longest / 120 : template.id === "keychain_tag" ? (spec.params.width_mm ?? 45) / 120 : (spec.params.height_mm ?? 120) / 120;
   const steps = [
@@ -449,11 +458,11 @@ function startJob(design, spec, parentVersionId) {
         ? { ...completed.printability.checks, thinnest_wall: { status: "fail", summary: `0.8 mm at ${longest} mm · below 1.2 mm`, value: 0.8, unit: "mm", threshold: 1.2 } }
         : completed.printability.checks,
     };
-    const anchorLabel = (id) => template.anchors.find((a) => a.id === id)?.label?.toLowerCase() ?? id;
+    const anchorLabel = (id) => template.anchors.find((a) => a.id === id)?.label?.toLowerCase() ?? "piece";
     const content = (spec.features ?? []).map((f) =>
-      f.type === "emboss_text" ? `your Naam “${f.text}” on the ${anchorLabel(f.anchor)}`
+      f.type === "emboss_text" ? `your text “${f.text}” on the ${anchorLabel(f.anchor)}`
         : f.type === "relief_image" ? `your photo ${f.mode === "deboss" ? "cut into" : "raised on"} the ${anchorLabel(f.anchor)}`
-          : f.type === "hero_mesh" ? `your own form at ${longest} mm` : `a ${f.motif_id.replace(/_/g, " ")} motif on the ${anchorLabel(f.anchor)}`);
+          : f.type === "hero_mesh" ? `your own 3D form at ${longest} mm` : `a ${f.motif_id.replace(/_/g, " ")} motif on the ${anchorLabel(f.anchor)}`);
     const contentNote = content.length ? ` I set ${content.length > 1 ? `${content.slice(0, -1).join(", ")} and ${content[content.length - 1]}` : content[0]}.` : "";
     Object.assign(version, {
       status: "ready",
@@ -463,7 +472,7 @@ function startJob(design, spec, parentVersionId) {
       print_estimate: est,
       price: price(est, spec.material, priceCtx(version)),
       karigar_note: hero && template.family === "raw_print"
-        ? `Your file, repaired and set at ${longest} mm on its longest side, ${spec.params.orientation === "lay_flat" ? "laid flat on its widest face" : "printed as you sent it"}.${thin ? " The thinnest wall came out under 1.2 mm; a larger size fixes that." : ""}`
+        ? `Your file, repaired and set at ${longest} mm on its longest side, ${orientation === "lay_flat" ? "laid flat on its widest face" : "printed as you sent it"}.${thin ? " The thinnest wall came out under 1.2 mm; a larger size fixes that." : ""}`
         : versionNo === 1
           ? (template.id === "keychain_tag" ? `A ${spec.params.shape ?? "rounded"} Saathi tag, ${spec.params.width_mm ?? 45} mm wide with a ${spec.params.hole_d_mm ?? 4.2} mm ring hole.` : completed.karigar_note) + contentNote
           : `Version ${versionNo}: I re-sculpted the ${template.name.toLowerCase()} at ${spec.params.height_mm ?? spec.params.width_mm ?? 120} mm and kept the walls at ${spec.params.wall_mm ?? spec.params.thickness_mm ?? 3.2} mm.${contentNote}`,
@@ -505,7 +514,7 @@ const server = http.createServer(async (req, res) => {
     }
     if ((m = p.match(/^\/api\/families\/([^/]+)$/))) {
       const f = familyById(decodeURIComponent(m[1]));
-      return f ? json(res, 200, familyView(f)) : problem(res, 404, "unknown_family", "No Avatar with that name.");
+      return f ? json(res, 200, familyView(f)) : problem(res, 404, "unknown_family", "We don't make that kind of piece.");
     }
     // ---- uploads: multipart file + kind, kept in memory and served back under /media/uploads/ ----
     if (p === "/api/uploads" && method === "POST") {
@@ -525,19 +534,31 @@ const server = http.createServer(async (req, res) => {
       const max = kind === "image" ? 15 * 1024 * 1024 : 50 * 1024 * 1024;
       if (file.data.length > max) return problem(res, 413, "payload_too_large", `Files can be up to ${Math.round(max / 1024 / 1024)} MB.`);
       const id = randomUUID();
-      const pending = /review/i.test(file.filename ?? "");
+      const pending = /review|reject/i.test(file.filename ?? "");
+      const mediaUrl = `http://${req.headers.host ?? `localhost:${PORT}`}/media/uploads/${id}.${format}`;
       const meta = {
         id, kind, format, bytes: file.data.length, sha256: createHash("sha256").update(file.data).digest("hex"),
-        status: pending ? "pending_review" : "ready", url: pending ? null : `http://${req.headers.host ?? `localhost:${PORT}`}/media/uploads/${id}.${format}`, created_at: now(),
+        status: pending ? "pending_review" : "ready", url: pending ? null : mediaUrl, created_at: now(),
       };
       uploads.set(id, { meta, data: file.data, contentType: UPLOAD_MIME[format] ?? "application/octet-stream", filename: file.filename ?? `${id}.${format}`, owner: who.key });
+      // The stand-in reviewer: "review" files are cleared, "reject" files turned down with a reviewer's message.
+      if (pending) {
+        setTimeout(() => {
+          const up = uploads.get(id);
+          if (!up || up.meta.status !== "pending_review") return;
+          if (/reject/i.test(up.filename)) Object.assign(up.meta, { status: "rejected", url: null, message: "We can't print copyrighted heroes, but your own hero is welcome." });
+          else Object.assign(up.meta, { status: "ready", url: mediaUrl });
+        }, REVIEW_MS);
+      }
       return json(res, 201, meta);
     }
-    if ((m = p.match(/^\/api\/uploads\/([^/]+)$/))) {
+    if ((m = p.match(/^\/api\/uploads\/([^/]+)$/)) && method === "GET") {
+      // Only the identity that uploaded the file may read it; anyone else gets the same 404 as an unknown id.
+      const who = identity(req);
       const up = uploads.get(m[1]);
-      return up ? json(res, 200, up.meta) : problem(res, 404, "not_found", "No such upload.");
+      return up && who && up.owner === who.key ? json(res, 200, up.meta) : problem(res, 404, "not_found", "No such upload.");
     }
-    if ((m = p.match(/^\/media\/uploads\/([^/.]+)\.[a-z0-9]+$/))) {
+    if ((m = p.match(/^\/media\/uploads\/([^/.]+)\.[a-z0-9]+$/)) && method === "GET") {
       const up = uploads.get(m[1]);
       if (!up || up.meta.status !== "ready") return problem(res, 404, "not_found", "No such file.");
       res.writeHead(200, { "Content-Type": up.contentType, "Content-Length": up.data.length, "Cache-Control": "private, max-age=3600", ...CORS });
@@ -567,13 +588,13 @@ const server = http.createServer(async (req, res) => {
         family = familyById(item.family_id ?? template.family) ?? null;
       } else if (body.family_id) {
         family = familyById(body.family_id);
-        if (!family) return problem(res, 404, "unknown_family", "No Avatar with that name.");
-        if (!family.available) return problem(res, 422, "family_not_available", `${family.codename} isn't open yet.`);
+        if (!family) return problem(res, 404, "unknown_family", "We don't make that kind of piece.");
+        if (!family.available) return problem(res, 422, "family_not_available", `${familyLabel(family)} isn't open yet.`);
         const templateId = body.template_id ?? family.default_template_id;
         template = templates.find((t) => t.id === templateId && t.family === family.id);
-        if (!template) return problem(res, 422, "template_not_available", `${family.codename}'s template isn't live yet.`);
+        if (!template) return problem(res, 422, "template_not_available", `${familyLabel(family)} is still being finished in the studio.`);
         params = { ...defaults(template), ...(body.params ?? {}) };
-        material = body.material ?? template.materials[0]; title = body.title ?? `${family.codename} · ${family.name}`;
+        material = body.material ?? template.materials[0]; title = body.title ?? familyLabel(family);
       } else {
         template = templates.find((t) => t.id === body.template_id);
         if (!template) return problem(res, 404, "not_found", "No such template.");
@@ -581,8 +602,8 @@ const server = http.createServer(async (req, res) => {
         material = body.material ?? template.materials[0]; title = body.title ?? template.name;
         family = familyById(template.family) ?? null;
       }
-      if (family && !materialAllowed(family, material)) return problem(res, 422, "validation_failed", `${materialOf(material)?.name ?? material} isn't offered for ${family.codename}.`);
-      const features = resolveFeatures(body.features ?? [], template);
+      if (family && !materialAllowed(family, material)) return problem(res, 422, "validation_failed", `${materialOf(material)?.name ?? material} isn't offered for ${familyLabel(family)}.`);
+      const features = resolveFeatures(body.features ?? [], template, who);
       const design = { id: randomUUID(), source: body.source, catalog_item_slug: slug, family_id: family?.id ?? null, title, status: "generating", created_at: now(), versions_count: 0 };
       Object.defineProperty(design, "owner", { value: who?.key ?? null, writable: true, enumerable: false });
       designs.set(design.id, design);
@@ -607,7 +628,7 @@ const server = http.createServer(async (req, res) => {
       if (!v) return problem(res, 404, "not_found", "No such version.");
       const body = JSON.parse(await readBody(req));
       const template = templates.find((t) => t.id === v.spec.template.split("@")[0]) ?? templates[0];
-      const features = body.features === undefined || body.features === null ? (v.spec.features ?? []) : resolveFeatures(body.features, template);
+      const features = body.features === undefined || body.features === null ? (v.spec.features ?? []) : resolveFeatures(body.features, template, identity(req));
       const spec = { ...v.spec, params: { ...v.spec.params, ...body.params }, material: body.material ?? v.spec.material, features };
       return json(res, 202, startJob(designs.get(v.design_id), spec, v.id));
     }
@@ -915,45 +936,68 @@ const UPLOAD_FORMATS = { image: ["png", "jpg", "webp", "heic"], model: ["stl", "
 const UPLOAD_MIME = { png: "image/png", jpg: "image/jpeg", webp: "image/webp", heic: "image/heic", stl: "model/stl", glb: "model/gltf-binary", gltf: "model/gltf+json", "3mf": "model/3mf", obj: "model/obj", ply: "application/octet-stream", off: "application/octet-stream" };
 const SCRIPTS = [["devanagari", /[\u0900-\u097F]/], ["bengali", /[\u0980-\u09FF]/], ["gujarati", /[\u0A80-\u0AFF]/], ["tamil", /[\u0B80-\u0BFF]/], ["telugu", /[\u0C00-\u0C7F]/], ["kannada", /[\u0C80-\u0CFF]/]];
 const detectScript = (text) => SCRIPTS.find(([, re]) => re.test(text))?.[0] ?? "latin";
-/** Type ∈ features_supported, anchor exists and accepts it, one feature per anchor, upload resolvable → the url filled in. */
-function resolveFeatures(list, template) {
-  if (!Array.isArray(list)) throw fail(400, "bad_request", "features must be an array.");
-  if (list.length > 8) throw fail(422, "validation_failed", "At most 8 features.");
+/** Customer copy for a feature type: plain words first, the codename after, never the code id. */
+const FEATURE_WORDS = { emboss_text: "text (Naam)", motif: "a motif (Buti)", relief_image: "a photo relief (Chhavi)", hero_mesh: "your own 3D form (Roop)" };
+const capitalise = (text) => text.charAt(0).toUpperCase() + text.slice(1);
+/**
+ * Type ∈ features_supported, anchor exists and accepts it (a hero form only on a volume anchor, everything else on a
+ * surface), one feature per anchor, upload owned by the caller and ready → the url filled in. Messages are customer copy.
+ */
+function resolveFeatures(list, template, who) {
+  if (!Array.isArray(list)) throw fail(400, "bad_request", "Send features as a list.");
+  if (list.length > 8) throw fail(422, "validation_failed", "A piece can carry at most 8 things.");
+  if (template.family === "raw_print") checkRawForm(list);
   const seen = new Set();
   return list.map((f) => {
-    if (!f || typeof f !== "object" || !FEATURE_TYPES.includes(f.type)) throw fail(422, "validation_failed", "Unknown feature type.");
-    if (!(template.features_supported ?? []).includes(f.type)) throw fail(422, "unsupported_feature", `${template.name} doesn't take ${f.type}.`);
+    if (!f || typeof f !== "object" || !FEATURE_TYPES.includes(f.type)) throw fail(422, "validation_failed", "That isn't something a piece can carry.");
+    const words = FEATURE_WORDS[f.type];
+    if (!(template.features_supported ?? []).includes(f.type)) throw fail(422, "unsupported_feature", `${template.name} can't carry ${words} yet.`);
     const anchor = template.anchors.find((a) => a.id === f.anchor);
-    if (!anchor) throw fail(422, "validation_failed", `No anchor ${f.anchor} on ${template.name}.`);
-    if (!(anchor.accepts ?? template.features_supported ?? []).includes(f.type)) throw fail(422, "unsupported_feature", `${anchor.label} doesn't take ${f.type}.`);
-    if (seen.has(anchor.id)) throw fail(422, "validation_failed", `Only one feature per anchor (${anchor.label}).`);
+    if (!anchor) throw fail(422, "validation_failed", `That spot isn't on ${template.name}.`);
+    const spot = `The ${anchor.label.toLowerCase()}`;
+    const volume = (anchor.kind ?? "surface") === "volume";
+    if (!(anchor.accepts ?? template.features_supported ?? []).includes(f.type) || volume !== (f.type === "hero_mesh")) {
+      throw fail(422, "unsupported_feature", `${spot} can't carry ${words} yet.`);
+    }
+    if (seen.has(anchor.id)) throw fail(422, "validation_failed", `${spot} already carries something; one thing per spot.`);
     seen.add(anchor.id);
     const out = { ...f };
     if (f.type === "emboss_text") {
-      if (typeof f.text !== "string" || !f.text.trim() || f.text.length > 40) throw fail(422, "validation_failed", "Text must be 1–40 characters.");
-      out.script ??= detectScript(f.text); out.depth_mm ??= 1.2; out.projection ??= "planar"; out.mode ??= "emboss";
+      if (typeof f.text !== "string" || !f.text.trim() || f.text.length > 40) throw fail(422, "validation_failed", "Your text (Naam) can be 1 to 40 characters.");
+      out.script ??= detectScript(f.text); out.depth_mm ??= Math.min(1.2, anchor.max_relief_mm ?? 1.2); out.projection ??= "planar"; out.mode ??= "emboss";
+      if (anchor.max_relief_mm && out.depth_mm > anchor.max_relief_mm) throw fail(422, "param_out_of_range", `Letters on the ${anchor.label.toLowerCase()} can be at most ${anchor.max_relief_mm} mm deep.`);
     } else if (f.type === "motif") {
-      if (typeof f.motif_id !== "string") throw fail(422, "validation_failed", "motif_id is required.");
+      if (typeof f.motif_id !== "string") throw fail(422, "validation_failed", "Pick a motif (Buti) first.");
       out.scale ??= 1; out.depth_mm ??= 1; out.mode ??= "deboss";
     } else {
       const up = uploads.get(f.source?.upload_id);
-      if (!up) throw fail(404, "not_found", "That upload isn't known to the studio.");
-      if (up.meta.status === "pending_review") throw fail(409, "upload_not_ready", "This file is still with a reviewer.");
-      if (up.meta.status === "rejected") throw fail(422, "upload_rejected", "This file can't be printed.");
+      // The real API resolves uploads with Uploads.findOwned: someone else's file reads as unknown.
+      if (!up || !who || up.owner !== who.key) throw fail(404, "not_found", "That file isn't known to the studio.");
+      if (up.meta.status === "pending_review") throw fail(409, "upload_not_ready", "The studio is still checking this file.");
+      if (up.meta.status === "rejected") throw fail(422, "upload_rejected", up.meta.message ?? "We can't print this one; try a different file.");
       const expect = f.type === "relief_image" ? "image" : "model";
-      if (up.meta.kind !== expect) throw fail(422, "validation_failed", `${f.type} needs ${expect === "image" ? "a photo" : "a model file"}.`);
+      if (up.meta.kind !== expect) throw fail(422, "validation_failed", `${capitalise(words)} needs ${expect === "image" ? "a photo" : "a model file"}.`);
       out.source = { upload_id: up.meta.id, url: up.meta.url, format: up.meta.format, origin: "upload" };
       if (f.type === "relief_image") {
-        out.mode ??= "emboss"; out.relief_mm ??= 0.6; out.fit ??= "contain"; out.invert ??= false; out.cutout ??= "none";
+        out.mode ??= "emboss"; out.relief_mm ??= Math.min(0.6, anchor.max_relief_mm ?? 0.6); out.fit ??= "contain"; out.invert ??= false; out.cutout ??= "none";
         if (out.relief_mm < 0.2 || out.relief_mm > 3) throw fail(422, "param_out_of_range", "Relief must be between 0.2 and 3 mm.");
         if (anchor.max_relief_mm && out.relief_mm > anchor.max_relief_mm) throw fail(422, "param_out_of_range", `Relief on the ${anchor.label.toLowerCase()} can be at most ${anchor.max_relief_mm} mm.`);
       } else {
         out.fit ??= "contain"; out.yaw_deg ??= 0; out.orientation ??= "as_uploaded";
-        if (out.longest_mm !== undefined && (out.longest_mm < 5 || out.longest_mm > 250)) throw fail(422, "param_out_of_range", "Longest side must be between 5 and 250 mm.");
+        if (out.longest_mm !== undefined && (out.longest_mm < 5 || out.longest_mm > 250)) throw fail(422, "param_out_of_range", "The longest side must be between 5 and 250 mm.");
       }
     }
     return out;
   });
+}
+/** Swaroop, like the geometry template: exactly one form, with an explicit size inside the family envelope. */
+function checkRawForm(list) {
+  const hero = list.find((f) => f && f.type === "hero_mesh");
+  if (!hero) throw fail(422, "invalid_spec", "Add your model file to print it as it is.");
+  const env = familyById("raw_print")?.size_envelope_mm ?? { min_longest_mm: 20, max_longest_mm: 240 };
+  const lo = env.min_longest_mm, hi = env.max_longest_mm;
+  if (hero.fit !== "longest" || typeof hero.longest_mm !== "number") throw fail(422, "invalid_spec", `Choose how long your model should be on its longest side (${lo}–${hi} mm).`);
+  if (hero.longest_mm < lo || hero.longest_mm > hi) throw fail(422, "param_out_of_range", `The longest side can be ${lo}–${hi} mm.`);
 }
 /** Minimal multipart/form-data parser: [{ name, filename, type, data: Buffer }]. */
 function parseMultipart(buf, boundary) {

@@ -1,5 +1,7 @@
 import type { CatalogItem, Shelf, TemplateDescriptor } from "./api/types";
 import { RAW_FAMILY_ID, humanise } from "./families";
+import { addWords, templateTakes } from "./features";
+import { joinList } from "./format";
 
 export interface ShelfPill {
   id: string;
@@ -38,14 +40,19 @@ export interface MakeItYours {
 }
 
 /**
- * "Make it yours · add a photo or your name" → /create/{family}?item={slug}, shown when the item's
- * template takes personal content (a non-empty `features_supported`) and the item knows its family.
+ * "Make it yours · add a photo or your name" → /create/{family}?item={slug}. Shown only when the composer can put
+ * something on the item's template today — a photo relief or a name on a surface anchor, or your own 3D form on a
+ * figurine-style volume anchor (motifs wait for the motif library) — and the label says exactly that: "add a photo",
+ * "add your name", "add a photo or your name". A descriptor without `features_supported` takes nothing.
+ * `openFamilies`, when known (GET /api/families lists the families that are available with a live template), also
+ * hides the link for a family that isn't open, so it never lands on "still being finished".
  */
-export function makeItYours(item: CatalogItem, template: TemplateDescriptor | undefined): MakeItYours | undefined {
-  if (!item.family_id || item.family_id === RAW_FAMILY_ID || !template || template.features_supported.length === 0) return undefined;
-  const supported = new Set(template.features_supported);
-  const what = supported.has("relief_image") ? "add a photo or your name" : supported.has("emboss_text") ? "add your name" : "add a motif";
-  return { href: `/create/${encodeURIComponent(item.family_id)}?item=${encodeURIComponent(item.slug)}`, label: `Make it yours · ${what}` };
+export function makeItYours(item: CatalogItem, template: TemplateDescriptor | undefined, openFamilies?: ReadonlySet<string>): MakeItYours | undefined {
+  if (!item.family_id || item.family_id === RAW_FAMILY_ID || !template) return undefined;
+  if (openFamilies && !openFamilies.has(item.family_id)) return undefined;
+  const words = addWords(templateTakes(template));
+  if (words.length === 0) return undefined;
+  return { href: `/create/${encodeURIComponent(item.family_id)}?item=${encodeURIComponent(item.slug)}`, label: `Make it yours · add ${joinList(words, "or")}` };
 }
 
 /** Example prompts shown under the Home prompt bar. */

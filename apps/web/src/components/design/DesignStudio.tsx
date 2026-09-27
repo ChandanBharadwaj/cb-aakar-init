@@ -6,13 +6,14 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatPaise } from "@aakar/design-tokens";
 import { api, toProblem } from "@/lib/api/client";
-import { boundsMm, glbUrl, type DesignVersion, type Family, type Problem, type TemplateDescriptor } from "@/lib/api/types";
-import { hardwareNames, isRawFamily, RAW_FAMILY_ID } from "@/lib/families";
-import { familyLabel, featuresFromSpec, hasContentSlot, sameFeatures } from "@/lib/features";
+import { boundsMm, glbUrl, type DesignVersion, type Family, type PrintabilityReport, type Problem, type TemplateDescriptor } from "@/lib/api/types";
+import { allowedMaterialIds, hardwareNames, isRawFamily, namedHardware, RAW_FAMILY_ID } from "@/lib/families";
+import { familyLabel, featuresForSubmit, featuresFromSpec, hasContentSlot, sameFeatures } from "@/lib/features";
 import { formatGrams, formatMm, formatPrintTime } from "@/lib/format";
+import { REJECTED_COPY } from "@/lib/uploads";
 import { environmentLabel } from "@/lib/viewer/environments";
 import { useCartStore } from "@/store/cart";
-import { selectActiveVersion, selectMaterial, useDesignStore } from "@/store/design";
+import { selectActiveVersion, selectMaterial, uploadHold, useDesignStore } from "@/store/design";
 import { toast } from "@/store/toast";
 import { BloomLoader } from "@/components/brand/BloomLoader";
 import { MandalaSpinner } from "@/components/brand/MandalaSpinner";
@@ -49,6 +50,16 @@ function sameParams(a: Record<string, unknown>, b: Record<string, unknown>): boo
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
   for (const k of keys) if (a[k] !== b[k]) return false;
   return true;
+}
+
+/**
+ * What a raw print that failed the check needs, pointed at the one control that fixes it: the size slider on the
+ * "Your form" card (Swaroop has no template sliders).
+ */
+function rawNudge(report: PrintabilityReport | undefined, minWallMm: number): string | undefined {
+  if (report?.passed !== false) return undefined;
+  if (report.checks.fits_bed?.status === "fail") return "It's too big for the printer; make it smaller with the size slider on Your form.";
+  return `Walls under ${formatMm(minWallMm, 1)} won't print; make it larger with the size slider on Your form.`;
 }
 
 export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
@@ -190,18 +201,32 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
   const prevVersion = versionIndex > 0 ? versionsAsc[versionIndex - 1] : undefined;
   const nextVersion = versionIndex >= 0 ? versionsAsc[versionIndex + 1] : undefined;
 
-  // Dirty when the sliders or the Chhaap differ from the version on stage; one Sculpt sends both.
-  const paramsDirty = activeVersion ? !sameParams(store.paramsDraft, activeVersion.spec.params) : false;
-  const featuresDirty = activeVersion ? !sameFeatures(store.featuresDraft, featuresFromSpec(activeVersion.spec)) : false;
+  // Swaroop: no template params; its size and orientation live on the one hero form, which can't be removed.
+  const raw = familyId === RAW_FAMILY_ID || (family ? isRawFamily(family) : false);
+
+  // Dirty when the sliders or the Chhaap (as it would be sent) differ from the version on stage; one Sculpt sends both.
+  const sending = useMemo(() => featuresForSubmit(store.featuresDraft), [store.featuresDraft]);
+  const paramsDirty = activeVersion && !raw ? !sameParams(store.paramsDraft, activeVersion.spec.params) : false;
+  const featuresDirty = activeVersion ? !sameFeatures(sending, featuresFromSpec(activeVersion.spec)) : false;
   const dirty = paramsDirty || featuresDirty;
   const busy = Boolean(job && job.stage !== "failed");
+  const hold = uploadHold(store.featuresDraft, store.uploads);
+  const needsForm = raw && !store.featuresDraft.some((f) => f.type === "hero_mesh");
+
+  // Finishes: the family's material_rules and the template's list, the same rule the composers apply.
+  const allowedFinishes = useMemo(() => allowedMaterialIds(store.materials, family, template), [store.materials, family, template]);
+  useEffect(() => {
+    if (!material || allowedFinishes.length === 0 || allowedFinishes.includes(material.id)) return;
+    const first = allowedFinishes[0];
+    if (first) useDesignStore.getState().selectMaterial(first);
+  }, [material, allowedFinishes]);
 
   async function sculpt() {
-    if (!activeVersion || !material) return;
+    if (!activeVersion || !material || hold || needsForm) return;
     setSculpting(true);
     setSculptProblem(undefined);
     try {
-      const accepted = await api.versions.editParams(activeVersion.id, { params: store.paramsDraft, material: material.id, features: store.featuresDraft });
+      const accepted = await api.versions.editParams(activeVersion.id, { params: raw ? {} : store.paramsDraft, material: material.id, features: sending });
       useDesignStore.getState().startJob(accepted.job_id);
       router.replace(`/design/${designId}?job=${encodeURIComponent(accepted.job_id)}`);
     } catch (err) {
@@ -248,10 +273,9 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
   const bounds = boundsMm(activeVersion);
   const model = glbUrl(activeVersion);
   const environment = template?.environment ?? family?.environment;
-  const raw = familyId === RAW_FAMILY_ID || (family ? isRawFamily(family) : false);
-  const hardware = hardwareNames(activeVersion?.hardware);
-  const minWall = template?.constraints.min_wall_mm ?? 1.2;
-  const rawNudge = raw && activeVersion?.printability?.passed === false && !busy ? `The studio needs walls of at least ${formatMm(minWall, 1)} here; try a larger size.` : undefined;
+  const hardware = hardwareNames(namedHardware(activeVersion?.hardware, family));
+  const minWall = template?.constraints.min_wall_mm ?? activeVersion?.spec.constraints?.min_wall_mm ?? 1.2;
+  const nudge = raw && !busy ? rawNudge(activeVersion?.printability, minWall) : undefined;
 
   const eyebrow = family
     ? familyLabel(family)
@@ -348,25 +372,44 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
 
           {template ? (
             <>
-              <ParamSliders
-                params={template.params}
-                values={store.paramsDraft}
-                onChange={(k, v) => useDesignStore.getState().setParam(k, v)}
-                disabled={busy || sculpting}
-              />
+              {/* Swaroop's size and orientation sit on the "Your form" card; its template has no sliders of its own. */}
+              {!raw && (
+                <ParamSliders
+                  params={template.params}
+                  values={store.paramsDraft}
+                  onChange={(k, v) => useDesignStore.getState().setParam(k, v)}
+                  disabled={busy || sculpting}
+                />
+              )}
               {hasContentSlot(template) && (
                 <ContentSlotPanel
                   template={template}
                   family={family}
                   features={store.featuresDraft}
                   onChange={(anchorId, feature) => useDesignStore.getState().setFeature(anchorId, feature)}
+                  raw={raw}
                   disabled={busy || sculpting}
                 />
               )}
               <div className="grid gap-2">
-                <button type="button" className="ak-btn ak-btn-primary" onClick={sculpt} disabled={!dirty || busy || sculpting || !activeVersion} aria-busy={sculpting}>
+                <button
+                  type="button"
+                  className="ak-btn ak-btn-primary"
+                  onClick={sculpt}
+                  disabled={!dirty || busy || sculpting || !activeVersion || Boolean(hold) || needsForm}
+                  aria-busy={sculpting}
+                >
                   {sculpting ? "Sending to the studio…" : "Sculpt"}
                 </button>
+                {(hold || needsForm) && (
+                  <p role="status" className="text-[11px] leading-snug text-warning">
+                    {hold === "checking"
+                      ? "The studio is checking a file you added. Sculpt opens as soon as it's cleared."
+                      : hold === "rejected"
+                        ? "A file you added can't be printed. Choose a different one to sculpt."
+                        : "Add your model file to sculpt."}
+                  </p>
+                )}
                 {dirty && activeVersion && (
                   <button type="button" className="ak-btn ak-btn-secondary min-h-9 text-xs" onClick={undo} disabled={busy}>
                     Undo changes
@@ -374,7 +417,11 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
                 )}
                 {sculptProblem && (
                   <p role="alert" className="text-xs text-danger">
-                    {sculptProblem.code === "upload_not_ready" ? "A file in your Chhaap is still with a reviewer." : (sculptProblem.detail ?? sculptProblem.title)}
+                    {sculptProblem.code === "upload_not_ready"
+                      ? "The studio is still checking a file you added. You can sculpt as soon as it's cleared."
+                      : sculptProblem.code === "upload_rejected"
+                        ? REJECTED_COPY
+                        : (sculptProblem.detail ?? sculptProblem.title)}
                   </p>
                 )}
               </div>
@@ -459,7 +506,7 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
 
         {/* Right: finishes, stats, stability, price */}
         <aside className="ak-panel order-2 grid content-start gap-4 border-t border-surface-border p-5 lg:order-3 lg:min-h-0 lg:overflow-y-auto lg:border-l lg:border-t-0">
-          <FinishChips materials={store.materials} value={material?.id} onChange={(id) => useDesignStore.getState().selectMaterial(id)} allowed={template?.materials} disabled={sculpting} />
+          <FinishChips materials={store.materials} value={material?.id} onChange={(id) => useDesignStore.getState().selectMaterial(id)} allowed={allowedFinishes} disabled={sculpting} />
 
           <div className="ak-well grid gap-1.5 p-3.5">
             <Stat label="Height" value={bounds ? formatMm(bounds[2]) : undefined} hint={bounds ? `${formatMm(bounds[0])} × ${formatMm(bounds[1])} × ${formatMm(bounds[2])}` : undefined} />
@@ -469,9 +516,9 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
           </div>
 
           <StabilityCard report={activeVersion?.printability} pending={busy || activeVersion?.status === "generating"} />
-          {rawNudge && (
+          {nudge && (
             <p role="status" className="text-xs leading-snug text-warning">
-              {rawNudge}
+              {nudge}
             </p>
           )}
 

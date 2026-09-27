@@ -1,8 +1,9 @@
 "use client";
 
 import { create } from "zustand";
-import type { Design, DesignSpec, DesignVersion, JobStageEvent, Material, ParamValues, PriceBreakdown, Stage } from "@/lib/api/types";
-import { featuresFromSpec, withFeature, type Feature } from "@/lib/features";
+import type { Design, DesignSpec, DesignVersion, JobStageEvent, Material, ParamValues, PriceBreakdown, Stage, Upload } from "@/lib/api/types";
+import { featuresFromSpec, uploadIdOf, withFeature, type Feature } from "@/lib/features";
+import { rejectionMessage } from "@/lib/uploads";
 import { FALLBACK_MATERIALS } from "@/lib/viewer/materials";
 
 export interface JobProgress {
@@ -12,6 +13,15 @@ export interface JobProgress {
   percent?: number;
   versionId?: string | null;
   errorCode?: string | null;
+}
+
+/** What this tab knows about a customer upload: the file's own name, its review state, a preview URL once cleared. */
+export interface UploadNote {
+  name?: string;
+  status?: Upload["status"];
+  url?: string;
+  /** Why a reviewer turned the file down (the API's words, or the default copy). */
+  message?: string;
 }
 
 export type PriceState =
@@ -32,6 +42,11 @@ interface DesignState {
   paramsDraft: ParamValues;
   /** The Chhaap being edited: at most one feature per anchor; sent whole with the next Sculpt. */
   featuresDraft: Feature[];
+  /**
+   * Uploads seen in this tab, by id. Kept across `reset()`, so the Chhaap panel still shows a file's own name
+   * after a remount or the hop from a composer to the studio.
+   */
+  uploads: Record<string, UploadNote>;
 
   setDesign(design: Design): void;
   setVersions(versions: DesignVersion[]): void;
@@ -48,6 +63,9 @@ interface DesignState {
   setFeature(anchorId: string, feature: Feature | null): void;
   /** Rebuild the draft from a version's spec (undo, or a new version arriving). */
   resetFeatures(fromSpec: Pick<DesignSpec, "features"> | undefined): void;
+  /** Note a fresh upload (with the file's name, when the browser has it) or a newer record from polling. */
+  rememberUpload(upload: Upload, fileName?: string): void;
+  /** Back to an empty studio; the upload notes stay. */
   reset(): void;
 }
 
@@ -61,6 +79,7 @@ const initial = {
   job: undefined,
   paramsDraft: {} as ParamValues,
   featuresDraft: [] as Feature[],
+  uploads: {} as Record<string, UploadNote>,
 };
 
 export const useDesignStore = create<DesignState>()((set, get) => ({
@@ -120,7 +139,19 @@ export const useDesignStore = create<DesignState>()((set, get) => ({
 
   resetFeatures: (fromSpec) => set({ featuresDraft: featuresFromSpec(fromSpec) }),
 
-  reset: () => set({ ...initial }),
+  rememberUpload: (upload, fileName) =>
+    set((s) => {
+      const prev = s.uploads[upload.id];
+      const note: UploadNote = {
+        name: fileName ?? prev?.name,
+        status: upload.status,
+        url: upload.url ?? prev?.url,
+        message: upload.status === "rejected" ? rejectionMessage(upload) : undefined,
+      };
+      return { uploads: { ...s.uploads, [upload.id]: note } };
+    }),
+
+  reset: () => set((s) => ({ ...initial, uploads: s.uploads })),
 }));
 
 /** Selects the version currently on stage. */
@@ -134,4 +165,19 @@ export function selectActiveVersion(s: Pick<DesignState, "design" | "versions" |
 
 export function selectMaterial(s: Pick<DesignState, "materials" | "materialId">): Material | undefined {
   return s.materials.find((m) => m.id === s.materialId) ?? s.materials[0];
+}
+
+/**
+ * Why these features can't be sent yet: a file the studio is still checking, or one a reviewer turned down.
+ * A feature whose upload this tab never saw (a stored spec) was accepted by the API, so it never holds.
+ */
+export function uploadHold(features: readonly Feature[], uploads: Readonly<Record<string, UploadNote>>): "checking" | "rejected" | undefined {
+  let checking = false;
+  for (const f of features) {
+    const id = uploadIdOf(f);
+    const status = id ? uploads[id]?.status : undefined;
+    if (status === "rejected") return "rejected";
+    if (status === "pending_review") checking = true;
+  }
+  return checking ? "checking" : undefined;
 }

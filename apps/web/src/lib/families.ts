@@ -2,6 +2,7 @@
 // picker ordering and the material rules that trim the finish chips. Codenames, names and taglines are
 // data from the API (portal-editable); code ids such as `raw_print` never change.
 import type { Family, HardwareRef, Material, TemplateDescriptor } from "@/lib/api/types";
+import { joinList } from "@/lib/format";
 
 /** The one family that prints a customer's own model file as it is (Swaroop). */
 export const RAW_FAMILY_ID = "raw_print";
@@ -20,9 +21,22 @@ export function hardwareName(part: HardwareRef): string {
   return part.name ?? humanise(part.sku);
 }
 
-function joinAnd(parts: string[]): string {
-  if (parts.length <= 1) return parts.join("");
-  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+/**
+ * Parts with their customer-facing names. A template's list (and an older version's) carries only sku and qty,
+ * so a missing name comes from the family's list, which the API fills from hardware_items; only a part the family
+ * doesn't name either falls back to its humanised sku (in `hardwareName`).
+ */
+export function namedHardware(parts: readonly HardwareRef[] | undefined, family?: Pick<Family, "hardware">): HardwareRef[] {
+  const names = new Map((family?.hardware ?? []).flatMap((h) => (h.name ? [[h.sku, h.name] as const] : [])));
+  return (parts ?? []).map((h) => {
+    const name = h.name ?? names.get(h.sku);
+    return name ? { ...h, name } : { ...h };
+  });
+}
+
+/** What goes in the box with this template: its own list when it has one (its pockets are cut for those parts), else the family default. */
+export function packedHardware(family: Pick<Family, "hardware">, template?: Pick<TemplateDescriptor, "hardware">): HardwareRef[] {
+  return namedHardware(template?.hardware?.length ? template.hardware : family.hardware, family);
 }
 
 /** "Comes with a steel split ring 25 mm", "Comes with 2 × neodymium disc magnet 10 × 3 mm": the picker's hardware line. */
@@ -38,7 +52,7 @@ export function hardwareSentence(hardware: readonly HardwareRef[] | undefined): 
     if (pair) return `a pair of ${lower}`;
     return `${/^[aeiou]/i.test(lower) ? "an" : "a"} ${lower}`;
   });
-  return `Comes with ${joinAnd(parts)}`;
+  return `Comes with ${joinList(parts)}`;
 }
 
 /** "Steel split ring 25 mm · 2 × Neodymium disc magnet 10 × 3 mm": the value behind a "Comes with" label. */

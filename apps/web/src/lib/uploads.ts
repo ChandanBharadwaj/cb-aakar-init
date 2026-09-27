@@ -1,8 +1,34 @@
 // Client-side rules for customer uploads (POST /api/uploads): accepted formats and size caps from the
 // contract, so a file that the API would refuse never leaves the browser. The noun in copy is always
 // "photo" or "model file", never mesh.
-import type { UploadKind } from "@/lib/api/types";
+import type { Upload, UploadKind } from "@/lib/api/types";
 import type { ContentFormat } from "@/lib/features";
+
+/** A file the content scanner sent to a reviewer is polled every 4 s, for at most two minutes. */
+export const REVIEW_POLL_MS = 4_000;
+export const REVIEW_POLL_LIMIT_MS = 120_000;
+
+/** What a customer reads when a file is turned down and the API gives no reason of its own. */
+export const REJECTED_COPY = "We can't print this one; try a different file.";
+
+/**
+ * Why a file was turned down, in the API's words when it sends a `message` (not in the Upload contract yet,
+ * so it is read defensively), else the default copy.
+ */
+export function rejectionMessage(upload: Upload): string {
+  const message = (upload as Upload & { message?: unknown }).message;
+  return typeof message === "string" && message.trim() ? message.trim() : REJECTED_COPY;
+}
+
+/** "dragon_v2.stl" → "dragon v2": a working title from a file name. */
+export function fileTitle(name: string): string {
+  return name
+    .replace(/\.[^.]+$/, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80);
+}
 
 export const IMAGE_FORMATS: readonly ContentFormat[] = ["png", "jpg", "webp", "heic"];
 export const MODEL_FORMATS: readonly ContentFormat[] = ["stl", "glb", "3mf", "obj", "ply", "off", "gltf"];

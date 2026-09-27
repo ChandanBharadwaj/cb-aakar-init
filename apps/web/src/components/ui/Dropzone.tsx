@@ -3,7 +3,7 @@
 import { useId, useRef, useState, type DragEvent } from "react";
 import { api, toProblem } from "@/lib/api/client";
 import type { Upload, UploadKind } from "@/lib/api/types";
-import { acceptFor, fileProblem, formatBytes, formatHint } from "@/lib/uploads";
+import { acceptFor, fileProblem, formatBytes, formatHint, rejectionMessage } from "@/lib/uploads";
 
 export interface DropzoneProps {
   kind: UploadKind;
@@ -44,7 +44,7 @@ export function Dropzone({ kind, label, title, hint, onUploaded, disabled, compa
     try {
       const upload = await api.uploads.create(file, kind);
       if (upload.status === "rejected") {
-        setState({ status: "error", message: kind === "image" ? "We can't use this photo. Try another one." : "We can't print this file. Try another export from your 3D program." });
+        setState({ status: "error", message: rejectionMessage(upload) });
         return;
       }
       setState({ status: "idle" });

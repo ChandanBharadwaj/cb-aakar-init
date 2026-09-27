@@ -6,10 +6,13 @@ import { useEffect, useId, useMemo, useState } from "react";
 import { formatPaise } from "@aakar/design-tokens";
 import { api, toProblem } from "@/lib/api/client";
 import type { CatalogItem, Family, Material, ParamValues, Problem } from "@/lib/api/types";
-import { allowedMaterialIds, defaultTemplate, envelopeLine, hardwareNames, hardwareSentence, priceFromLabel } from "@/lib/families";
-import { contentAnchors, familyLabel, featureSummary, type Feature } from "@/lib/features";
+import { allowedMaterialIds, defaultTemplate, envelopeLine, hardwareNames, hardwareSentence, packedHardware, priceFromLabel } from "@/lib/families";
+import { CHHAAP, contentAnchors, familyLabel, featureSummary, featuresForSubmit, type Feature } from "@/lib/features";
+import { capitalise } from "@/lib/format";
+import { REJECTED_COPY } from "@/lib/uploads";
 import { FALLBACK_MATERIALS } from "@/lib/viewer/materials";
 import { environmentLabel } from "@/lib/viewer/environments";
+import { uploadHold, useDesignStore } from "@/store/design";
 import { ContentSlotPanel } from "@/components/design/ContentSlotPanel";
 import { FinishChips } from "@/components/ui/FinishChips";
 
@@ -34,7 +37,8 @@ function primitiveParams(values: Record<string, unknown> | undefined): ParamValu
 /**
  * The Avatar composer: pick a template when the family has several, fill the Chhaap, choose a finish,
  * then "Sculpt" → `POST /api/designs {source: "create", family_id, template_id, features, material, title}`
- * → the studio with the job, exactly like the Shop and Remix paths.
+ * → the studio with the job, exactly like the Shop and Remix paths. Sculpt waits while the studio is still
+ * checking a file in the Chhaap, and after a file is turned down until it is replaced.
  */
 export function ContentComposer({ family, materials: materialsProp, item, prompt }: ContentComposerProps) {
   const router = useRouter();
@@ -49,6 +53,9 @@ export function ContentComposer({ family, materials: materialsProp, item, prompt
   const [title, setTitle] = useState(() => (prompt ?? item?.name ?? "").slice(0, 80));
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<Problem>();
+  const uploads = useDesignStore((s) => s.uploads);
+  const hold = uploadHold(features, uploads);
+  const sending = useMemo(() => featuresForSubmit(features), [features]);
 
   // A template switch can change the finishes on offer; keep the selection valid.
   useEffect(() => {
@@ -69,7 +76,7 @@ export function ContentComposer({ family, materials: materialsProp, item, prompt
   }
 
   async function sculpt() {
-    if (!template || !materialId || busy) return;
+    if (!template || !materialId || busy || hold) return;
     setBusy(true);
     setProblem(undefined);
     try {
@@ -78,7 +85,7 @@ export function ContentComposer({ family, materials: materialsProp, item, prompt
         source: "create",
         family_id: family.id,
         template_id: template.id,
-        features,
+        features: sending,
         material: materialId,
         title: title.trim() || familyLabel(family),
         ...(params ? { params } : {}),
@@ -90,14 +97,16 @@ export function ContentComposer({ family, materials: materialsProp, item, prompt
     }
   }
 
-  const hardware = hardwareNames(template?.hardware?.length ? template.hardware : family.hardware);
+  // The template's parts are authoritative but carry only sku and qty; the names come from the family.
+  const packed = packedHardware(family, template);
+  const hardware = hardwareNames(packed);
   const from = priceFromLabel(family, formatPaise);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
       <section className="ak-card grid content-start gap-6 p-6 sm:p-8" aria-labelledby="composer-heading">
         <header className="grid gap-2">
-          <span className="ak-eyebrow">{family.kind === "object" ? "Object" : "Avatar"}</span>
+          <span className="ak-eyebrow">{family.kind === "object" ? "Object" : "Avatar · the form your idea takes"}</span>
           <h1 id="composer-heading" className="font-display text-4xl font-semibold leading-none">
             {family.codename} <span className="text-surface-muted">· {family.name}</span>
           </h1>
@@ -112,10 +121,10 @@ export function ContentComposer({ family, materials: materialsProp, item, prompt
 
         {!ready ? (
           <div className="ak-well grid gap-2 p-5">
-            <p className="font-semibold">{family.codename} is still being finished in the studio.</p>
-            <p className="text-sm text-surface-muted">Pick another Avatar for now; this one opens as soon as its template is live.</p>
+            <p className="font-semibold">{familyLabel(family)} is still being finished in the studio.</p>
+            <p className="text-sm text-surface-muted">Pick another form for your idea for now; this one opens as soon as its template is live.</p>
             <Link href="/create" className="ak-btn ak-btn-secondary ak-btn-pill justify-self-start">
-              Back to the Avatars
+              Back to Create
             </Link>
           </div>
         ) : (
@@ -158,19 +167,27 @@ export function ContentComposer({ family, materials: materialsProp, item, prompt
             </div>
 
             <div className="grid gap-2">
-              <button type="button" className="ak-btn ak-btn-primary ak-btn-pill justify-self-start px-8" onClick={sculpt} disabled={busy || !template || !materialId} aria-busy={busy}>
+              <button type="button" className="ak-btn ak-btn-primary ak-btn-pill justify-self-start px-8" onClick={sculpt} disabled={busy || !template || !materialId || Boolean(hold)} aria-busy={busy}>
                 {busy ? "Sending to the studio…" : "Sculpt"}
               </button>
-              <p className="text-[12px] text-surface-muted">
-                {features.length === 0 ? "You can sculpt the plain Avatar and add your Chhaap in the studio." : "Sculpt opens the studio, where size, finish and price are live."}
+              <p className={hold ? "text-[12px] text-warning" : "text-[12px] text-surface-muted"} role={hold ? "status" : undefined}>
+                {hold === "checking"
+                  ? "The studio is checking a file you added. Sculpt opens as soon as it's cleared."
+                  : hold === "rejected"
+                    ? "A file you added can't be printed. Choose a different one to sculpt."
+                    : sending.length === 0
+                      ? `You can sculpt it plain and add ${CHHAAP.phrase} in the studio.`
+                      : "Sculpt opens the studio, where size, finish and price are live."}
               </p>
               {problem && (
                 <p role="alert" className="text-xs text-danger">
                   {problem.code === "upload_not_ready"
-                    ? "A file you added is still with a reviewer. You can sculpt once it's approved."
-                    : problem.code === "family_not_available"
-                      ? `${family.codename} isn't open right now.`
-                      : (problem.detail ?? problem.title)}
+                    ? "The studio is still checking a file you added. You can sculpt as soon as it's cleared."
+                    : problem.code === "upload_rejected"
+                      ? REJECTED_COPY
+                      : problem.code === "family_not_available"
+                        ? `${familyLabel(family)} isn't open right now.`
+                        : (problem.detail ?? problem.title)}
                 </p>
               )}
             </div>
@@ -198,13 +215,13 @@ export function ContentComposer({ family, materials: materialsProp, item, prompt
             </div>
           )}
           <div className="grid gap-0.5">
-            <dt className="text-[11px] text-surface-muted">Your Chhaap</dt>
+            <dt className="text-[11px] text-surface-muted">{capitalise(CHHAAP.phrase)}</dt>
             <dd>
-              {features.length === 0 ? (
+              {sending.length === 0 ? (
                 <span className="text-surface-muted">Nothing yet</span>
               ) : (
                 <ul className="grid gap-1">
-                  {features.map((f) => (
+                  {sending.map((f) => (
                     <li key={`${f.anchor}-${f.type}`} className="font-semibold">
                       {featureSummary(f)}
                     </li>
@@ -221,7 +238,7 @@ export function ContentComposer({ family, materials: materialsProp, item, prompt
           )}
         </dl>
         <p className="text-[11px] leading-snug text-surface-muted">
-          {hardwareSentence(family.hardware) ?? "Printed to order in the finish you choose."} Nothing is printed until you pay.
+          {hardwareSentence(packed) ?? "Printed to order in the finish you choose."} Nothing is printed until you pay.
         </p>
       </aside>
     </div>

@@ -6,6 +6,7 @@
 // required on the response side, so the UI keeps this discriminated union with optional
 // defaults instead. Keep it in step with the schema whenever a feature changes.
 import type { DesignSpec, Family, TemplateAnchor, TemplateDescriptor } from "@/lib/api/types";
+import { capitalise, formatMm } from "@/lib/format";
 
 export type FeatureType = "emboss_text" | "motif" | "relief_image" | "hero_mesh";
 
@@ -63,7 +64,10 @@ export type ReliefImage = {
   cutout?: "none" | "silhouette";
 };
 
-/** `$defs/hero_mesh` — Roop. */
+/**
+ * `$defs/hero_mesh` — Roop. On Swaroop (`raw_print@1`, no template params) this one feature carries the
+ * piece's size (`fit: "longest"` + `longest_mm`) and `orientation`.
+ */
 export type HeroMesh = {
   type: "hero_mesh";
   source: ContentSource;
@@ -79,6 +83,8 @@ export type HeroMesh = {
 
 export type Feature = EmbossText | Motif | ReliefImage | HeroMesh;
 
+export type Orientation = NonNullable<HeroMesh["orientation"]>;
+
 // Schema limits, so sliders and counters never offer a value the API would refuse.
 export const TEXT_MAX_CHARS = 40;
 export const RELIEF_MM = { min: 0.2, max: 3, default: 0.6 } as const;
@@ -88,17 +94,28 @@ export const LONGEST_MM = { min: 5, max: 250 } as const;
 /** Display order of the Chhaap tabs: text, photo, your form, then motifs (which arrive later). */
 export const FEATURE_TYPES: readonly FeatureType[] = ["emboss_text", "relief_image", "hero_mesh", "motif"];
 
+/**
+ * Buti (motifs) needs the motif library, which isn't live yet. Until it is, a motif is never offered as something
+ * to add: the Avatar picker and the Shop's "Make it yours" line leave it out, and the Chhaap tabs mark it "soon".
+ */
+export const MOTIFS_LIVE = false;
+
+/** True for the feature types a customer can add today. */
+export function isLiveFeature(type: FeatureType): boolean {
+  return type !== "motif" || MOTIFS_LIVE;
+}
+
 export type FeatureCodename = "Naam" | "Buti" | "Chhavi" | "Roop";
 
-const FEATURE_COPY: Record<FeatureType, { codename: FeatureCodename; descriptor: string }> = {
-  emboss_text: { codename: "Naam", descriptor: "Name or text" },
-  motif: { codename: "Buti", descriptor: "Motif" },
-  relief_image: { codename: "Chhavi", descriptor: "Photo relief" },
-  hero_mesh: { codename: "Roop", descriptor: "Your own 3D form" },
+const FEATURE_COPY: Record<FeatureType, { codename: FeatureCodename; descriptor: string; noun: string }> = {
+  emboss_text: { codename: "Naam", descriptor: "Name or text", noun: "text" },
+  motif: { codename: "Buti", descriptor: "Motif", noun: "motif" },
+  relief_image: { codename: "Chhavi", descriptor: "Photo relief", noun: "photo relief" },
+  hero_mesh: { codename: "Roop", descriptor: "Your own 3D form", noun: "your own 3D form" },
 };
 
-/** Brand name of a feature type: Naam · Buti · Chhavi · Roop. */
-export function featureLabel(type: FeatureType): FeatureCodename {
+/** The bare codename (Naam · Buti · Chhavi · Roop), only for places that show its descriptor right beside it, like the Chhaap tabs. */
+export function featureCodename(type: FeatureType): FeatureCodename {
   return FEATURE_COPY[type].codename;
 }
 
@@ -107,15 +124,29 @@ export function featureDescriptor(type: FeatureType): string {
   return FEATURE_COPY[type].descriptor;
 }
 
-/** "Naam · Name or text": the codename paired with its descriptor, the way every label in the app reads. */
-export function featureTitle(type: FeatureType): string {
-  return `${featureLabel(type)} · ${featureDescriptor(type)}`;
+/** "Naam · Name or text": the codename paired with its descriptor, for labels and titles. */
+export function featureLabel(type: FeatureType): string {
+  return `${featureCodename(type)} · ${featureDescriptor(type)}`;
 }
+
+/** "text (Naam)", "your own 3D form (Roop)": plain words first and the codename after, for running copy. */
+export function featurePhrase(type: FeatureType): string {
+  return `${FEATURE_COPY[type].noun} (${featureCodename(type)})`;
+}
+
+/** The Chhaap itself, the brand word for everything a customer sets into a piece, with its plain words. */
+export const CHHAAP = { label: "Chhaap · Your imprint", phrase: "your imprint (Chhaap)" } as const;
 
 /** "Saathi · Keychain & bag charm": an Avatar's codename with its plain name. */
 export function familyLabel(family: Pick<Family, "codename" | "name">): string {
   return `${family.codename} · ${family.name}`;
 }
+
+/** "As uploaded · Lay flat": how a customer's own form sits on the bed (Swaroop). */
+export const ORIENTATIONS: readonly { value: Orientation; label: string; description: string }[] = [
+  { value: "as_uploaded", label: "As uploaded", description: "Keep the file's own orientation" },
+  { value: "lay_flat", label: "Lay flat", description: "Turn it to rest on its flattest face" },
+];
 
 const SCRIPT_RANGES: readonly [TextScript, RegExp][] = [
   ["devanagari", /[ऀ-ॿ]/],
@@ -137,46 +168,80 @@ export function detectScript(text: string): TextScript | undefined {
   return undefined;
 }
 
+type ContentTemplate = Pick<TemplateDescriptor, "anchors" | "features_supported">;
+
 /**
- * Feature types an anchor takes: its own `accepts`, else the template's `features_supported`
- * (the contract's default). Only a volume anchor can hold a hero form; a surface anchor holds the rest.
+ * Feature types an anchor takes: its own `accepts` (else the template's `features_supported`, the contract's
+ * default), never more than the template supports; a descriptor without `features_supported` supports nothing.
+ * Only a volume anchor holds a hero form; a surface anchor holds the rest.
  */
 export function anchorAccepts(anchor: TemplateAnchor, template: Pick<TemplateDescriptor, "features_supported">): FeatureType[] {
-  const kind = anchor.kind ?? "surface";
-  const list: FeatureType[] = anchor.accepts ?? template.features_supported ?? [];
-  return FEATURE_TYPES.filter((t) => list.includes(t) && (kind === "volume" ? t === "hero_mesh" : t !== "hero_mesh"));
+  const supported: readonly string[] = template.features_supported ?? [];
+  const list: readonly string[] = anchor.accepts ?? supported;
+  const volume = (anchor.kind ?? "surface") === "volume";
+  return FEATURE_TYPES.filter((t) => list.includes(t) && supported.includes(t) && (volume ? t === "hero_mesh" : t !== "hero_mesh"));
 }
 
-/** Anchors that can carry content, in descriptor order. */
-export function contentAnchors(template: Pick<TemplateDescriptor, "anchors" | "features_supported">): TemplateAnchor[] {
-  return template.anchors.filter((a) => anchorAccepts(a, template).length > 0);
+/** Anchors a customer can fill today (at least one live feature type), in descriptor order. */
+export function contentAnchors(template: ContentTemplate): TemplateAnchor[] {
+  return (template.anchors ?? []).filter((a) => anchorAccepts(a, template).some(isLiveFeature));
 }
 
 /** True when the template has somewhere to put a Chhaap. */
-export function hasContentSlot(template: Pick<TemplateDescriptor, "anchors" | "features_supported">): boolean {
+export function hasContentSlot(template: ContentTemplate): boolean {
   return contentAnchors(template).length > 0;
 }
 
-const round1 = (n: number) => Math.round(n * 10) / 10;
-
-/** Deepest relief this anchor allows (its `max_relief_mm`, capped by the schema). */
-export function maxReliefMm(anchor: Pick<TemplateAnchor, "max_relief_mm">): number {
-  return round1(Math.max(RELIEF_MM.min, Math.min(RELIEF_MM.max, anchor.max_relief_mm ?? RELIEF_MM.max)));
+/** What the composer can put on this template today, across its anchors, in tab order (Buti waits for the motif library). */
+export function templateTakes(template: ContentTemplate): FeatureType[] {
+  const found = new Set(contentAnchors(template).flatMap((a) => anchorAccepts(a, template)));
+  return FEATURE_TYPES.filter((t) => found.has(t) && isLiveFeature(t));
 }
 
-/** 0.6 mm, or less when the anchor is shallower. */
-export function defaultReliefMm(anchor: Pick<TemplateAnchor, "max_relief_mm">): number {
-  return Math.min(RELIEF_MM.default, maxReliefMm(anchor));
+/** What a family's live templates take today: the picker's "Takes …" line (never the family's aspirational `content_slot.accepts`). */
+export function familyTakes(family: Pick<Family, "templates">): FeatureType[] {
+  const found = new Set(family.templates.flatMap((t) => templateTakes(t)));
+  return FEATURE_TYPES.filter((t) => found.has(t));
 }
 
-export function clampReliefMm(value: number, anchor: Pick<TemplateAnchor, "max_relief_mm">): number {
-  return round1(Math.min(maxReliefMm(anchor), Math.max(RELIEF_MM.min, value)));
+const ADD_WORDS: readonly (readonly [FeatureType, string])[] = [
+  ["relief_image", "a photo"],
+  ["hero_mesh", "your own 3D form"],
+  ["emboss_text", "your name"],
+];
+
+/** ["a photo", "your name"]: what a customer can add, in plain words, for "Make it yours · add a photo or your name". */
+export function addWords(types: readonly FeatureType[]): string[] {
+  return ADD_WORDS.filter(([t]) => types.includes(t)).map(([, words]) => words);
 }
 
-/** Text depth: the schema default, kept inside the anchor's relief cap. */
-export function defaultTextDepthMm(anchor: Pick<TemplateAnchor, "max_relief_mm">): number {
-  const cap = anchor.max_relief_mm ?? TEXT_DEPTH_MM.default;
-  return round1(Math.min(TEXT_DEPTH_MM.default, Math.max(TEXT_DEPTH_MM.min, cap)));
+export interface DepthRange {
+  min: number;
+  max: number;
+  default: number;
+}
+
+function depthRange(schema: DepthRange, anchor: Pick<TemplateAnchor, "max_relief_mm">): DepthRange {
+  const cap = typeof anchor.max_relief_mm === "number" && anchor.max_relief_mm > 0 ? anchor.max_relief_mm : schema.max;
+  const max = Math.min(schema.max, cap);
+  // An anchor shallower than the schema's floor pulls the floor down to its cap, so the slider never offers more than the anchor takes.
+  const min = Math.min(schema.min, max);
+  return { min, max, default: Math.min(max, Math.max(min, schema.default)) };
+}
+
+/** Photo relief depth on this anchor: 0.2–3 mm, default 0.6, never deeper than its `max_relief_mm`. */
+export function reliefRange(anchor: Pick<TemplateAnchor, "max_relief_mm">): DepthRange {
+  return depthRange(RELIEF_MM, anchor);
+}
+
+/** Letter depth on this anchor: 0.4–3 mm, default 1.2, under the same `max_relief_mm` cap. */
+export function textDepthRange(anchor: Pick<TemplateAnchor, "max_relief_mm">): DepthRange {
+  return depthRange(TEXT_DEPTH_MM, anchor);
+}
+
+/** A slider value kept inside the range (hundredths, so a cap such as 1.25 mm is never rounded past). */
+export function clampDepth(value: number, range: DepthRange): number {
+  return Math.min(range.max, Math.max(range.min, Math.round(value * 100) / 100));
 }
 
 /** Characters a Naam may have on this family (its `content_slot.max_text_chars`, never above the schema's 40). */
@@ -222,6 +287,23 @@ export function featureOn(features: readonly Feature[], anchorId: string): Featu
   return features.find((f) => f.anchor === anchorId);
 }
 
+/** The upload behind a photo relief or a hero form. */
+export function uploadIdOf(feature: Feature): string | undefined {
+  return feature.type === "relief_image" || feature.type === "hero_mesh" ? feature.source.upload_id : undefined;
+}
+
+/**
+ * The Chhaap as it is sent: each Naam is trimmed here, once, instead of on every keystroke, and a Naam that is
+ * only spaces leaves its spot plain.
+ */
+export function featuresForSubmit(features: readonly Feature[]): Feature[] {
+  return features.flatMap((f): Feature[] => {
+    if (f.type !== "emboss_text") return [f];
+    const text = f.text.trim();
+    return text ? [{ ...f, text }] : [];
+  });
+}
+
 function stable(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stable);
   if (typeof value === "object" && value !== null) {
@@ -243,16 +325,19 @@ export function sameFeatures(a: readonly Feature[], b: readonly Feature[]): bool
   return JSON.stringify(stable(sort(a))) === JSON.stringify(stable(sort(b)));
 }
 
-/** One line describing a feature for chips and the karigar-style summary. */
+/** One line describing a feature for summaries: "Text (Naam) · “Asha”", "Photo relief (Chhavi) · raised 0.6 mm". */
 export function featureSummary(feature: Feature): string {
+  const head = capitalise(featurePhrase(feature.type));
   switch (feature.type) {
     case "emboss_text":
-      return `${featureLabel("emboss_text")} · “${feature.text}”`;
-    case "relief_image":
-      return `${featureLabel("relief_image")} · photo, ${feature.mode === "deboss" ? "cut in" : "raised"} ${(feature.relief_mm ?? RELIEF_MM.default).toFixed(1)} mm`;
+      return `${head} · “${feature.text.trim()}”`;
+    case "relief_image": {
+      const how = feature.mode === "deboss" ? "cut in" : feature.mode === "lithophane" ? "lit from behind" : "raised";
+      return `${head} · ${how} ${formatMm(feature.relief_mm ?? RELIEF_MM.default, 1)}`;
+    }
     case "hero_mesh":
-      return `${featureLabel("hero_mesh")} · your form${feature.longest_mm ? `, ${Math.round(feature.longest_mm)} mm` : ""}`;
+      return `${head}${feature.longest_mm ? ` · ${Math.round(feature.longest_mm)} mm` : ""}`;
     case "motif":
-      return `${featureLabel("motif")} · ${feature.motif_id.replace(/_/g, " ")}`;
+      return `${head} · ${feature.motif_id.replace(/_/g, " ")}`;
   }
 }

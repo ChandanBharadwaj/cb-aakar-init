@@ -35,20 +35,28 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
 }
 
 /**
- * Streams in after the shell so the heading paints while the API answers. Items are required; the shelves
- * and the template descriptors (for the "Make it yours" line) are niceties with a fallback.
+ * Streams in after the shell so the heading paints while the API answers. Items are required; the shelves,
+ * the template descriptors and the open families (for the "Make it yours" line) are niceties with a fallback.
  */
 async function Catalogue({ category }: { category?: string }) {
-  const [itemsResult, shelvesResult, templatesResult] = await Promise.allSettled([api.catalog.items(), api.catalog.shelves(), api.templates.list()]);
+  const [itemsResult, shelvesResult, templatesResult, familiesResult] = await Promise.allSettled([
+    api.catalog.items(),
+    api.catalog.shelves(),
+    api.templates.list(),
+    api.families.list(),
+  ]);
   if (itemsResult.status === "rejected") {
     return <ProblemCard problem={toProblem(itemsResult.reason)} title="Couldn't reach the studio" action={{ href: "/shop", label: "Try again" }} />;
   }
   const items = shopItems(itemsResult.value);
   const shelves = shelvesResult.status === "fulfilled" && shelvesResult.value.length > 0 ? shelvesResult.value : shelvesFromItems(items);
   const templates = new Map((templatesResult.status === "fulfilled" ? templatesResult.value : []).map((t) => [t.id, t]));
+  // Without the family list the line relies on the template alone; with it, a family that isn't open gets no link.
+  const openFamilies =
+    familiesResult.status === "fulfilled" ? new Set(familiesResult.value.filter((f) => f.available !== false && f.ready !== false).map((f) => f.id)) : undefined;
   const personalise: Record<string, MakeItYours> = {};
   for (const item of items) {
-    const line = makeItYours(item, templates.get(item.template_id));
+    const line = makeItYours(item, templates.get(item.template_id), openFamilies);
     if (line) personalise[item.slug] = line;
   }
   return <ShopGrid items={items} shelves={shelves} initialCategory={category} personalise={personalise} />;

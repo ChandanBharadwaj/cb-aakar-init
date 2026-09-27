@@ -3,16 +3,18 @@
 import { useRouter } from "next/navigation";
 import { useId, useMemo, useState } from "react";
 import { api, toProblem } from "@/lib/api/client";
-import type { Family, Material, Problem, Upload } from "@/lib/api/types";
+import type { Family, Material, Problem } from "@/lib/api/types";
 import { allowedMaterialIds, defaultTemplate, envelopeLine, sizeHint } from "@/lib/families";
-import { longestMmRange, type HeroMesh } from "@/lib/features";
+import { familyLabel, longestMmRange, ORIENTATIONS, type HeroMesh, type Orientation } from "@/lib/features";
 import { formatMm } from "@/lib/format";
-import { fileFormat, formatBytes } from "@/lib/uploads";
+import { fileFormat, fileTitle, formatBytes, REJECTED_COPY } from "@/lib/uploads";
 import { FALLBACK_MATERIALS } from "@/lib/viewer/materials";
+import { useDesignStore } from "@/store/design";
 import { Dropzone } from "@/components/ui/Dropzone";
 import { FinishChips } from "@/components/ui/FinishChips";
 import { RangeField } from "@/components/ui/RangeField";
-import { Segmented, type SegmentedOption } from "@/components/ui/Segmented";
+import { Segmented } from "@/components/ui/Segmented";
+import { useUploadReview } from "./useUploadReview";
 
 export interface RawPrintComposerProps {
   family: Family;
@@ -20,18 +22,20 @@ export interface RawPrintComposerProps {
   prompt?: string;
 }
 
-type Orientation = NonNullable<HeroMesh["orientation"]>;
-
-const ORIENTATIONS: readonly SegmentedOption<Orientation>[] = [
-  { value: "as_uploaded", label: "As uploaded", description: "Keep the file's own orientation" },
-  { value: "lay_flat", label: "Lay flat", description: "Turn it to rest on its flattest face" },
-];
+interface ChosenFile {
+  uploadId: string;
+  name: string;
+  bytes: number;
+  format: string;
+}
 
 /**
  * Swaroop, "Print as it is": a model-file dropzone, a size slider inside the family's envelope, an
- * orientation toggle and finish chips. "Check and price" → `POST /api/designs {source: "upload",
- * family_id: "raw_print", features: [hero_mesh], params: {longest_mm, orientation}, material}` → the studio,
- * where the stability check and the price come back like any other piece.
+ * orientation toggle and finish chips. `raw_print@1` has no template params, so the size and orientation travel
+ * on its one hero form: "Check and price" → `POST /api/designs {source: "upload", family_id: "raw_print",
+ * params: {}, features: [{type: "hero_mesh", anchor, fit: "longest", longest_mm, orientation, yaw_deg: 0}],
+ * material}` → the studio, where the stability check and the price come back like any other piece. A file the
+ * studio is still checking is polled until it is cleared (the button opens) or turned down (choose another).
  */
 export function RawPrintComposer({ family, materials: materialsProp, prompt }: RawPrintComposerProps) {
   const router = useRouter();
@@ -42,7 +46,8 @@ export function RawPrintComposer({ family, materials: materialsProp, prompt }: R
   const range = useMemo(() => longestMmRange(family, anchor), [family, anchor]);
   const allowed = useMemo(() => allowedMaterialIds(materials, family, template), [materials, family, template]);
 
-  const [file, setFile] = useState<{ upload: Upload; file: File }>();
+  const [file, setFile] = useState<ChosenFile>();
+  const review = useUploadReview(file?.uploadId);
   const [longest, setLongest] = useState(range.default);
   const [orientation, setOrientation] = useState<Orientation>("as_uploaded");
   const [materialId, setMaterialId] = useState<string | undefined>(allowed[0]);
@@ -50,29 +55,37 @@ export function RawPrintComposer({ family, materials: materialsProp, prompt }: R
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<Problem>();
 
-  const pendingReview = file?.upload.status === "pending_review";
-  const canCheck = Boolean(file && !pendingReview && materialId) && !busy;
+  const held = review.status === "pending_review" || review.status === "rejected";
+  const canCheck = Boolean(file && materialId) && !held && !busy;
+  const workingTitle = (file ? fileTitle(file.name) : "") || familyLabel(family);
+
+  function chooseAgain() {
+    setFile(undefined);
+    setProblem(undefined);
+  }
 
   async function check() {
-    if (!file || !materialId || busy) return;
+    if (!file || !materialId || busy || held) return;
     setBusy(true);
     setProblem(undefined);
+    // Size and orientation live on the feature; Swaroop's template takes no params.
     const hero: HeroMesh = {
       type: "hero_mesh",
-      source: { upload_id: file.upload.id, url: file.upload.url ?? undefined, format: fileFormat(file.file.name) },
+      source: { upload_id: file.uploadId, url: review.url, format: fileFormat(file.name) },
       anchor: anchor?.id ?? "body",
       fit: "longest",
       longest_mm: longest,
       orientation,
+      yaw_deg: 0,
     };
     try {
       const accepted = await api.designs.create({
         source: "upload",
         family_id: family.id,
+        params: {},
         features: [hero],
-        params: { longest_mm: longest, orientation },
         material: materialId,
-        title: title.trim() || `${family.codename} · ${file.file.name.replace(/\.[^.]+$/, "")}`.slice(0, 80),
+        title: title.trim() || workingTitle,
       });
       router.push(`/design/${accepted.design_id}?job=${encodeURIComponent(accepted.job_id)}`);
     } catch (err) {
@@ -80,6 +93,8 @@ export function RawPrintComposer({ family, materials: materialsProp, prompt }: R
       setBusy(false);
     }
   }
+
+  const fileState = review.checking || review.stalled ? " · being checked" : review.rejected ? " · can't be printed" : " · received";
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -100,14 +115,14 @@ export function RawPrintComposer({ family, materials: materialsProp, prompt }: R
               <span className="ak-label">1 · Your model file</span>
               {file ? (
                 <div className="ak-well flex flex-wrap items-center justify-between gap-3 p-3.5 text-sm">
-                  <div className="grid gap-0.5">
-                    <span className="font-semibold">{file.file.name}</span>
+                  <div className="grid min-w-0 gap-0.5">
+                    <span className="truncate font-semibold">{file.name}</span>
                     <span className="text-[11px] text-surface-muted">
-                      {formatBytes(file.upload.bytes)} · {file.upload.format.toUpperCase()}
-                      {pendingReview ? " · with a reviewer" : " · received"}
+                      {formatBytes(file.bytes)} · {file.format.toUpperCase()}
+                      {fileState}
                     </span>
                   </div>
-                  <button type="button" className="ak-btn ak-btn-secondary min-h-9 px-4 py-1.5 text-xs" onClick={() => setFile(undefined)} disabled={busy}>
+                  <button type="button" className="ak-btn ak-btn-secondary min-h-9 px-4 py-1.5 text-xs" onClick={chooseAgain} disabled={busy}>
                     Replace file
                   </button>
                 </div>
@@ -117,14 +132,39 @@ export function RawPrintComposer({ family, materials: materialsProp, prompt }: R
                   label="Your model file"
                   title="Drop your model file here"
                   hint="Upload the file from your 3D program (.stl, .obj, .3mf) · up to 50 MB"
-                  onUploaded={(upload, f) => setFile({ upload, file: f })}
+                  onUploaded={(upload, f) => {
+                    useDesignStore.getState().rememberUpload(upload, f.name);
+                    setFile({ uploadId: upload.id, name: f.name, bytes: upload.bytes, format: upload.format });
+                    setProblem(undefined);
+                  }}
                   disabled={busy}
                 />
               )}
-              {pendingReview && (
+              {review.checking && (
                 <p role="status" className="text-[12px] text-warning">
-                  This file is with a reviewer. You can check and price it once it&apos;s approved.
+                  The studio is checking this file. &ldquo;Check and price&rdquo; opens as soon as it&apos;s cleared.
                 </p>
+              )}
+              {review.stalled && (
+                <div role="status" className="grid gap-1.5 text-[12px] text-warning">
+                  <p>The studio is still checking this file; it can take a little longer.</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" className="ak-btn ak-btn-secondary min-h-9 px-4 py-1.5 text-xs" onClick={review.recheck} disabled={busy}>
+                      Check again
+                    </button>
+                    <button type="button" className="ak-btn ak-btn-secondary min-h-9 px-4 py-1.5 text-xs" onClick={chooseAgain} disabled={busy}>
+                      Try a different file
+                    </button>
+                  </div>
+                </div>
+              )}
+              {review.rejected && (
+                <div role="status" className="grid gap-1.5 text-[12px] text-warning">
+                  <p>{review.message}</p>
+                  <button type="button" className="ak-btn ak-btn-secondary min-h-9 justify-self-start px-4 py-1.5 text-xs" onClick={chooseAgain} disabled={busy}>
+                    Upload a different file
+                  </button>
+                </div>
               )}
             </div>
 
@@ -153,7 +193,7 @@ export function RawPrintComposer({ family, materials: materialsProp, prompt }: R
               <label htmlFor={titleId} className="text-xs text-surface-muted">
                 Name your piece <span className="opacity-70">(optional)</span>
               </label>
-              <input id={titleId} type="text" className="ak-input" value={title} maxLength={80} placeholder={family.codename} onChange={(e) => setTitle(e.target.value)} disabled={busy} />
+              <input id={titleId} type="text" className="ak-input" value={title} maxLength={80} placeholder={workingTitle} onChange={(e) => setTitle(e.target.value)} disabled={busy} />
             </div>
 
             <div className="grid gap-2">
@@ -161,15 +201,21 @@ export function RawPrintComposer({ family, materials: materialsProp, prompt }: R
                 {busy ? "Sending to the studio…" : "Check and price"}
               </button>
               <p className="text-[12px] text-surface-muted">
-                {file ? "We check the walls and balance first; the price follows in the studio." : "Add your model file to check and price it."}
+                {!file
+                  ? "Add your model file to check and price it."
+                  : held
+                    ? "Check and price opens once the studio has cleared your file."
+                    : "We check the walls and balance first; the price follows in the studio."}
               </p>
               {problem && (
                 <p role="alert" className="text-xs text-danger">
                   {problem.code === "upload_not_ready"
-                    ? "This file is still with a reviewer."
-                    : problem.code === "content_unusable"
-                      ? "We couldn't repair this file. Try another export from your 3D program."
-                      : (problem.detail ?? problem.title)}
+                    ? "The studio is still checking this file."
+                    : problem.code === "upload_rejected"
+                      ? REJECTED_COPY
+                      : problem.code === "content_unusable"
+                        ? "We couldn't repair this file. Try another export from your 3D program."
+                        : (problem.detail ?? problem.title)}
                 </p>
               )}
             </div>

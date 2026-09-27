@@ -24,12 +24,19 @@ async function load(slug: string): Promise<{ item?: CatalogItem; problem?: Probl
   }
 }
 
-/** Shelves and the template descriptor are niceties: the page renders without them. */
-async function extras(item: CatalogItem): Promise<{ shelves: Shelf[]; template?: TemplateDescriptor }> {
-  const [shelves, template] = await Promise.allSettled([api.catalog.shelves(), api.templates.get(item.template_id)]);
+/** Shelves, the template descriptor and the item's family are niceties: the page renders without them. */
+async function extras(item: CatalogItem): Promise<{ shelves: Shelf[]; template?: TemplateDescriptor; openFamilies?: ReadonlySet<string> }> {
+  const [shelves, template, family] = await Promise.allSettled([
+    api.catalog.shelves(),
+    api.templates.get(item.template_id),
+    item.family_id ? api.families.get(item.family_id) : Promise.resolve(undefined),
+  ]);
+  const known = family.status === "fulfilled" ? family.value : undefined;
   return {
     shelves: shelves.status === "fulfilled" ? shelves.value : [],
     template: template.status === "fulfilled" ? template.value : undefined,
+    // "Make it yours" only for a family that is open; unknown (no family, or the API didn't answer) leaves it to the template.
+    openFamilies: known ? new Set(known.available !== false && known.ready !== false ? [known.id] : []) : undefined,
   };
 }
 
@@ -55,12 +62,12 @@ export default async function ItemPage({ params }: ItemPageProps) {
     );
   }
 
-  const { shelves, template } = await extras(item);
+  const { shelves, template, openFamilies } = await extras(item);
   const available = isAvailable(item);
   const finish = materialById(item.default_material);
   const image = item.media?.find((m) => m.kind === "image" || m.kind === "thumbnail")?.url ?? item.media?.[0]?.url;
   const shelf = categoryLabel(item.category, shelves);
-  const personalise = makeItYours(item, template);
+  const personalise = makeItYours(item, template, openFamilies);
 
   return (
     <main className="mx-auto w-full max-w-[1180px] flex-1 px-4 pb-16 pt-2 sm:px-8 lg:px-11">
