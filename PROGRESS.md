@@ -5,7 +5,7 @@ Living status of the plan in [PLAN.md](PLAN.md). Update this file with every mer
 | | |
 |---|---|
 | Last updated | 2026-09-27 |
-| Current phase | **Phase 1 — Shop + Remix-lite MVP** (starting) |
+| Current phase | **Phase 1 — Shop + Remix-lite MVP** (starting; local Docker only, production deferred per ADR-0006) |
 | Completed | Phase 0 — Foundations |
 | Roadmap position | ~2 of 28 scheduled weeks (5 phases; 1 done) |
 
@@ -60,12 +60,13 @@ Grouped by workstream (PLAN §15). Tick items as they merge.
 **API**
 - [ ] Identity: phone OTP + Google sign-in, guest design ownership transfer
 - [ ] Cart with guest merge
-- [ ] Orders with `AK-` numbers, state machine, order events, SSE tracking
+- [ ] Orders with `AK-000001` numbers, state machine, order events, SSE tracking
 - [ ] Payments: Razorpay orders, webhook verification, reconciliation, invoices
 - [ ] Shipping: Delhivery serviceability, rates, AWB, tracking webhooks
 - [ ] Notifications: WhatsApp templates + email fallback, opt-in registry
 - [ ] Fulfilment: print jobs, printer assignment, stage transitions, QC, reprint
 - [ ] Outbox relay for unpublished events
+- [ ] `admin` module: staff auth, versioned `pricing_policies` table replacing `application.yml` values, materials/catalog/template/printer CRUD with audit (ADR-0008, ADR-0012)
 - [ ] `available` flag driven by the geometry template registry instead of the seed
 
 **Storefront**
@@ -75,8 +76,8 @@ Grouped by workstream (PLAN §15). Tick items as they merge.
 - [ ] Remaining environments; material chips with calibration swatches
 
 **Studio ops**
-- [ ] `services/farm-agent`: Moonraker/OctoPrint bridge, snapshots, stage posts
-- [ ] Ops console under `/studio`
+- [ ] `services/farm-agent`: `PrinterBridge` interface with Moonraker and Bambu Lab bridges, fake-printer test doubles, snapshots, stage posts (ADR-0004)
+- [ ] `apps/admin` management portal: staff sign-in, pricing policies, materials and rates, catalog items and availability, live templates, printers, fulfilment ops, audit log (ADR-0012)
 - [ ] Packaging card PDF at PACKED
 
 **Non-functional**
@@ -91,14 +92,15 @@ Grouped by workstream (PLAN §15). Tick items as they merge.
 | 0001 | Cream pages + indigo stage | Accepted 2026-09-27 |
 | 0002 | Shop · Create · Remix labels | Accepted 2026-09-27 |
 | 0003 | All seven embossing scripts at launch | Accepted 2026-09-27 |
-| 0004 | Open-firmware printers | Proposed |
+| 0004 | Klipper/Moonraker and Bambu Lab, two farm-agent bridges | Accepted 2026-09-27 |
 | 0005 | Generative provider behind an adapter | Proposed |
-| 0006 | AWS ap-south-1 | Proposed |
-| 0007 | Retire KalaForge; `AK-` order prefix | Proposed |
-| 0008 | Free shipping ≥ ₹999; margin in rates | Proposed |
+| 0006 | Local Docker only for now; production deferred | Deferred 2026-09-27 |
+| 0007 | Retire KalaForge; `AK-000001` order numbers | Accepted 2026-09-27 |
+| 0008 | Pricing, shipping, margin are versioned config in the portal | Accepted 2026-09-27 |
 | 0009 | Parametric-first geometry | Accepted |
 | 0010 | RabbitMQ dispatch with direct profile | Accepted |
 | 0011 | Contract-first schemas | Accepted |
+| 0012 | Separate management portal `apps/admin` | Accepted 2026-09-27 |
 
 ## Verification snapshot
 

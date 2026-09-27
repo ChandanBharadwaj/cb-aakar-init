@@ -8,6 +8,14 @@ All notable changes to Aakar. Format follows [Keep a Changelog](https://keepacha
 - ADR-0001 accepted: cream pages with an indigo stage.
 - ADR-0002 accepted: navigation reads Shop · Create · Remix.
 - ADR-0003 accepted with a wider scope than recommended: all seven embossing scripts at launch.
+- ADR-0004 accepted: the studio runs Klipper/Moonraker and Bambu Lab printers; the farm agent ships two bridges.
+- ADR-0006 deferred: local Docker Compose is the only deployment target for now; production hosting decided later.
+- ADR-0007 accepted: Aakar everywhere, `AK-000001` order numbers.
+- ADR-0008 accepted in a new form: pricing, shipping and margin are versioned configuration edited in the management portal; board figures are the seed.
+- ADR-0012 added and accepted: a separate management portal (`apps/admin`) owns operational configuration and fulfilment ops; the storefront's planned `/studio` console is dropped.
+
+### Changed
+- PLAN.md: `admin` API module, `apps/admin` in the layout, farm agent with two bridges, Phase 1 exit criterion reinterpreted for the local stack, infra row reflects local-only hosting.
 
 ## [0.1.0] — 2026-09-27 — Phase 0: Foundations
 

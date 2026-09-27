@@ -184,7 +184,7 @@ flowchart LR
 | Text shaping | HarfBuzz (uharfbuzz) + FreeType + Noto fonts | Correct Indic conjunct shaping before extrusion |
 | Slicer | PrusaSlicer or OrcaSlicer CLI | Print time and filament grams for pricing; G-code for the farm |
 | Realtime | Server-Sent Events from Spring | One-way progress streams; simpler than WebSockets behind load balancers |
-| Infra | AWS ap-south-1: ECS Fargate (or EKS), RDS Postgres, Amazon MQ, S3 + CloudFront, Secrets Manager | Data residency in India, managed everything for a small team |
+| Infra | **Local Docker Compose for now** (ADR-0006). Candidate for later: AWS ap-south-1 with ECS Fargate, RDS Postgres, Amazon MQ, S3 + CloudFront, Secrets Manager | The owner wants to play with the product locally first; India data residency and managed services when production is scheduled |
 | Observability | OpenTelemetry end to end, Grafana stack | Trace a design from prompt → Java → queue → Python → slicer |
 | CI/CD | GitHub Actions: Gradle build/test, pytest, Playwright, Docker images, Terraform plan | One pipeline for the monorepo |
 
@@ -209,6 +209,7 @@ A single Spring Boot application organised as a **Modulith**. Modules communicat
 | `notification` | WhatsApp templates, email, in-app | Opt-in registry; template versioning |
 | `media` | Presigned upload/download, asset registry, checksums | Short-TTL URLs; virus scan hook for user uploads (motif images later) |
 | `share` | Public short links (`/k/{code}`) from the unboxing card → reprint or remix | Rate-limited, read-only |
+| `admin` | Staff authentication and the management portal's API: pricing policies (versioned), materials, catalog, live templates, printers, fulfilment ops, audit log | Separate staff accounts; every change audited (ADR-0012) |
 
 Cross-cutting: Flyway migrations, jOOQ or JPA (JPA fine to start), Bean Validation on all DTOs, ProblemDetail error responses, Micrometer metrics, OpenAPI spec generated and published to `packages/contracts`.
 
@@ -438,7 +439,7 @@ Stage text shown to the customer: **Understanding your idea → Weaving your des
 /checkout             Review → Stability → Pay
 /orders/[id]          Tracking with live stages
 /k/[code]             Public reprint/remix link from the card
-/studio/*             Internal ops console (role-gated)
+(staff screens live in apps/admin, not here — ADR-0012)
 ```
 
 ### 8.2 The viewer
@@ -546,14 +547,14 @@ Customer view: **Queued · Slicing · Printing · Sanding · Shipped** (Finishin
 
 A Python service running on a small box in the studio.
 
-- Subscribes to **Moonraker** (Klipper) WebSocket for progress, current layer and state; falls back to OctoPrint REST for printers that need it. Printers with closed ecosystems are supported via their local MQTT bridge where available; prefer open-firmware printers when buying.
+- Two bridges behind one `PrinterBridge` interface (ADR-0004): **Moonraker** (Klipper) over WebSocket for progress, current layer, state and camera snapshots; **Bambu Lab** over local MQTT in LAN mode with FTPS upload and the local camera stream.
 - Captures camera snapshots every few seconds during a print.
 - At about 45% progress assembles a **5-second clip** (evenly sampled frames, 24 fps, 720p, ffmpeg) and uploads it; the API sends the WhatsApp template with the video ("Layer 212 of 480"). At completion it assembles the full time-lapse for the share page.
 - Posts stage transitions and failures; a failed print creates a `REPRINT` job and notifies ops.
 
-### 11.3 Ops console
+### 11.3 Management portal (`apps/admin`)
 
-Route group `/studio` in the same Next.js app, role-gated: queue by printer, one-tap stage advancement for manual steps (sanding, QC, packing), QC photo upload, reprint, content-review queue, daily print schedule, material stock levels.
+A separate, staff-only Next.js app (ADR-0012). Fulfilment ops: queue by printer, one-tap stage advancement for manual steps (sanding, QC, packing), QC photo upload, reprint, content-review queue, daily print schedule, material stock levels. Configuration: pricing policies (ADR-0008), materials and rates, catalog items and availability, live template versions, registered printers (ADR-0004). Every change is audited.
 
 ### 11.4 Packaging
 
@@ -610,9 +611,10 @@ Kraft box, marigold tape, sustainable fill, and the printed card: *Designed by Y
 - Text emboss in all seven launch scripts (Latin, Devanagari, Telugu, Tamil, Kannada, Bengali, Gujarati) with HarfBuzz shaping and a golden-image test set per script; planar and cylindrical projection.
 - Printability report v1 (manifold, bed fit, wall thickness, centre of gravity).
 - Identity, cart, checkout with Razorpay, orders, SSE tracking, WhatsApp status texts.
-- Fulfilment: farm agent progress, ops console stages, packaging card PDF.
+- Fulfilment: farm agent with Moonraker and Bambu bridges, packaging card PDF.
+- Management portal (`apps/admin`): staff sign-in, pricing policies, materials, catalog availability, fulfilment ops (ADR-0012).
 
-**Exit**: 50 paid orders shipped; ≥ 95% fidelity; p95 preview ≤ 15 s; zero payment reconciliation gaps.
+**Exit**: the full loop runs on the local Docker stack with payment and shipping providers in sandbox mode; 50 end-to-end orders (real prints, sandbox payments) with ≥ 95% fidelity; p95 preview ≤ 15 s; zero reconciliation gaps. Production hosting is deferred (ADR-0006).
 
 ### Phase 2 — Create + Co-Designer (weeks 11–18)
 
@@ -682,11 +684,11 @@ Decisions needed from the product owner before Phase 0 ends. Recommendations are
 1. ~~**Surface theme**~~ Decided 27 Sep 2026: cream pages with an indigo stage (ADR-0001).
 2. ~~**Navigation labels**~~ Decided 27 Sep 2026: Shop · Create · Remix; Bazaar · Canvas · Karigar are codenames (ADR-0002).
 3. ~~**Launch scripts for embossing**~~ Decided 27 Sep 2026: all seven scripts at launch (ADR-0003).
-4. **Printers**: open-firmware machines (Klipper/Moonraker) for farm-agent integration, count for launch.
-5. **Generative provider** for Phase 3: hosted vendor versus self-hosted open model; decide by Phase 2 exit.
-6. **Hosting**: AWS ap-south-1 as proposed, or an alternative.
-7. **Legacy naming**: retire "KalaForge" everywhere, `AK-` order prefix.
-8. **Free shipping threshold** and initial margin.
+4. ~~**Printers**~~ Decided 27 Sep 2026: both Klipper/Moonraker and Bambu Lab; the farm agent ships two bridges (ADR-0004). Launch count still open.
+5. **Generative provider** for Phase 3: hosted vendor versus self-hosted open model; decide by Phase 2 exit (ADR-0005, still open by design).
+6. ~~**Hosting**~~ Decided 27 Sep 2026: local Docker Compose only for now; production hosting deferred (ADR-0006).
+7. ~~**Legacy naming**~~ Decided 27 Sep 2026: Aakar everywhere, `AK-000001` order numbers (ADR-0007).
+8. ~~**Free shipping threshold** and initial margin~~ Decided 27 Sep 2026: pricing, shipping and margin are versioned configuration edited in the management portal; board figures are the seed (ADR-0008, ADR-0012).
 
 ---
 
@@ -718,7 +720,8 @@ Decisions needed from the product owner before Phase 0 ends. Recommendations are
 
 ```
 aakar/
-  apps/web/                  Next.js storefront + /studio ops console
+  apps/web/                  Next.js storefront
+  apps/admin/                Next.js management portal (staff): pricing, materials, catalog, printers, fulfilment ops
   services/api/              Spring Boot modulith (Java 21, Gradle)
   services/designer/         Python: Claude co-designer agent (FastAPI + worker)
   services/geometry/         Python: templates, CAD, mesh ops, emboss, exports
