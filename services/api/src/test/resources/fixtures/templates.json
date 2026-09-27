@@ -29,55 +29,56 @@
     "id": "keychain_tag",
     "version": 1,
     "family": "keychain",
-    "name": "Saathi Keychain Tag",
-    "description": "A palm-sized tag with a loop for a steel split ring; your photo, name or motif sits in relief on the face.",
+    "name": "Saathi keychain tag",
+    "description": "A palm-sized tag with a loop for a steel split ring. Your photo sits in relief on the face, and another can go on the back.",
     "environment": "studio",
     "params": {
       "shape": {
         "type": "enum",
         "label": "Shape",
-        "unit": "",
         "default": "rounded",
+        "handle": false,
         "options": [
           "rect",
           "rounded",
           "circle",
           "heart"
         ],
-        "handle": false,
         "group": "Shape"
       },
       "width_mm": {
         "type": "number",
-        "label": "Width",
+        "label": "Size",
+        "default": 45.0,
+        "handle": true,
         "unit": "mm",
-        "default": 45,
+        "description": "Longest side, ring loop included.",
         "min": 30,
         "max": 60,
         "step": 1,
-        "handle": true,
         "group": "Size"
       },
       "thickness_mm": {
         "type": "number",
         "label": "Thickness",
-        "unit": "mm",
-        "default": 3,
-        "min": 2.4,
-        "max": 4,
-        "step": 0.1,
+        "default": 3.0,
         "handle": false,
+        "unit": "mm",
+        "min": 2.4,
+        "max": 4.0,
+        "step": 0.1,
         "group": "Size"
       },
       "hole_d_mm": {
         "type": "number",
         "label": "Ring hole",
-        "unit": "mm",
         "default": 4.2,
-        "min": 4,
-        "max": 6,
-        "step": 0.1,
         "handle": false,
+        "unit": "mm",
+        "description": "Finished hole for the split ring; it is cut 0.2 mm larger because printed holes shrink.",
+        "min": 4.0,
+        "max": 6.0,
+        "step": 0.1,
         "group": "Details"
       }
     },
@@ -88,17 +89,14 @@
         "kind": "surface",
         "projection": "planar",
         "size_mm": [
-          40,
-          30
+          32.0,
+          23.5
         ],
-        "bleed_mm": 2,
+        "bleed_mm": 1.0,
         "accepts": [
-          "relief_image",
-          "emboss_text",
-          "motif"
+          "relief_image"
         ],
-        "max_relief_mm": 1.2,
-        "max_text_height_mm": 12
+        "max_relief_mm": 1.5
       },
       {
         "id": "back",
@@ -106,16 +104,14 @@
         "kind": "surface",
         "projection": "planar",
         "size_mm": [
-          40,
-          30
+          32.0,
+          23.5
         ],
-        "bleed_mm": 2,
+        "bleed_mm": 1.0,
         "accepts": [
-          "emboss_text",
-          "motif"
+          "relief_image"
         ],
-        "max_relief_mm": 0.8,
-        "max_text_height_mm": 10
+        "max_relief_mm": 1.5
       }
     ],
     "constraints": {
@@ -137,9 +133,7 @@
     ],
     "style_variants": [],
     "features_supported": [
-      "relief_image",
-      "emboss_text",
-      "motif"
+      "relief_image"
     ],
     "hardware": [
       {
@@ -150,37 +144,361 @@
     "min_feature_mm": 0.8
   },
   {
+    "id": "fridge_magnet",
+    "version": 1,
+    "family": "fridge_magnet",
+    "name": "Chumbak fridge magnet",
+    "description": "A flat plate with hidden pockets for strong 10 × 3 mm magnets in the back. Your photo sits in relief on the face.",
+    "environment": "kitchen_marble",
+    "params": {
+      "shape": {
+        "type": "enum",
+        "label": "Shape",
+        "default": "rounded",
+        "handle": false,
+        "options": [
+          "rect",
+          "rounded",
+          "circle"
+        ],
+        "group": "Shape"
+      },
+      "size_mm": {
+        "type": "number",
+        "label": "Size",
+        "default": 55.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "Longest side.",
+        "min": 40,
+        "max": 70,
+        "step": 1,
+        "group": "Size"
+      },
+      "thickness_mm": {
+        "type": "number",
+        "label": "Thickness",
+        "default": 5.0,
+        "handle": false,
+        "unit": "mm",
+        "min": 4.5,
+        "max": 6.0,
+        "step": 0.1,
+        "group": "Size"
+      },
+      "magnet_count": {
+        "type": "integer",
+        "label": "Magnets",
+        "default": 1,
+        "handle": false,
+        "unit": "count",
+        "description": "10 × 3 mm magnets set into the back; two hold a bigger magnet straighter.",
+        "min": 1,
+        "max": 2,
+        "step": 1,
+        "group": "Details"
+      }
+    },
+    "anchors": [
+      {
+        "id": "face",
+        "label": "Face",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          47.2,
+          35.0
+        ],
+        "bleed_mm": 1.0,
+        "accepts": [
+          "relief_image"
+        ],
+        "max_relief_mm": 1.5
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 1.2,
+      "max_overhang_deg": 55,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "basic_white",
+      "terracotta_matte",
+      "terracotta_silk",
+      "polished_brass",
+      "sandalwood_silk",
+      "indigo_matte"
+    ],
+    "style_variants": [],
+    "features_supported": [
+      "relief_image"
+    ],
+    "hardware": [
+      {
+        "sku": "magnet_d10x3",
+        "qty": 1
+      }
+    ],
+    "min_feature_mm": 0.8
+  },
+  {
+    "id": "hanging_ornament",
+    "version": 1,
+    "family": "ornament",
+    "name": "Jhoomar hanging ornament",
+    "description": "A two-sided disc, star or bauble with a hanging hole and a raised border. A photo can sit in relief on the front and another on the back.",
+    "environment": "teak_table_candlelight",
+    "params": {
+      "silhouette": {
+        "type": "enum",
+        "label": "Silhouette",
+        "default": "disc",
+        "handle": false,
+        "options": [
+          "disc",
+          "star",
+          "bauble"
+        ],
+        "group": "Shape"
+      },
+      "diameter_mm": {
+        "type": "number",
+        "label": "Size",
+        "default": 70.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "Across the widest part.",
+        "min": 50,
+        "max": 90,
+        "step": 1,
+        "group": "Size"
+      },
+      "thickness_mm": {
+        "type": "number",
+        "label": "Thickness",
+        "default": 4.0,
+        "handle": false,
+        "unit": "mm",
+        "min": 3.0,
+        "max": 5.0,
+        "step": 0.1,
+        "group": "Size"
+      },
+      "border_mm": {
+        "type": "number",
+        "label": "Raised border",
+        "default": 3.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "Width of the raised rim on the front; 0 for none, otherwise at least 1.5 mm.",
+        "min": 0,
+        "max": 6,
+        "step": 0.5,
+        "group": "Details"
+      }
+    },
+    "anchors": [
+      {
+        "id": "face_front",
+        "label": "Front",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          48.7,
+          36.6
+        ],
+        "bleed_mm": 1.0,
+        "accepts": [
+          "relief_image"
+        ],
+        "max_relief_mm": 1.5
+      },
+      {
+        "id": "face_back",
+        "label": "Back",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          48.7,
+          36.6
+        ],
+        "bleed_mm": 1.0,
+        "accepts": [
+          "relief_image"
+        ],
+        "max_relief_mm": 1.5
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 1.2,
+      "max_overhang_deg": 55,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "basic_white",
+      "terracotta_matte",
+      "terracotta_silk",
+      "polished_brass",
+      "sandalwood_silk",
+      "indigo_matte"
+    ],
+    "style_variants": [],
+    "features_supported": [
+      "relief_image"
+    ],
+    "hardware": [
+      {
+        "sku": "cord_200",
+        "qty": 1
+      }
+    ],
+    "min_feature_mm": 0.8
+  },
+  {
+    "id": "desk_nameplate",
+    "version": 1,
+    "family": "nameplate",
+    "name": "Pehchaan desk nameplate",
+    "description": "A nameplate that leans back on a flat foot, like a desk sign. Your photo or motif sits in relief on the face; names arrive with lettering.",
+    "environment": "studio",
+    "params": {
+      "width_mm": {
+        "type": "number",
+        "label": "Width",
+        "default": 180.0,
+        "handle": true,
+        "unit": "mm",
+        "min": 120,
+        "max": 250,
+        "step": 1,
+        "group": "Size"
+      },
+      "height_mm": {
+        "type": "number",
+        "label": "Height",
+        "default": 60.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "Height of the face, measured up the slope.",
+        "min": 40,
+        "max": 100,
+        "step": 1,
+        "group": "Size"
+      },
+      "tilt_deg": {
+        "type": "number",
+        "label": "Tilt",
+        "default": 70.0,
+        "handle": false,
+        "unit": "deg",
+        "description": "Lean of the face from horizontal.",
+        "min": 60,
+        "max": 80,
+        "step": 1,
+        "group": "Shape"
+      },
+      "base_depth_mm": {
+        "type": "number",
+        "label": "Foot depth",
+        "default": 40.0,
+        "handle": false,
+        "unit": "mm",
+        "min": 30,
+        "max": 60,
+        "step": 1,
+        "group": "Shape"
+      },
+      "thickness_mm": {
+        "type": "number",
+        "label": "Thickness",
+        "default": 5.0,
+        "handle": false,
+        "unit": "mm",
+        "min": 4.0,
+        "max": 8.0,
+        "step": 0.5,
+        "group": "Details"
+      }
+    },
+    "anchors": [
+      {
+        "id": "face",
+        "label": "Face",
+        "kind": "surface",
+        "projection": "planar",
+        "max_text_height_mm": 36.0,
+        "size_mm": [
+          176.0,
+          56.0
+        ],
+        "bleed_mm": 1.0,
+        "accepts": [
+          "relief_image"
+        ],
+        "max_relief_mm": 1.5
+      },
+      {
+        "id": "base_front",
+        "label": "Front of the foot",
+        "kind": "surface",
+        "projection": "planar",
+        "max_text_height_mm": 8.0,
+        "size_mm": [
+          178.0,
+          8.0
+        ],
+        "bleed_mm": 0.5,
+        "accepts": [
+          "relief_image"
+        ],
+        "max_relief_mm": 1.5
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 1.2,
+      "max_overhang_deg": 55,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "basic_white",
+      "terracotta_matte",
+      "terracotta_silk",
+      "polished_brass",
+      "sandalwood_silk",
+      "indigo_matte"
+    ],
+    "style_variants": [],
+    "features_supported": [
+      "relief_image"
+    ],
+    "hardware": [
+      {
+        "sku": "adhesive_pads",
+        "qty": 1
+      }
+    ],
+    "min_feature_mm": 0.8
+  },
+  {
     "id": "raw_print",
     "version": 1,
     "family": "raw_print",
     "name": "Swaroop · Print as it is",
-    "description": "Your own 3D model file, checked, sized and printed as it is.",
+    "description": "Your own 3D model file, checked for gaps and thin walls, repaired where needed, sized to the longest side you choose and printed as it is.",
     "environment": "studio",
-    "params": {
-      "longest_mm": {
-        "type": "number",
-        "label": "Longest side",
-        "unit": "mm",
-        "default": 80,
-        "min": 20,
-        "max": 240,
-        "step": 1,
-        "handle": true,
-        "group": "Size"
-      },
-      "orientation": {
-        "type": "enum",
-        "label": "Orientation",
-        "unit": "",
-        "default": "as_uploaded",
-        "options": [
-          "as_uploaded",
-          "lay_flat"
-        ],
-        "handle": false,
-        "group": "Shape"
-      }
-    },
+    "params": {},
     "anchors": [
       {
         "id": "body",
@@ -188,9 +506,9 @@
         "kind": "volume",
         "projection": "planar",
         "bounds_mm": [
-          240,
-          240,
-          240
+          240.0,
+          240.0,
+          240.0
         ],
         "accepts": [
           "hero_mesh"
@@ -201,9 +519,9 @@
       "min_wall_mm": 1.2,
       "max_overhang_deg": 55,
       "bed_mm": [
-        250,
-        250,
-        250
+        250.0,
+        250.0,
+        250.0
       ]
     },
     "materials": [

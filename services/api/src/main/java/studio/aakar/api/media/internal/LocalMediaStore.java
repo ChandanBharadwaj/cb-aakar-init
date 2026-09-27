@@ -19,7 +19,11 @@ import studio.aakar.api.media.MediaStore;
 import studio.aakar.api.media.StoredMedia;
 import studio.aakar.api.shared.AakarProperties;
 
-/** Files under {@code aakar.media.dir}, served by {@link MediaController} at {@code /media/{key}}. */
+/**
+ * Files under {@code aakar.media.dir}, served by {@link MediaController} at {@code /media/{key}}: the public URL is
+ * {@code {aakar.api.public-url}/media/{key}}, the internal one (for the geometry service)
+ * {@code {aakar.media.internal-base-url}/media/{key}}.
+ */
 @Component
 class LocalMediaStore implements MediaStore {
 
@@ -30,16 +34,33 @@ class LocalMediaStore implements MediaStore {
 
     private final Path root;
     private final String publicUrl;
+    private final String internalBaseUrl;
 
     LocalMediaStore(MediaProperties properties, AakarProperties aakar) {
         this.root = Paths.get(properties.dir()).toAbsolutePath().normalize();
         this.publicUrl = aakar.api().publicUrl();
+        String internal = properties.internalBaseUrl();
+        this.internalBaseUrl = internal == null || internal.isBlank() ? publicUrl : stripSlash(internal.trim());
     }
 
     @Override
     public StoredMedia store(String folder, String originalFilename, byte[] bytes, String contentType) {
-        String key = folderKey(folder) + "/" + UUID.randomUUID() + "." + extension(originalFilename, contentType);
+        return storeAs(folder, UUID.randomUUID().toString(), extension(originalFilename, contentType), bytes, contentType);
+    }
+
+    @Override
+    public StoredMedia storeAs(String folder, String name, String extension, byte[] bytes, String contentType) {
+        if (name == null || !SEGMENT.matcher(name).matches()) {
+            throw new IllegalArgumentException("Invalid media file name '" + name + "'");
+        }
+        if (extension == null || !EXTENSION.matcher(extension).matches()) {
+            throw new IllegalArgumentException("Invalid media file extension '" + extension + "'");
+        }
+        String key = folderKey(folder) + "/" + name + "." + extension;
         Path target = root.resolve(key).normalize();
+        if (!target.startsWith(root)) {
+            throw new IllegalArgumentException("Media key " + key + " leaves the media directory");
+        }
         try {
             Files.createDirectories(target.getParent());
             Files.write(target, bytes);
@@ -63,6 +84,11 @@ class LocalMediaStore implements MediaStore {
         return Optional.of(new FileSystemResource(path));
     }
 
+    @Override
+    public String internalUrl(String key) {
+        return internalBaseUrl + PUBLIC_PATH + key;
+    }
+
     private static String folderKey(String folder) {
         if (folder == null || folder.isBlank()) {
             throw new IllegalArgumentException("folder is required");
@@ -73,6 +99,10 @@ class LocalMediaStore implements MediaStore {
             }
         }
         return folder;
+    }
+
+    private static String stripSlash(String url) {
+        return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
     }
 
     static String extension(String filename, String contentType) {

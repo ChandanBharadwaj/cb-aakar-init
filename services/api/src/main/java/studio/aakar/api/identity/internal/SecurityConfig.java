@@ -19,7 +19,8 @@ import studio.aakar.api.shared.ProblemResponses;
 
 /**
  * Stateless resource-server style chain. Public: catalog (items, shelves, materials), families, templates, designs (unguessable ids), versions,
- * jobs, cart (guest or user), auth, shipping serviceability, the geometry callback, actuator and docs.
+ * jobs, cart and uploads (guest or user; the services answer 401 without either), auth, shipping serviceability, the geometry callback,
+ * media files, actuator and docs.
  * Signed-in only: profile, addresses, checkout, orders, payments. Unauthenticated calls to those answer
  * 401 {@code unauthenticated} as Problem Details. Unknown routes stay public so they 404 like before.
  * {@code /admin/api/**} never reaches this chain: the admin module registers its own, earlier-ordered chain
@@ -36,7 +37,7 @@ class SecurityConfig {
     };
     static final String[] PUBLIC = {
         "/api/catalog/**", "/api/families/**", "/api/templates/**", "/api/designs/**", "/api/versions/**", "/api/jobs/**",
-        "/api/cart/**", "/api/auth/**", "/api/shipping/**", "/internal/**", "/media/**", "/actuator/**", "/swagger-ui/**",
+        "/api/cart/**", "/api/uploads/**", "/api/auth/**", "/api/shipping/**", "/internal/**", "/media/**", "/actuator/**", "/swagger-ui/**",
         "/swagger-ui.html", "/v3/api-docs/**", "/error"
     };
 

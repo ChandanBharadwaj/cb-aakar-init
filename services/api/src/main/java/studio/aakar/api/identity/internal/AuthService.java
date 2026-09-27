@@ -18,10 +18,11 @@ import studio.aakar.api.design.Designs;
 import studio.aakar.api.identity.SessionResponse;
 import studio.aakar.api.identity.UserDto;
 import studio.aakar.api.identity.Users;
+import studio.aakar.api.media.Uploads;
 import studio.aakar.api.shared.ApiProblemException;
 import studio.aakar.api.shared.Identity;
 
-/** Sign-in: verify the code, find or create the user, issue a token, attach the guest's designs and cart. */
+/** Sign-in: verify the code, find or create the user, issue a token, attach the guest's designs, uploads and cart. */
 @Service
 class AuthService implements Users {
 
@@ -32,14 +33,16 @@ class AuthService implements Users {
     private final SessionService sessions;
     private final Designs designs;
     private final Carts carts;
+    private final Uploads uploads;
     private final Clock clock;
 
-    AuthService(OtpService otp, UserRepository users, SessionService sessions, Designs designs, Carts carts, Clock clock) {
+    AuthService(OtpService otp, UserRepository users, SessionService sessions, Designs designs, Carts carts, Uploads uploads, Clock clock) {
         this.otp = otp;
         this.users = users;
         this.sessions = sessions;
         this.designs = designs;
         this.carts = carts;
+        this.uploads = uploads;
         this.clock = clock;
     }
 
@@ -57,9 +60,12 @@ class AuthService implements Users {
         SessionResponse.Attached attached = SessionResponse.Attached.NOTHING;
         if (caller.isGuest()) {
             int movedDesigns = designs.attachGuest(caller.id(), user.id());
+            // The photos and model files on those designs follow them; the contract's `attached` counts designs and cart items only.
+            int movedUploads = uploads.attachGuest(caller.id(), user.id());
             int movedItems = carts.mergeGuestCart(caller.id(), user.id());
             attached = new SessionResponse.Attached(movedDesigns, movedItems);
-            log.info("Guest {} attached to user {}: {} designs, {} cart items", caller.id(), user.id(), movedDesigns, movedItems);
+            log.info("Guest {} attached to user {}: {} designs, {} uploads, {} cart items", caller.id(), user.id(), movedDesigns, movedUploads,
+                    movedItems);
         }
         return new SessionResponse(token.accessToken(), SessionResponse.BEARER, token.expiresInS(), user.toDto(), attached);
     }
