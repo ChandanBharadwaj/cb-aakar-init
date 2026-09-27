@@ -57,12 +57,16 @@ for (const [file, id] of examples) {
   console.log(`✓ examples/template-descriptors.json: ${descriptors.length} descriptors valid`);
 }
 
-// Experiences name environments, families and styles that live elsewhere: check the references a schema cannot.
+// Experiences name environments, presets, families, motifs and styles that live elsewhere: check what a schema cannot.
 {
   // Backdrops whose storefront preset has not landed yet. PR 12 (Katha) adds comic_rooftop_night to tokens.json
   // environments and the viewer; delete it from this list then (the check below says when).
   const PENDING_PRESETS = new Set(["comic_rooftop_night"]);
+  // Motif packs whose artwork has not landed in the motif library yet (Katha's comic_bursts, PR 12).
+  const PENDING_MOTIF_PACKS = new Set(["comic_bursts"]);
   const { environments, experiences } = read("../design-tokens/experiences.json");
+  const motifLibrary = read("../design-tokens/motifs/index.json").motifs;
+  const motifIds = new Set([...motifLibrary.map((m) => m.id), ...motifLibrary.flatMap((m) => m.tags ?? [])]);
   const tokens = read("../design-tokens/tokens.json");
   const familyIds = new Set(read("../design-tokens/families.json").families.map((f) => f.id));
   const presets = Object.keys(tokens.environments);
@@ -93,11 +97,19 @@ for (const [file, id] of examples) {
   for (const key of PENDING_PRESETS) {
     if (presets.includes(key)) problems.push(`preset '${key}' is a tokens.json environment now: remove it from PENDING_PRESETS in validate.mjs`);
   }
+  for (const pack of PENDING_MOTIF_PACKS) {
+    if (motifIds.has(pack)) problems.push(`motif pack '${pack}' is in the motif library now: remove it from PENDING_MOTIF_PACKS in validate.mjs`);
+  }
   const environmentIds = new Set(environments.map((e) => e.id));
   const brandColours = new Set(Object.values(tokens.color).map((c) => c.toUpperCase()));
   for (const x of experiences) {
     if (!environmentIds.has(x.environment)) problems.push(`experience ${x.id}: environment '${x.environment}' is not in environments`);
     for (const a of x.avatars) if (!familyIds.has(a)) problems.push(`experience ${x.id}: avatar '${a}' is not a family in families.json`);
+    for (const m of x.motif_pack ?? []) {
+      if (!motifIds.has(m) && !PENDING_MOTIF_PACKS.has(m)) {
+        problems.push(`experience ${x.id}: motif_pack '${m}' is neither a motif (or motif tag) in design-tokens/motifs/index.json nor pending`);
+      }
+    }
     if (!brandColours.has(x.surface.accent.toUpperCase())) problems.push(`experience ${x.id}: accent ${x.surface.accent} is not a tokens.json brand colour`);
     for (const w of x.season ?? []) {
       // Calendar-date windows run forwards; month-day windows recur and may wrap the new year.
@@ -117,8 +129,9 @@ for (const [file, id] of examples) {
     for (const p of problems) console.error(`✗ experiences.json: ${p}`);
   } else {
     const pending = environments.filter((e) => PENDING_PRESETS.has(e.preset_key)).map((e) => e.id);
-    console.log(`✓ experiences.json: ${experiences.length} experiences name known environments and families; `
-      + `${environments.length} environments (preset pending: ${pending.join(", ") || "none"})`);
+    const packs = experiences.flatMap((x) => x.motif_pack ?? []).filter((m) => PENDING_MOTIF_PACKS.has(m));
+    console.log(`✓ experiences.json: ${experiences.length} experiences name known environments, families and motifs; `
+      + `${environments.length} environments (preset pending: ${pending.join(", ") || "none"}; motif pack pending: ${packs.join(", ") || "none"})`);
   }
 }
 

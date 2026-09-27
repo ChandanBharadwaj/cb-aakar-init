@@ -1,21 +1,32 @@
 package studio.aakar.api.catalog.internal;
 
 import java.time.Clock;
+import java.time.DateTimeException;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.MonthDay;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import studio.aakar.api.catalog.AdminExperienceDto;
 import studio.aakar.api.catalog.Catalog;
 import studio.aakar.api.catalog.CatalogItemDto;
 import studio.aakar.api.catalog.CatalogItemInput;
+import studio.aakar.api.catalog.EnvironmentDto;
+import studio.aakar.api.catalog.ExperienceDto;
+import studio.aakar.api.catalog.ExperienceInput;
 import studio.aakar.api.catalog.FamilyDto;
 import studio.aakar.api.catalog.FamilyInput;
 import studio.aakar.api.catalog.HardwareItemDto;
@@ -42,21 +53,28 @@ class CatalogService implements Catalog {
     private final ShelfRepository shelves;
     private final TemplateFamilyRepository families;
     private final HardwareItemRepository hardware;
+    private final EnvironmentRepository environments;
+    private final ExperienceRepository experiences;
     private final Templates templates;
     private final PriceCalculator pricing;
     private final FamilyJson familyJson;
+    private final ExperienceJson experienceJson;
     private final Clock clock;
 
     CatalogService(CatalogItemRepository items, MaterialRepository materials, ShelfRepository shelves, TemplateFamilyRepository families,
-            HardwareItemRepository hardware, Templates templates, PriceCalculator pricing, FamilyJson familyJson, Clock clock) {
+            HardwareItemRepository hardware, EnvironmentRepository environments, ExperienceRepository experiences, Templates templates,
+            PriceCalculator pricing, FamilyJson familyJson, ExperienceJson experienceJson, Clock clock) {
         this.items = items;
         this.materials = materials;
         this.shelves = shelves;
         this.families = families;
         this.hardware = hardware;
+        this.environments = environments;
+        this.experiences = experiences;
         this.templates = templates;
         this.pricing = pricing;
         this.familyJson = familyJson;
+        this.experienceJson = experienceJson;
         this.clock = clock;
     }
 
@@ -115,6 +133,9 @@ class CatalogService implements Catalog {
         requireShelfKnown("category", input.category());
         requireFamilyKnownOrAbsent("family_id", input.familyId());
         requireMaterialKnown(input.defaultMaterial());
+        if (input.environment() != null && !input.environment().isBlank()) {
+            requireEnvironmentKnown("environment", input.environment());
+        }
     }
 
     // ---- Materials -----------------------------------------------------------------------------------------------------
@@ -241,6 +262,7 @@ class CatalogService implements Catalog {
 
     private void validateFamily(FamilyInput input) {
         requireShelfKnown("shelf", input.shelf());
+        requireEnvironmentKnown("environment", input.environmentOrDefault());
         for (HardwareRef ref : input.hardwareOrEmpty()) {
             if (!hardware.existsById(ref.sku())) {
                 throw ApiProblemException.unprocessable(ProblemCodes.UNKNOWN_HARDWARE, "Unknown hardware",
@@ -337,7 +359,202 @@ class CatalogService implements Catalog {
         return item.toDto();
     }
 
+    // ---- Viewer environments (Mahaul) and experiences (Duniya) ---------------------------------------------------------
+
+    @Override
+    public List<EnvironmentDto> environments() {
+        return environments.findAllByOrderBySortOrderAscIdAsc().stream().map(EnvironmentEntity::toDto).toList();
+    }
+
+    @Override
+    public List<ExperienceDto> experiences(boolean includeUnavailable) {
+        List<ExperienceEntity> rows = experiences.findAllByOrderBySortOrderAscIdAsc().stream()
+                .filter(x -> includeUnavailable || x.available())
+                .toList();
+        if (rows.isEmpty()) {
+            return List.of();
+        }
+        ExperienceContext context = experienceContext();
+        return rows.stream().map(context::toDto).toList();
+    }
+
+    @Override
+    public Optional<ExperienceDto> experience(String slug) {
+        if (slug == null || slug.isBlank()) {
+            return Optional.empty();
+        }
+        return experiences.findBySlug(slug.trim()).map(x -> experienceContext().toDto(x));
+    }
+
+    @Override
+    public boolean experienceExists(String id) {
+        return id != null && !id.isBlank() && experiences.existsById(id.trim());
+    }
+
+    @Override
+    public List<AdminExperienceDto> allExperiences() {
+        return experiences.findAllByOrderBySortOrderAscIdAsc().stream().map(experienceJson::toAdminDto).toList();
+    }
+
+    @Override
+    public Optional<AdminExperienceDto> adminExperience(String id) {
+        if (id == null || id.isBlank()) {
+            return Optional.empty();
+        }
+        return experiences.findById(id.trim()).map(experienceJson::toAdminDto);
+    }
+
+    @Override
+    @Transactional
+    public AdminExperienceDto createExperience(ExperienceInput input) {
+        if (experiences.existsById(input.id())) {
+            throw ApiProblemException.conflict(ProblemCodes.EXPERIENCE_EXISTS, "Experience exists",
+                    "Experience '" + input.id() + "' already exists; update it with PUT /admin/api/experiences/" + input.id());
+        }
+        if (experiences.existsBySlug(input.slug())) {
+            throw slugTaken(input.slug());
+        }
+        validateExperience(input);
+        ExperienceEntity saved = experiences.save(new ExperienceEntity(input.id(), input, experienceJson, clock.instant()));
+        log.info("Experience {} ({} · {}) created at /duniya/{}", saved.id(), saved.codename(), saved.title(), saved.slug());
+        return experienceJson.toAdminDto(saved);
+    }
+
+    @Override
+    @Transactional
+    public AdminExperienceDto updateExperience(String id, ExperienceInput input) {
+        ExperienceEntity experience = experiences.findById(id).orElseThrow(() -> unknownExperience(id));
+        if (input.id() != null && !input.id().equals(id)) {
+            log.info("Experience {} updated with body id {}; the path id wins", id, input.id());
+        }
+        if (experiences.existsBySlugAndIdNot(input.slug(), id)) {
+            throw slugTaken(input.slug());
+        }
+        validateExperience(input);
+        experience.apply(input, experienceJson, clock.instant());
+        log.info("Experience {} updated (available={}, slug {})", id, experience.available(), experience.slug());
+        return experienceJson.toAdminDto(experience);
+    }
+
+    /** What the schema cannot say: references exist, lists hold no repeats, season windows are real and in order. */
+    private void validateExperience(ExperienceInput input) {
+        requireEnvironmentKnown("environment", input.environment());
+        requireDistinct("avatars", input.avatars());
+        for (String familyId : input.avatars()) {
+            if (!families.existsById(familyId.trim())) {
+                throw ApiProblemException.unprocessable(ProblemCodes.UNKNOWN_FAMILY, "Unknown family",
+                        "avatars names '" + familyId + "', which is not a family (see GET /admin/api/families)");
+            }
+        }
+        requireDistinct("items", input.itemsOrEmpty());
+        for (String slug : input.itemsOrEmpty()) {
+            if (!items.existsById(slug.trim())) {
+                throw ApiProblemException.unprocessable(ProblemCodes.VALIDATION_FAILED, "Validation failed",
+                        "items names '" + slug + "', which is not a Shop item (see GET /admin/api/catalog/items)");
+            }
+        }
+        requireDistinct("motif_pack", input.motifPackOrEmpty());
+        requireDistinct("collections", input.collectionsOrEmpty().stream().map(ExperienceDto.Collection::id).toList());
+        List<ExperienceDto.SeasonWindow> season = input.seasonOrEmpty();
+        for (int i = 0; i < season.size(); i++) {
+            requireSeasonWindow(i, season.get(i));
+        }
+    }
+
+    /**
+     * Both ends calendar dates with {@code starts_on ≤ ends_on}, or both month-days (a recurring window, which may wrap the
+     * new year); every date must exist ({@code --02-29} does, {@code --02-30} does not).
+     */
+    private static void requireSeasonWindow(int index, ExperienceDto.SeasonWindow window) {
+        String where = "season[" + index + "] (" + window.label() + ")";
+        boolean startsRecurring = window.startsOn().startsWith("--");
+        if (startsRecurring != window.endsOn().startsWith("--")) {
+            throw ApiProblemException.unprocessable(ProblemCodes.VALIDATION_FAILED, "Validation failed",
+                    where + " mixes a date and a month-day; use two dates (2026-10-20) or two month-days (--10-01)");
+        }
+        try {
+            if (startsRecurring) {
+                MonthDay.parse(window.startsOn());
+                MonthDay.parse(window.endsOn());
+            } else if (LocalDate.parse(window.startsOn()).isAfter(LocalDate.parse(window.endsOn()))) {
+                throw ApiProblemException.unprocessable(ProblemCodes.VALIDATION_FAILED, "Validation failed",
+                        where + " ends (" + window.endsOn() + ") before it starts (" + window.startsOn() + ")");
+            }
+        } catch (DateTimeException e) {
+            throw ApiProblemException.unprocessable(ProblemCodes.VALIDATION_FAILED, "Validation failed",
+                    where + " names a day that does not exist (" + window.startsOn() + " to " + window.endsOn() + ")");
+        }
+    }
+
+    private static void requireDistinct(String field, List<String> values) {
+        Set<String> seen = new HashSet<>();
+        for (String value : values) {
+            if (value != null && !seen.add(value.trim())) {
+                throw ApiProblemException.unprocessable(ProblemCodes.VALIDATION_FAILED, "Validation failed",
+                        field + " lists '" + value.trim() + "' more than once");
+            }
+        }
+    }
+
+    /** Every family row, the family view context and every Shop item, read once per request. */
+    private ExperienceContext experienceContext() {
+        Map<String, TemplateFamilyEntity> familyRows = families.findAll().stream()
+                .collect(Collectors.toMap(TemplateFamilyEntity::id, Function.identity()));
+        Map<String, CatalogItemDto> itemsBySlug = items.findAll().stream()
+                .map(CatalogItemEntity::toDto)
+                .collect(Collectors.toMap(CatalogItemDto::slug, Function.identity()));
+        return new ExperienceContext(familyContext(), familyRows, itemsBySlug);
+    }
+
+    private final class ExperienceContext {
+
+        private final FamilyContext familyContext;
+        private final Map<String, TemplateFamilyEntity> familyRows;
+        private final Map<String, CatalogItemDto> itemsBySlug;
+        private final Map<String, FamilyDto> familyViews = new LinkedHashMap<>();
+
+        ExperienceContext(FamilyContext familyContext, Map<String, TemplateFamilyEntity> familyRows, Map<String, CatalogItemDto> itemsBySlug) {
+            this.familyContext = familyContext;
+            this.familyRows = familyRows;
+            this.itemsBySlug = itemsBySlug;
+        }
+
+        /** The orderable avatars in the experience's order, its curated items in order and the lowest floor among the avatars. */
+        ExperienceDto toDto(ExperienceEntity experience) {
+            List<FamilyDto> avatars = experience.avatarIds().stream()
+                    .map(this::familyView)
+                    .filter(Objects::nonNull)
+                    .filter(FamilyDto::orderable)
+                    .toList();
+            List<CatalogItemDto> curated = experience.itemSlugs().stream().map(itemsBySlug::get).filter(Objects::nonNull).toList();
+            Long priceFrom = avatars.stream().map(FamilyDto::priceFromPaise).filter(Objects::nonNull).min(Long::compare).orElse(null);
+            return experienceJson.toDto(experience, avatars, curated, priceFrom);
+        }
+
+        private FamilyDto familyView(String familyId) {
+            TemplateFamilyEntity row = familyRows.get(familyId);
+            return row == null ? null : familyViews.computeIfAbsent(familyId, id -> familyContext.toDto(row));
+        }
+    }
+
+    static ApiProblemException unknownExperience(String idOrSlug) {
+        return ApiProblemException.notFound(ProblemCodes.UNKNOWN_EXPERIENCE, "Unknown experience", "Experience " + idOrSlug + " was not found");
+    }
+
+    private static ApiProblemException slugTaken(String slug) {
+        return ApiProblemException.conflict(ProblemCodes.SLUG_EXISTS, "Slug exists", "Another experience already lives at /duniya/" + slug);
+    }
+
     // ---- Shared checks -------------------------------------------------------------------------------------------------
+
+    /** The backdrop must be in {@code environments}; 422 {@code validation_failed} naming the known ids otherwise. */
+    private void requireEnvironmentKnown(String field, String environmentId) {
+        if (environmentId == null || environmentId.isBlank() || !environments.existsById(environmentId.trim())) {
+            String ids = environments.findAllByOrderBySortOrderAscIdAsc().stream().map(EnvironmentEntity::id).collect(Collectors.joining(", "));
+            throw ApiProblemException.unprocessable(ProblemCodes.VALIDATION_FAILED, "Validation failed",
+                    field + " '" + environmentId + "' is not a backdrop; the backdrops are: " + ids);
+        }
+    }
 
     private void requireShelfKnown(String field, String shelfId) {
         if (shelfId == null || shelfId.isBlank() || !shelves.existsById(shelfId.trim())) {

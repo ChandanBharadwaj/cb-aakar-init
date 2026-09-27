@@ -9,8 +9,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * {@code CatalogItemInput} in the management contract. {@code category} must be a shelf id and {@code family_id}, when
- * given, a seeded family; both are checked by the catalog service (422 {@code validation_failed} / {@code unknown_family}).
+ * {@code CatalogItemInput} in the management contract. {@code category} must be a shelf id, {@code environment}, when given,
+ * a backdrop id and {@code family_id}, when given, a seeded family; the catalog service checks them (422
+ * {@code validation_failed} naming the shelves or backdrops / {@code unknown_family}).
  */
 public record CatalogItemInput(
         @NotBlank(message = "slug is required")

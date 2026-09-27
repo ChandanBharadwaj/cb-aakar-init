@@ -24,8 +24,8 @@ import studio.aakar.api.templates.TemplateDescriptor;
 
 /**
  * The API's copy of the geometry service's feature checks ({@code features/validate.py}): every rule, the
- * Devanagari text length and the lithophane exemption. Real descriptors come from {@code fixtures/templates.json};
- * a template that takes text is built inline (text arrives on the carriers with PR 3b).
+ * Devanagari text length and the lithophane exemption. Real descriptors come from {@code fixtures/templates.json} (the
+ * carriers take text and motifs since PR 3b); a plaque with a text-only edge, a lithophane window and a volume is built inline.
  */
 class FeatureValidatorTest {
 
@@ -90,12 +90,11 @@ class FeatureValidatorTest {
 
     @Test
     void theTypeMustBeOneTheTemplateSupports() {
-        // the keychain takes photos only until lettering lands (PR 3b)
-        ApiProblemException problem = rejects(keychain, KEYCHAIN, List.of(text("face", "Asha")), ProblemCodes.UNSUPPORTED_FEATURE);
-        assertThat(problem.getMessage()).isEqualTo("Saathi keychain tag can't carry text (Naam) yet");
-        problem = rejects(keychain, KEYCHAIN, List.of(Map.of("type", "hero_mesh", "source", Map.of("upload_id", UPLOAD), "anchor", "face")),
-                ProblemCodes.UNSUPPORTED_FEATURE);
-        assertThat(problem.getMessage()).contains("your own 3D form (Roop)");
+        // since lettering landed (PR 3b) the keychain takes a name on either face, but still no 3D form
+        assertThat(validator.validate(keychain, KEYCHAIN, List.of(text("face", "Asha"), text("back", "Ravi")))).hasSize(2);
+        ApiProblemException problem = rejects(keychain, KEYCHAIN,
+                List.of(Map.of("type", "hero_mesh", "source", Map.of("upload_id", UPLOAD), "anchor", "face")), ProblemCodes.UNSUPPORTED_FEATURE);
+        assertThat(problem.getMessage()).isEqualTo("Saathi keychain tag can't carry your own 3D form (Roop) yet");
         assertThat(problem.properties()).containsEntry("unsupported", List.of("hero_mesh"));
         rejects(keychain, KEYCHAIN, List.of(Map.of("type", "sticker", "anchor", "face")), ProblemCodes.VALIDATION_FAILED);
     }
@@ -104,6 +103,10 @@ class FeatureValidatorTest {
     void theAnchorMustExistAndAcceptTheType() {
         ApiProblemException problem = rejects(keychain, KEYCHAIN, List.of(relief("top")), ProblemCodes.VALIDATION_FAILED);
         assertThat(problem.getMessage()).contains("no such place").contains("Face, Back");
+        // the keychain's back takes a photo or a name; motifs go on the face
+        problem = rejects(keychain, KEYCHAIN, List.of(motif("back")), ProblemCodes.UNSUPPORTED_FEATURE);
+        assertThat(problem.getMessage()).isEqualTo("The Back of Saathi keychain tag does not take motif (Buti)");
+        assertThat(validator.validate(keychain, KEYCHAIN, List.of(motif("face")))).hasSize(1);
         problem = rejects(plaque, FamilyLimits.none("nameplate"), List.of(relief("edge")), ProblemCodes.UNSUPPORTED_FEATURE);
         assertThat(problem.getMessage()).isEqualTo("The Edge of Test plaque does not take photo relief (Chhavi)");
         assertThat(problem.properties()).containsEntry("anchor", "edge").containsEntry("feature", 0);
@@ -242,7 +245,8 @@ class FeatureValidatorTest {
     @Test
     void customerDetailsNeverUseCodeWords() {
         List<List<Map<String, Object>>> bad = List.of(
-                List.of(text("face", "Asha")),
+                List.of(motif("back")),
+                List.of(text("face", "x".repeat(17))),
                 List.of(relief("face"), relief("face")),
                 List.of(Map.of("type", "hero_mesh", "source", Map.of("upload_id", UPLOAD), "anchor", "face")));
         for (List<Map<String, Object>> features : bad) {
@@ -269,6 +273,10 @@ class FeatureValidatorTest {
 
     private static Map<String, Object> text(String anchor, String text) {
         return Map.of("type", "emboss_text", "text", text, "anchor", anchor);
+    }
+
+    private static Map<String, Object> motif(String anchor) {
+        return Map.of("type", "motif", "motif_id", "lotus", "anchor", anchor);
     }
 
     private static Map<String, Object> hero(int longest) {

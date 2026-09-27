@@ -6,7 +6,7 @@ import java.util.Optional;
 /**
  * Public API of the catalog module: read by the design and cart modules to start Shop designs and price
  * versions; written by the management API (ADR-0012), which owns items, materials, shelves, outcome families
- * (Avatars) and bought-in hardware.
+ * (Avatars), bought-in hardware and experiences (Duniya). Viewer environments (Mahaul) are read-only reference data.
  */
 public interface Catalog {
 
@@ -16,8 +16,9 @@ public interface Catalog {
     Optional<CatalogItemDto> item(String slug);
 
     /**
-     * 409 {@code slug_exists} when the slug is taken; 422 {@code validation_failed} for a category that is not a shelf;
-     * 422 {@code unknown_family} / {@code unknown_material} for an unknown family or default material.
+     * 409 {@code slug_exists} when the slug is taken; 422 {@code validation_failed} for a category that is not a shelf or an
+     * environment that is not a backdrop; 422 {@code unknown_family} / {@code unknown_material} for an unknown family or default
+     * material.
      */
     CatalogItemDto createItem(CatalogItemInput input);
 
@@ -68,8 +69,9 @@ public interface Catalog {
     List<FamilyDto> allFamilies();
 
     /**
-     * 409 {@code family_exists} when the id is taken; 422 {@code validation_failed} for an unknown shelf or an envelope
-     * with {@code min > max}; 422 {@code unknown_hardware} / {@code unknown_material} for unknown SKUs or allowed materials.
+     * 409 {@code family_exists} when the id is taken; 422 {@code validation_failed} for an unknown shelf or environment or an
+     * envelope with {@code min > max}; 422 {@code unknown_hardware} / {@code unknown_material} for unknown SKUs or allowed
+     * materials.
      */
     FamilyDto createFamily(FamilyInput input);
 
@@ -86,4 +88,41 @@ public interface Catalog {
 
     /** 404 for an unknown SKU. */
     HardwareItemDto updateHardware(String sku, HardwareItemInput input);
+
+    /** Viewer backdrops (Mahaul) in display order: the valid {@code environment} of experiences, families and Shop items. */
+    List<EnvironmentDto> environments();
+
+    /**
+     * Experiences (Duniya) in display order, for the Shop. With {@code includeUnavailable} false only {@code available} ones.
+     * {@code avatars} are expanded to the families that can be ordered today ({@link FamilyDto#orderable()}, the
+     * {@link #families} view) in the experience's order, {@code items} to its curated Shop items; {@code price_from_paise} is
+     * the lowest floor among those avatars. Needs the live descriptors, like {@link #families}.
+     */
+    List<ExperienceDto> experiences(boolean includeUnavailable);
+
+    /** Any experience by its URL slug, available or not, expanded like {@link #experiences}. */
+    Optional<ExperienceDto> experience(String slug);
+
+    /** Whether an experience id exists; a database check only (never calls the geometry service). */
+    boolean experienceExists(String id);
+
+    /** Every experience as stored (family ids and item slugs, available or not), for the management API. */
+    List<AdminExperienceDto> allExperiences();
+
+    /** One experience as stored, by id (management API). */
+    Optional<AdminExperienceDto> adminExperience(String id);
+
+    /**
+     * 409 {@code experience_exists} / {@code slug_exists} when the id / slug is taken; 422 {@code validation_failed} for an
+     * unknown environment (the detail names the backdrops) or Shop item, a repeated avatar, item, motif or collection, or a
+     * season window whose ends are not both dates in order or both month-days; 422 {@code unknown_family} for an avatar that
+     * is not a family.
+     */
+    AdminExperienceDto createExperience(ExperienceInput input);
+
+    /**
+     * 404 {@code unknown_experience} for an unknown id (the id in the path wins over the body); 409 {@code slug_exists} when
+     * another experience has the slug; 422 as on create.
+     */
+    AdminExperienceDto updateExperience(String id, ExperienceInput input);
 }

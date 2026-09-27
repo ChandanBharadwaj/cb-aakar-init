@@ -52,6 +52,10 @@ public final class ProblemCodes {
     public static final String CONTENT_UNUSABLE = "content_unusable";
     public static final String REVIEW_ALREADY_DECIDED = "review_already_decided";
 
+    // Experiences (Duniya) and viewer environments (Mahaul), plan §7
+    public static final String UNKNOWN_EXPERIENCE = "unknown_experience";
+    public static final String EXPERIENCE_EXISTS = "experience_exists";
+
     private ProblemCodes() {
     }
 }

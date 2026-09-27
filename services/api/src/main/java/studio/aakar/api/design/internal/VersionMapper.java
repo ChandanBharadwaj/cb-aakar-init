@@ -54,8 +54,8 @@ class VersionMapper {
 
     DesignResponse toResponse(DesignEntity design, DesignVersionEntity latest, int versionsCount) {
         VersionStatus status = latest == null ? VersionStatus.generating : latest.status();
-        return new DesignResponse(design.id(), design.source(), design.catalogItemSlug(), design.familyId(), design.title(), status,
-                design.createdAt(), versionsCount, latest == null ? null : toResponse(latest));
+        return new DesignResponse(design.id(), design.source(), design.catalogItemSlug(), design.familyId(), design.experienceId(),
+                design.title(), status, design.createdAt(), versionsCount, latest == null ? null : toResponse(latest));
     }
 
     /** Price of a ready version for any material; empty while the version has no print estimate yet. */

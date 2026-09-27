@@ -28,6 +28,8 @@ class AuditLog {
     static final String FAMILY_UPDATE = "family.update";
     static final String HARDWARE_CREATE = "hardware.create";
     static final String HARDWARE_UPDATE = "hardware.update";
+    static final String EXPERIENCE_CREATE = "experience.create";
+    static final String EXPERIENCE_UPDATE = "experience.update";
     static final String REVIEW_DECIDE = "review.decide";
     static final int MAX_PAGE_SIZE = 200;
     private static final TypeReference<Map<String, Object>> MAP = new TypeReference<>() { };

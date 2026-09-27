@@ -21,7 +21,8 @@ cd services/api
 
 Needs a PostgreSQL 16 with database `aakar` (user/password `aakar`) — `docker compose -f infra/docker-compose.yml up postgres`
 or a local server. Flyway creates the schema and seeds the six Shop items on their six shelves, six materials, the 25 outcome
-families (Avatars) with their seven bought-in hardware items, and the pricing policy on start.
+families (Avatars) with their seven bought-in hardware items, the pricing policy, the seven viewer backdrops (Mahaul) and the five
+experiences (Duniya) on start.
 Point `AAKAR_GEOMETRY_URL` at a running geometry service (`services/geometry`, default `http://localhost:8081`);
 the catalog, sign-in, cart, addresses, serviceability and everything except templates/generation works without it.
 
@@ -106,8 +107,8 @@ Builds keyed on `$.spec.template` (`keychain_tag@1`, `fridge_magnet@1`, `raw_pri
 included) with the template's `hardware` (the magnet reports `magnet_count` magnets) and a small estimate; a `hero_mesh`
 (`$.spec.features[0].type`) whose URL contains `broken` fails with `content_unusable`. `support/SampleFiles` makes small
 genuine files of every upload format.
-Tests that read monorepo files (`packages/contracts`, `packages/design-tokens/materials.json` and `families.json`) skip with
-a message when those files are missing; `-Daakar.repo.root=…` overrides the monorepo location.
+Tests that read monorepo files (`packages/contracts`, `packages/design-tokens/materials.json`, `families.json` and
+`experiences.json`) skip with a message when those files are missing; `-Daakar.repo.root=…` overrides the monorepo location.
 
 | Test | Covers |
 |---|---|
@@ -133,11 +134,13 @@ a message when those files are missing; `-Daakar.repo.root=…` overrides the mo
 | `FamiliesSeedTest` | `V9__families_hardware_uploads.sql`: `shelves`, `hardware_items`, every `template_families` row (JSONB columns included) and the Shop items' `family_id` backfill match `packages/design-tokens/families.json` |
 | `CatalogFamiliesIntegrationTest` | Shelves in order (storefront and portal), `GET /api/families` lists only available + ready families (`kind` filter, 400), family detail with hardware names and live descriptors (anchor `kind`/`size_mm`/`bounds_mm`/`accepts`, `hardware`, `min_feature_mm` round-trip; old fixtures unchanged), unavailable families resolve by id but are flagged, 404 `unknown_family`, responses validate against `template-family.v1.json` and `template-descriptor.v1.json`, Shop items refuse an unknown shelf (422 listing the shelves) and an unknown family (422 `unknown_family`) |
 | `UploadsIntegrationTest` | `POST /api/uploads` for every image and model format (sha256, served URL, owner folder without the guest id), 413 over 15 MB, 422 `unsupported_format` for a `.txt`, a kind mismatch or a renamed file, 400 / 401 / 415, owner-only `GET` (404 otherwise), guest uploads moving to the user on sign-in; a flagged file name → `pending_review`, a design with it → 409 `upload_not_ready`, the queue with owner and reason, a `studio` reviewer approves → `ready` → the design starts; a rejection → the note as `message`, 422 `upload_rejected`; 409 `review_already_decided`, queue filters, audit `review.decide` |
-| `CarrierDesignFlowIntegrationTest` | Walk (1): a guest's photos on both faces of a keychain (`family_id` + `features`), the spec carrying each photo by its internal URL (never the client's), the build request WireMock saw, the version's named split ring, the price with the hardware line and the ₹249 keychain minimum, cart and checkout snapshots, the print pack's Hardware/Content rows and `packing-list.txt`; the magnet's reported `magnet_count` hardware, edits that keep (`features` absent), replace or clear the content, stranger uploads 404; `unknown_family`, `family_not_available`, template of another family, content the keychain cannot carry (customer labels), relief depth cap, model-as-photo, 8-feature cap, default template/finish, a prompt as the working title, family material rules |
+| `CarrierDesignFlowIntegrationTest` | Walk (1): a guest's photos on both faces of a keychain (`family_id` + `features`), the spec carrying each photo by its internal URL (never the client's), the build request WireMock saw, the version's named split ring, the price with the hardware line and the ₹249 keychain minimum, cart and checkout snapshots, the print pack's Hardware/Content rows and `packing-list.txt`; the magnet's reported `magnet_count` hardware, edits that keep (`features` absent), replace or clear the content, stranger uploads 404; `unknown_family`, `family_not_available`, template of another family, a name on the keychain's back (accepted since the PR 3b descriptors) but not a motif or a 3D form (customer labels), relief depth cap, model-as-photo, 8-feature cap, default template/finish, a prompt as the working title, family material rules |
 | `RawPrintIntegrationTest` | Walk (2), Swaroop: `source: upload` + `raw_print` + one `hero_mesh` (fit longest 80) → ready with the `setup` line; resize by feature, finish swap keeps the form; missing form, 10 / 245 mm (never clamped), no fit, template params, a photo as the model, a relief on the body, wrong source → 4xx; a model the geometry stub cannot repair → job `failed` with `content_unusable` |
 | `templates/internal/FeatureValidatorTest` | Every feature rule (type supported, anchor exists and accepts, surface vs volume, one photo or form per anchor, `max_relief_mm` with the lithophane exemption, family text length counting Devanagari without marks ("नमस्ते" = 4), the raw family's single form inside 20–240 mm, contract shapes and ranges) and customer-worded details |
 | `media/internal/UploadFormatsTest` · `TermsContentScannerTest` · `templates/TemplateFixturesTest` | Magic-byte sniffing of every format and renamed or damaged files; flagged terms ignoring case, spaces and punctuation; fixtures equal the exported descriptors |
-| `AdminFamiliesIntegrationTest` | Owner creates and updates hardware and families (201/200; 409 `hardware_exists` / `family_exists`; 422 for an unknown shelf, hardware SKU or allowed material, a `min > max` envelope, bad enums), the path id wins on PUT, an available family without a live template stays off the storefront, the pricing preview with a `family_id` (hardware line, minimum, setup) and `family_rules` checks, `studio` role 403, audit `family.create|update` and `hardware.create|update` with before/after |
+| `AdminFamiliesIntegrationTest` | Owner creates and updates hardware and families (201/200; 409 `hardware_exists` / `family_exists`; 422 for an unknown shelf, backdrop, hardware SKU or allowed material, a `min > max` envelope, bad enums), the path id wins on PUT, an available family without a live template stays off the storefront, the pricing preview with a `family_id` (hardware line, minimum, setup) and `family_rules` checks, `studio` role 403, audit `family.create|update` and `hardware.create|update` with before/after |
+| `ExperiencesSeedTest` | `V11__experiences_environments.sql`: every `environments` row and every `experiences` row (JSONB `surface`, `motif_pack`, `collections`, `season` included) with its ordered `experience_avatars` and `experience_items` match `packages/design-tokens/experiences.json`; `catalog_items`, `template_families` and `experiences` reference `environments`; `designs.experience_id` exists |
+| `ExperiencesIntegrationTest` | `GET /api/experiences` lists Utsav, Adda, Yaadein, Masti in order (Katha is unavailable) with only their orderable avatars expanded in order (lithophane, figurine, keycap… have no live template in the stub, so they are left out there and kept in the portal rows), curated items, `price_from_paise` = the lowest avatar floor, rows valid against `experience.v1.json`; slugs resolve any experience (Katha flagged), 404 `unknown_experience`; `GET /api/environments` and the portal copy; owner CRUD (201/200, 409 `experience_exists` / `slug_exists`, 422 for an unknown backdrop naming the known ones, unknown family, unknown item, repeats, mixed or backwards or impossible season windows, bad style, slug or accent), path id wins, a reorder, a new slug and the switch off leave the Shop, defaults, `studio` 403, audit `experience.create|update` before/after; families and Shop items accept the comic rooftop and refuse an unknown backdrop; designs keep `experience_id` (Shop and Avatar paths, 422 `unknown_experience`) |
 
 ## Identity
 
@@ -156,7 +159,8 @@ after expiry. `POST /api/auth/otp/verify` creates the user on first sign-in, iss
 `X-Aakar-Guest` identity: designs and uploads with that `guest_id` get `owner_id`, the guest cart merges into the user cart (same
 version + material → quantities add up, capped at 20); `attached.designs` / `attached.cart_items` report the counts.
 
-Public routes: `/api/catalog/**`, `/api/templates/**`, `/api/designs/**` (designs stay readable by their unguessable id),
+Public routes: `/api/catalog/**`, `/api/families/**`, `/api/experiences/**`, `/api/environments/**`, `/api/templates/**`,
+`/api/designs/**` (designs stay readable by their unguessable id),
 `/api/versions/**`, `/api/jobs/**`, `/api/cart/**` and `/api/uploads/**` (guest or user; 401 with neither header), `/api/auth/otp/*`,
 `/api/shipping/**`, `/internal/**`, actuator, Swagger. Signed-in only: `/api/auth/me`, `/api/auth/logout`, `/api/me/**`,
 `/api/checkout`, `/api/orders/**`, `/api/payments/**` (401 Problem `unauthenticated`; other people's orders and payments 404).
@@ -177,8 +181,8 @@ before the customer chain); `GET /admin/api/auth/me` returns the account. Furthe
 (no endpoint yet).
 
 **Roles.** `owner` may do everything; `studio` runs fulfilment (orders, advance, print pack, QC photos, packaging card,
-preview, content reviews) and reads configuration — writes to pricing, materials, catalog, families, hardware and templates
-answer 403 `forbidden`.
+preview, content reviews) and reads configuration — writes to pricing, materials, catalog, families, hardware, experiences and
+templates answer 403 `forbidden`.
 
 **Endpoints.**
 
@@ -198,13 +202,16 @@ answer 403 `forbidden`.
 | POST | `/admin/api/pricing/preview` | `{policy, material, extruded_volume_cm3, print_seconds, family_id?}` → `PriceBreakdown` with `policy_version: preview`; a `family_id` (422 `unknown_family` when not seeded) prices a piece of that family: its default hardware at the draft's markup, its setup fee and its minimum |
 | GET · POST | `/admin/api/materials` | All incl. unavailable; create (owner; 409 `material_exists`) |
 | PUT | `/admin/api/materials/{materialId}` | Replace (owner; 404); `available: false` hides it from `GET /api/catalog/materials` (existing carts and orders keep pricing) |
-| GET · POST | `/admin/api/catalog/items` | All items; create (owner; 409 `slug_exists`, 422 `validation_failed` for a `category` that is not a shelf, 422 `unknown_family` / `unknown_material`) |
+| GET · POST | `/admin/api/catalog/items` | All items; create (owner; 409 `slug_exists`, 422 `validation_failed` for a `category` that is not a shelf or an `environment` that is not a backdrop, 422 `unknown_family` / `unknown_material`) |
 | PUT | `/admin/api/catalog/items/{slug}` | Replace (owner; 404) |
 | GET | `/admin/api/catalog/shelves` | Shelves in display order: the valid `category` (items) and `shelf` (families) values |
-| GET · POST | `/admin/api/families` | Every outcome family (Avatar) with `ready` and `template_ids`; create (owner; 409 `family_exists`; 422 `validation_failed` for an unknown shelf or a `min > max` envelope; 422 `unknown_hardware` / `unknown_material` for unknown SKUs or `material_rules.allowed` ids); audit `family.create` |
+| GET · POST | `/admin/api/families` | Every outcome family (Avatar) with `ready` and `template_ids`; create (owner; 409 `family_exists`; 422 `validation_failed` for an unknown shelf or backdrop (`environment`, `studio` when absent) or a `min > max` envelope; 422 `unknown_hardware` / `unknown_material` for unknown SKUs or `material_rules.allowed` ids); audit `family.create` |
 | PUT | `/admin/api/families/{familyId}` | Replace copy, tier, shelf, envelope, hardware, rules, content slot, availability (owner; the path id wins; 404 `unknown_family`); audit `family.update` |
 | GET · POST | `/admin/api/hardware` | Bought-in hardware items with cost and weight; create (owner; 409 `hardware_exists`); audit `hardware.create` |
 | PUT | `/admin/api/hardware/{sku}` | Replace (owner; 404); audit `hardware.update` |
+| GET · POST | `/admin/api/experiences` | Every experience (Duniya) as stored — `avatars` family ids and `items` slugs in order, available or not, `updated_at`; create (owner; 409 `experience_exists` / `slug_exists`; 422 `validation_failed` for an unknown backdrop (naming the known ones) or Shop item, a repeated avatar, item, motif or collection, a season window that is not two dates in order or two month-days; 422 `unknown_family`); audit `experience.create` |
+| PUT | `/admin/api/experiences/{experienceId}` | Replace copy, slug, backdrop, style, motif pack, avatars (order), items, collections, seasons, availability, sort order (owner; the path id wins; 404 `unknown_experience`; 409 `slug_exists` when another experience has the slug); audit `experience.update` |
+| GET | `/admin/api/environments` | The viewer backdrops (Mahaul), read-only: the valid `environment` values |
 | GET | `/admin/api/templates` | Geometry descriptors merged with `template_flags` (`live` default true) and the slugs using each |
 | PUT | `/admin/api/templates/{templateId}` | `{live}` (owner; 404); `live: false` hides it from `GET /api/templates` and makes `POST /api/designs` answer 422 `template_not_available` |
 | GET | `/admin/api/uploads?status&limit` | Customer uploads newest first (`status` ready · pending_review · rejected, 422 otherwise; `limit` 1–200, default 50) as `AdminUpload`: the `Upload` fields with a `url` staff can open in any status, `owner {user_id, guest_id, phone}`, `origin` and the latest `review {id, reason, status, decision_note, reviewer_email, decided_at}` |
@@ -214,7 +221,7 @@ answer 403 `forbidden`.
 
 Schema violations on admin bodies answer **422** `validation_failed` (the storefront API uses 400). Every write records an
 `audit_log` row (`order.advance`, `order.qc_photo`, `pricing.publish`, `material.create|update`, `catalog.create|update`, `family.create|update`,
-`hardware.create|update`, `template.live`, `review.decide`).
+`hardware.create|update`, `experience.create|update`, `template.live`, `review.decide`).
 
 **Print pack.** Built in memory: for each order item a `print-sheet.txt` (order number, piece and version, template `id@version`
 and params from the version spec, the **content** it carries by label — `photo relief (Chhavi) on face · text (Naam) "Asha" on
@@ -282,6 +289,33 @@ for "from ₹…" copy, not a quote. `TemplateDescriptor` mirrors the descriptor
 (surface | volume), `size_mm`, `bleed_mm`, `bounds_mm`, `accepts`, `max_relief_mm`, plus `hardware[]` and `min_feature_mm`.
 `catalog → templates` (readiness) and `catalog → pricing` (the floor) are its module edges; `catalog.internal` stays private
 (`ModularityTests`). `catalog_items.family_id` is backfilled for the six seeded items.
+
+## Experiences (Duniya) and viewer environments (Mahaul)
+
+An **experience** is a theme on the Shop — a stage backdrop, a default style, a motif pack, ordered Avatars, curated Shop items
+and seasons — that adds no geometry (`docs/research/outcome-categories/implementation-plan.md` §7–§8). The `catalog` module owns
+four tables seeded from [`packages/design-tokens/experiences.json`](../../packages/design-tokens/experiences.json) by
+`V11__experiences_environments.sql` (contract `packages/contracts/schemas/experience.v1.json`; `ExperiencesSeedTest` fails on drift):
+
+| Table | Holds |
+|---|---|
+| `environments` | The backdrops every `environment` names: `id`, `label`, `surface` stage · paper, `preset_key` (the storefront viewer preset that renders it — presets are code, so a new backdrop is engineering plus a row), `palette` (JSONB swatches, backdrop colour first), `sort_order`. The six storefront backdrops plus `comic_rooftop_night` (its preset lands with Katha, PR 12). `template_families.environment`, `catalog_items.environment` and `experiences.environment` reference it, so the portal checks backdrops against the table (422 `validation_failed` naming the known ids) instead of a hard-coded list |
+| `experiences` | `id` (snake_case, never renamed: `festive`, `desk_gaming`, `memories`, `kids_party`, `comics`), brand copy (`codename` "Utsav", `title` "Festive & gifting", `tagline`, `description`), unique `slug` (the URL `/duniya/<slug>`), `environment`, `style` (a design-spec style, incl. `comic_pop`), JSONB `surface` `{accent, paper_tint, hero_media}`, `motif_pack` (motif or pack ids), `collections` `[{id, title, licence_ref}]` and `season` `[{starts_on, ends_on, label}]` (two ISO dates in order, or two month-days `--10-01` that recur and may wrap the year), `available`, `sort_order` |
+| `experience_avatars` · `experience_items` | The families an experience shows and the Shop items it curates, each with `sort_order`; a write replaces the whole ordered list |
+
+`designs.experience_id` (nullable) remembers the experience a design started from: `POST /api/designs` takes an optional
+`experience_id` (any known experience, on the Shop or not; 422 `unknown_experience` otherwise) and `Design.experience_id` echoes it,
+so the karigar's note and packaging card can name the theme.
+
+`GET /api/experiences` lists the `available` experiences by `sort_order` in the storefront shape: `avatars` are the experience's
+families that can be ordered today (`available` and `ready`, the `GET /api/families` view with templates and `price_from_paise`)
+in the experience's order, `items` its curated Shop items in order (unavailable ones keep their Coming soon state), and
+`price_from_paise` the lowest floor among those avatars. `GET /api/experiences/{slug}` resolves any experience, available or not
+(404 `unknown_experience`), so `/duniya/katha` can say "coming soon". Both need the live descriptors, like the family endpoints
+(503 `geometry_unavailable` without the geometry service). `GET /api/environments` lists the backdrops. The portal edits the
+rows through `/admin/api/experiences` with ids instead of expansions, so it round-trips what it shows. Seeded: Utsav, Adda,
+Yaadein and Masti available; Katha (`comic_rooftop_night`, `comic_pop`, motif pack `comic_bursts`, no collections until a licence
+exists) unavailable until PR 12 ships its backdrop preset.
 
 ## Content on designs (the Chhaap), uploads and Swaroop (plan §2, §4, §5; ADR-0014)
 

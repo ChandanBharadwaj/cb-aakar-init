@@ -83,6 +83,11 @@ class DesignService implements Designs {
         if (request.source() == DesignSource.upload && !request.hasFamily()) {
             throw ApiProblemException.validation("family_id is required when source is upload (your own model file prints as family raw_print)");
         }
+        String experienceId = request.hasExperience() ? request.experienceId().trim() : null;
+        if (experienceId != null && !catalog.experienceExists(experienceId)) {
+            throw ApiProblemException.unprocessable(ProblemCodes.UNKNOWN_EXPERIENCE, "Unknown experience",
+                    "experience_id '" + experienceId + "' is not an experience (see GET /api/experiences)");
+        }
         Draft draft = request.source() == DesignSource.shop ? fromShop(request)
                 : request.hasFamily() ? fromFamily(request) : fromTemplate(request);
         requireSourceFitsFamily(request.source(), draft.family());
@@ -96,14 +101,15 @@ class DesignService implements Designs {
 
         Instant now = Instant.now();
         String familyId = draft.family() == null ? null : draft.family().id();
-        DesignEntity design = designs.save(new DesignEntity(request.source(), draft.catalogItemSlug(), familyId, draft.title(), owner, now));
+        DesignEntity design = designs.save(new DesignEntity(request.source(), draft.catalogItemSlug(), familyId, experienceId, draft.title(), owner,
+                now));
         Map<String, Object> spec = DesignSpecs.build(draft.descriptor(), draft.params(), draft.material(), features);
         DesignVersionEntity version = versions.save(new DesignVersionEntity(design.id(), 1, null, spec, DesignSpecs.templateRef(draft.descriptor()),
                 expectedHardware(draft.descriptor(), draft.family()), DesignVersionEntity.CREATED_BY_USER, now));
         UUID jobId = jobs.start(new GenerationRequest(design.id(), version.id(), 1, null, spec));
         version.attachJob(jobId);
-        log.info("Design {} created from {} ({}, family {}, {} feature(s)) by {}; job {}", design.id(), request.source(), draft.descriptor().ref(),
-                familyId, features.size(), owner, jobId);
+        log.info("Design {} created from {} ({}, family {}, experience {}, {} feature(s)) by {}; job {}", design.id(), request.source(),
+                draft.descriptor().ref(), familyId, experienceId, features.size(), owner, jobId);
         return new DesignAccepted(design.id(), 1, jobId, GenerationJobs.eventsPath(jobId));
     }
 
