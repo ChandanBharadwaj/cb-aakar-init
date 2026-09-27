@@ -5,7 +5,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: { default: "Aakar Studio", template: "%s · Aakar Studio" },
-  description: "Staff-only management portal for the Aakar 3D printing studio: orders, pricing, materials, catalog, templates, messages, audit.",
+  description: "Staff-only management portal for the Aakar 3D printing studio: orders, pricing, materials, catalog, Avatars, hardware, templates, content reviews, messages, audit.",
   applicationName: "Aakar Studio",
   robots: { index: false, follow: false },
 };

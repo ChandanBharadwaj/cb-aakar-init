@@ -13,12 +13,13 @@ import { Pill } from "@/components/ui/StatusPill";
 export function PricingPage() {
   const policies = useQuery(() => api.pricing.policies(), "policies");
   const materials = useQuery(() => api.materials.list(), "materials");
+  const families = useQuery(() => api.families.list(), "families");
   const versions = policies.data ?? [];
   const active = versions.find((v) => v.active);
 
   return (
     <>
-      <PageHeader eyebrow="Configuration" title="Pricing" description="Rates, fees, margin and shipping rules are versioned policies. Publishing a new version makes it active; older versions stay for the orders priced with them." />
+      <PageHeader eyebrow="Configuration" title="Pricing" description="Rates, fees, margin, shipping rules, the hardware markup and per-Avatar minimums are versioned policies. Publishing a new version makes it active; older versions stay for the orders priced with them." />
       {policies.problem && !policies.data ? (
         <ProblemCard problem={policies.problem} action={{ label: "Try again", onClick: () => void policies.reload() }} />
       ) : !policies.data || !materials.data ? (
@@ -68,7 +69,7 @@ export function PricingPage() {
               </div>
             </section>
           </div>
-          <PublishPolicyForm key={active.version} active={active} versions={versions} materials={materials.data} onPublished={() => void policies.reload()} />
+          <PublishPolicyForm key={active.version} active={active} versions={versions} materials={materials.data} families={families.data ?? []} onPublished={() => void policies.reload()} />
         </div>
       )}
     </>

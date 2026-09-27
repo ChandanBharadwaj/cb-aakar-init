@@ -2,10 +2,15 @@
 // Staff token lives in localStorage (`aakar_staff_token`) and travels as `Authorization: Bearer`.
 // A 401 on any call clears the token and sends the browser back to /signin.
 import type {
+  AdminFamily,
+  AdminFamilyInput,
+  AdminHardware,
+  AdminHardwareInput,
   AdminMaterial,
   AdminMaterialInput,
   AdminOrder,
   AdminTemplate,
+  AdminUpload,
   AdvanceRequest,
   AuditPage,
   CatalogItem,
@@ -22,9 +27,12 @@ import type {
   PricingPreviewRequest,
   Problem,
   PublishPolicyRequest,
+  ReviewDecision,
+  Shelf,
   Staff,
   StaffSession,
   TemplateLiveRequest,
+  UploadStatus,
 } from "./types";
 
 export const TOKEN_KEY = "aakar_staff_token";
@@ -226,6 +234,29 @@ export const api = {
     list: () => request<CatalogItem[]>("/admin/api/catalog/items"),
     create: (body: CatalogItemInput) => request<CatalogItem>("/admin/api/catalog/items", { method: "POST", body }),
     update: (slug: string, body: CatalogItemInput) => request<CatalogItem>(`/admin/api/catalog/items/${enc(slug)}`, { method: "PUT", body }),
+    /** Shop shelves (catalog categories) in display order; `CatalogItemInput.category` must be one of these ids. */
+    shelves: () => request<Shelf[]>("/admin/api/catalog/shelves"),
+  },
+  /** Outcome families (Avatars): owner-only writes, audited as family.create / family.update. */
+  families: {
+    list: () => request<AdminFamily[]>("/admin/api/families"),
+    create: (body: AdminFamilyInput) => request<AdminFamily>("/admin/api/families", { method: "POST", body }),
+    update: (id: string, body: AdminFamilyInput) => request<AdminFamily>(`/admin/api/families/${enc(id)}`, { method: "PUT", body }),
+  },
+  /** Bought-in hardware (split rings, magnets, LED bases): owner-only writes, audited as hardware.create / hardware.update. */
+  hardware: {
+    list: () => request<AdminHardware[]>("/admin/api/hardware"),
+    create: (body: AdminHardwareInput) => request<AdminHardware>("/admin/api/hardware", { method: "POST", body }),
+    update: (sku: string, body: AdminHardwareInput) => request<AdminHardware>(`/admin/api/hardware/${enc(sku)}`, { method: "PUT", body }),
+  },
+  /** Customer uploads (images for reliefs, model files for Swaroop); `pending_review` is the review queue. */
+  uploads: {
+    list: (status?: UploadStatus, limit?: number) => request<AdminUpload[]>("/admin/api/uploads", { query: { status, limit } }),
+  },
+  /** Content review decisions: studio or owner, audited as review.decide. */
+  reviews: {
+    decide: (reviewId: string, decision: ReviewDecision, note?: string) =>
+      request<AdminUpload>(`/admin/api/content-reviews/${enc(reviewId)}`, { method: "POST", body: { decision, ...(note?.trim() ? { note: note.trim() } : {}) } }),
   },
   templates: {
     list: () => request<AdminTemplate[]>("/admin/api/templates"),

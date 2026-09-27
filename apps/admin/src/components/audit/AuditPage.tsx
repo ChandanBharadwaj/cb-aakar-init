@@ -24,10 +24,13 @@ function targetHref(entry: AuditEntry): string | undefined {
   if (area === "material") return "/materials";
   if (area === "catalog") return "/catalog";
   if (area === "template") return "/templates";
+  if (area === "family") return "/avatars";
+  if (area === "hardware") return "/hardware";
+  if (area === "review") return "/reviews";
   return undefined;
 }
 
-const AREA_TONE: Record<string, "accent" | "info" | "neutral" | "success" | "warning"> = { order: "accent", pricing: "info", material: "neutral", catalog: "neutral", template: "success" };
+const AREA_TONE: Record<string, "accent" | "info" | "neutral" | "success" | "warning"> = { order: "accent", pricing: "info", material: "neutral", catalog: "neutral", template: "success", family: "accent", hardware: "neutral", review: "warning" };
 
 export function AuditPage() {
   const router = useRouter();

@@ -2,7 +2,8 @@
 // A stand-in for the `admin` module of services/api so the management portal can be built and exercised
 // before Spring Boot lands. Implements every path in packages/contracts/openapi/aakar-admin.v1.yaml with
 // in-memory data: staff accounts, ~14 orders across every status with events, pricing policy versions,
-// the six materials, six catalog items, one template, a messages log and an audit log.
+// the six materials, catalog items, three templates, the shelves / hardware / outcome families (Avatars) from
+// packages/design-tokens/families.json, a few customer uploads with content reviews, a messages log and an audit log.
 //
 // Usage: node scripts/mock-admin-api.mjs [port=8080]
 //
@@ -17,6 +18,7 @@ import path from "node:path";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "../../..");
 const tokensFile = JSON.parse(readFileSync(path.join(root, "packages/design-tokens/materials.json"), "utf8"));
+const familiesFile = JSON.parse(readFileSync(path.join(root, "packages/design-tokens/families.json"), "utf8"));
 
 const PORT = Number(process.argv[2] && !process.argv[2].startsWith("--") ? process.argv[2] : 8080);
 const BASE = `http://localhost:${PORT}`;
@@ -78,8 +80,11 @@ function roundToEnding(paise, ending) {
   return rupees * 100;
 }
 
-/** The pricing formula (PLAN §7.10) over a policy, a material and a print estimate. */
-function priceWith(policy, policyVersion, material, extrudedVolumeCm3, printSeconds) {
+/**
+ * The pricing formula (PLAN §7.10) over a policy, a material and a print estimate. With a family in the context the
+ * lines gain hardware (default BOM × unit cost × markup) and setup, and the family's minimum lifts the subtotal.
+ */
+function priceWith(policy, policyVersion, material, extrudedVolumeCm3, printSeconds, context = {}) {
   const mass = +(extrudedVolumeCm3 * material.density_g_cm3).toFixed(1);
   const materialPaise = Math.round(mass * material.rate_per_g_paise);
   const machine = Math.round((printSeconds / 3600) * policy.machine_rate_paise_per_hour);
@@ -92,25 +97,86 @@ function priceWith(policy, policyVersion, material, extrudedVolumeCm3, printSeco
     { code: "finishing", label: material.finish_class === "silk" ? "Hand sanding & sealing" : "Hand finishing", detail: `${material.finish_class} finish class`, amount_paise: finishing },
   ];
   if (policy.packaging_fee_paise > 0) lines.push({ code: "packaging", label: "Kraft box & card", amount_paise: policy.packaging_fee_paise });
+  const family = context.family;
+  const rule = family ? policy.family_rules?.[family.id] : undefined;
+  if (family) {
+    const markup = 1 + (policy.hardware_markup_pct ?? 0) / 100;
+    const parts = (family.hardware ?? []).map((ref) => ({ ref, item: hardwareBySku(ref.sku) })).filter((x) => x.item);
+    const hardwarePaise = parts.reduce((s, x) => s + Math.round(x.ref.qty * x.item.unit_cost_paise * markup), 0);
+    if (hardwarePaise > 0) {
+      lines.push({
+        code: "hardware",
+        label: `Hardware · ${parts.map((x) => `${x.item.name}${x.ref.qty > 1 ? ` × ${x.ref.qty}` : ""}`).join(", ")}`,
+        detail: `Bought-in parts at cost${policy.hardware_markup_pct ? ` + ${policy.hardware_markup_pct}% markup` : ""}`,
+        amount_paise: hardwarePaise,
+      });
+    }
+    if (rule?.setup_fee_paise > 0) lines.push({ code: "setup", label: family.kind === "raw" ? "Studio setup · repair & orientation" : "Studio setup", detail: `${family.codename} · ${family.name}`, amount_paise: rule.setup_fee_paise });
+  }
   const raw = lines.reduce((s, l) => s + l.amount_paise, 0);
   const withMargin = Math.round(raw * (1 + (policy.margin_pct ?? 0) / 100));
-  const subtotal = roundToEnding(withMargin, policy.round_to_rupees_ending_in);
+  const computed = roundToEnding(withMargin, policy.round_to_rupees_ending_in);
+  const minimum = rule?.minimum_subtotal_paise > 0 ? roundToEnding(rule.minimum_subtotal_paise, policy.round_to_rupees_ending_in) : 0;
+  const subtotal = Math.max(computed, minimum);
   const shipping = subtotal >= policy.free_shipping_above_paise ? 0 : policy.shipping_flat_paise;
-  return { currency: "INR", material_id: material.id, mass_g: mass, print_seconds: printSeconds, lines, subtotal_paise: subtotal, shipping_paise: shipping, shipping_label: policy.shipping_label, total_paise: subtotal + shipping, policy_version: policyVersion };
+  return {
+    currency: "INR",
+    material_id: material.id,
+    mass_g: mass,
+    print_seconds: printSeconds,
+    lines,
+    subtotal_paise: subtotal,
+    shipping_paise: shipping,
+    shipping_label: policy.shipping_label,
+    total_paise: subtotal + shipping,
+    policy_version: policyVersion,
+    ...(family ? { family_id: family.id } : {}),
+    ...(minimum > computed ? { minimum_subtotal_paise: minimum } : {}),
+  };
 }
 
 // ---------------------------------------------------------------------------------------------------------
 // Templates and catalog
 // ---------------------------------------------------------------------------------------------------------
-const templates = [{ id: "jharokha_phone_stand", version: 1, family: "phone_stand", name: "Jharokha Phone Stand", live: true }];
+// Rows carry the descriptor's family, features_supported (Chhaap types) and hardware so the portal can show them.
+const templates = [
+  { id: "jharokha_phone_stand", version: 1, family: "phone_stand", name: "Jharokha Phone Stand", live: true, features_supported: ["emboss_text"], hardware: [] },
+  { id: "keychain_tag", version: 1, family: "keychain", name: "Keychain Tag", live: true, features_supported: ["relief_image", "emboss_text", "motif"], hardware: [{ sku: "split_ring_25", qty: 1 }] },
+  { id: "raw_print", version: 1, family: "raw_print", name: "Raw Print · Swaroop", live: true, features_supported: ["hero_mesh"], hardware: [] },
+];
+
+// ---------------------------------------------------------------------------------------------------------
+// Shelves, hardware and outcome families (Avatars) seeded from packages/design-tokens/families.json.
+// POST/PUT mutate these arrays in memory; a restart reloads the seed.
+// ---------------------------------------------------------------------------------------------------------
+const FAMILY_KINDS = ["carrier", "object", "raw"];
+const FAMILY_TIERS = ["launch", "next", "later"];
+const SHAPE_TOLERANCES = ["any", "constrained", "strict"];
+const FEATURE_TYPES = ["emboss_text", "motif", "relief_image", "hero_mesh"];
+const ENVIRONMENTS = ["studio", "teak_table_candlelight", "desk_oak", "dashboard", "kitchen_marble", "balcony_daylight"];
+const FINISH_CLASSES = ["matte", "silk"];
+const ID_RE = /^[a-z][a-z0-9_]*$/;
+
+const shelves = familiesFile.shelves.map((sh) => ({ id: sh.id, label: sh.label, sort_order: sh.sort_order ?? 100 })).sort((a, b) => a.sort_order - b.sort_order);
+const shelfById = (id) => shelves.find((sh) => sh.id === id);
+const hardwareItems = familiesFile.hardware_items.map((h) => ({ ...normaliseHardware(h), updated_at: iso(ago(12 * DAY)) }));
+const hardwareBySku = (sku) => hardwareItems.find((h) => h.sku === sku);
+const families = familiesFile.families.map((f) => ({ ...normaliseFamily(f), updated_at: iso(ago(12 * DAY)) }));
+const familyById = (id) => families.find((f) => f.id === id);
+/** `ready` and `template_ids` are derived from the template registry (live templates of the family), never stored. */
+function familyView(f) {
+  const own = templates.filter((t) => t.family === f.id);
+  return { ...f, ready: own.some((t) => t.live), template_ids: own.map((t) => t.id) };
+}
 
 const catalog = [
-  { slug: "jharokha-phone-stand", name: "Jharokha Phone Stand", category: "desk_tech", template_id: "jharokha_phone_stand", default_params: { width_mm: 92, depth_mm: 78, height_mm: 120, tilt_deg: 70, lip_height_mm: 12, wall_mm: 3.2, arch_cusps: 5 }, default_material: "terracotta_silk", base_price_paise: 49900, specs_line: "Fits phones to 6.9″ · 92 × 78 × 120 mm · 64 g", environment: "desk_oak", description: "A cusped jharokha arch, printed in one piece, that holds any phone at a comfortable tilt.", available: true, media: [] },
-  { slug: "ajrakh-coasters", name: "Ajrakh Coasters · set of 4", category: "kitchen", template_id: "ajrakh_coasters", default_params: { diameter_mm: 100, count: 4 }, default_material: "indigo_matte", base_price_paise: 64900, specs_line: "100 mm · heat-safe to 90 °C · 28 g each", environment: "kitchen_marble", description: "Four coasters with an Ajrakh block-print relief.", available: false, media: [] },
-  { slug: "fluted-planter", name: "Fluted Planter · drainage tray", category: "home_decor", template_id: "fluted_planter", default_params: { diameter_mm: 140, height_mm: 130, flutes: 24, tray: true }, default_material: "terracotta_matte", base_price_paise: 89900, specs_line: "140 mm pot · fits 4″ nursery plants · 210 g", environment: "balcony_daylight", description: "Vertical flutes, a drainage tray, sized for nursery pots.", available: false, media: [] },
-  { slug: "kantha-nameplate", name: "Nameplate · Kantha border", category: "nameplates", template_id: "kantha_nameplate", default_params: { width_mm: 300, height_mm: 110 }, default_material: "polished_brass", base_price_paise: 119900, specs_line: "300 × 110 mm · raised letters · screws included", environment: "studio", description: "Raised letters in any of seven scripts inside a running Kantha stitch border.", available: false, media: [] },
-  { slug: "elephant-bookends", name: "Elephant Bookends", category: "gifting", template_id: "elephant_bookends", default_params: { height_mm: 180 }, default_material: "sandalwood_silk", base_price_paise: 134900, specs_line: "180 mm tall · weighted · holds 6 kg of books", environment: "teak_table_candlelight", description: "A pair of elephants, trunks raised, weighted at the base.", available: false, media: [] },
-  { slug: "headphone-stand-pillar", name: "Headphone Stand · Pillar", category: "desk_tech", template_id: "headphone_stand_pillar", default_params: { height_mm: 270 }, default_material: "basic_white", base_price_paise: 57900, specs_line: "270 mm tall · weighted base · 180 g", environment: "desk_oak", description: "A fluted pillar with a soft saddle for over-ear headphones.", available: false, media: [] },
+  { slug: "jharokha-phone-stand", name: "Jharokha Phone Stand", category: "desk_tech", family_id: "phone_stand", template_id: "jharokha_phone_stand", default_params: { width_mm: 92, depth_mm: 78, height_mm: 120, tilt_deg: 70, lip_height_mm: 12, wall_mm: 3.2, arch_cusps: 5 }, default_material: "terracotta_silk", base_price_paise: 49900, specs_line: "Fits phones to 6.9″ · 92 × 78 × 120 mm · 64 g", environment: "desk_oak", description: "A cusped jharokha arch, printed in one piece, that holds any phone at a comfortable tilt.", available: true, media: [] },
+  { slug: "saathi-photo-keychain", name: "Saathi · Photo Keychain", category: "keychains_charms", family_id: "keychain", template_id: "keychain_tag", default_params: { shape: "rounded", width_mm: 45, thickness_mm: 3, hole_d_mm: 5 }, default_material: "basic_white", base_price_paise: 24900, specs_line: "45 mm · steel split ring · 9 g", environment: "studio", description: "Your photo in relief on a palm-sized plate; the ring loop is part of the print.", available: true, media: [] },
+  { slug: "ajrakh-coasters", name: "Ajrakh Coasters · set of 4", category: "kitchen", family_id: "coaster", template_id: "ajrakh_coasters", default_params: { diameter_mm: 100, count: 4 }, default_material: "indigo_matte", base_price_paise: 64900, specs_line: "100 mm · heat-safe to 90 °C · 28 g each", environment: "kitchen_marble", description: "Four coasters with an Ajrakh block-print relief.", available: false, media: [] },
+  { slug: "fluted-planter", name: "Fluted Planter · drainage tray", category: "home_decor", family_id: "planter", template_id: "fluted_planter", default_params: { diameter_mm: 140, height_mm: 130, flutes: 24, tray: true }, default_material: "terracotta_matte", base_price_paise: 89900, specs_line: "140 mm pot · fits 4″ nursery plants · 210 g", environment: "balcony_daylight", description: "Vertical flutes, a drainage tray, sized for nursery pots.", available: false, media: [] },
+  { slug: "kantha-nameplate", name: "Nameplate · Kantha border", category: "nameplates", family_id: "nameplate", template_id: "kantha_nameplate", default_params: { width_mm: 300, height_mm: 110 }, default_material: "polished_brass", base_price_paise: 119900, specs_line: "300 × 110 mm · raised letters · screws included", environment: "studio", description: "Raised letters in any of seven scripts inside a running Kantha stitch border.", available: false, media: [] },
+  { slug: "elephant-bookends", name: "Elephant Bookends", category: "gifting", family_id: "bookend", template_id: "elephant_bookends", default_params: { height_mm: 180 }, default_material: "sandalwood_silk", base_price_paise: 134900, specs_line: "180 mm tall · weighted · holds 6 kg of books", environment: "teak_table_candlelight", description: "A pair of elephants, trunks raised, weighted at the base.", available: false, media: [] },
+  { slug: "headphone-stand-pillar", name: "Headphone Stand · Pillar", category: "desk_tech", family_id: "headphone_stand", template_id: "headphone_stand_pillar", default_params: { height_mm: 270 }, default_material: "basic_white", base_price_paise: 57900, specs_line: "270 mm tall · weighted base · 180 g", environment: "desk_oak", description: "A fluted pillar with a soft saddle for over-ear headphones.", available: false, media: [] },
 ];
 
 const templateView = (t) => ({ ...t, catalog_items: catalog.filter((c) => c.template_id === t.id).map((c) => c.slug) });
@@ -408,6 +474,47 @@ recordAudit("studio@aakar.local", "catalog.update", "jharokha-phone-stand", { av
 recordAudit("studio@aakar.local", "template.live", "jharokha_phone_stand", { live: false }, { live: true }, ago(11 * DAY));
 logNotification({ template: "otp", channel: "sms", to: c1.phone, text: "Your Aakar sign-in code is 482913. Valid for 5 minutes.", at: ago(10 * DAY + HOUR), user_id: c1.id });
 logNotification({ template: "otp", channel: "sms", to: c2.phone, text: "Your Aakar sign-in code is 105577. Valid for 5 minutes.", at: ago(30 * 60_000), user_id: c2.id });
+recordAudit("studio@aakar.local", "family.update", "keychain", { available: false }, { available: true }, ago(6 * DAY));
+recordAudit("studio@aakar.local", "hardware.update", "magnet_d10x3", { unit_cost_paise: 1200 }, { unit_cost_paise: 1500 }, ago(5 * DAY));
+
+// ---------------------------------------------------------------------------------------------------------
+// Customer uploads and content reviews (the Reviews queue). Flagged uploads wait as pending_review until staff decide.
+// ---------------------------------------------------------------------------------------------------------
+const UPLOAD_STATUSES = ["ready", "pending_review", "rejected"];
+const customerUploads = [];
+const fakeSha = () => Array.from({ length: 64 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("");
+/** A placeholder "photo": an inline SVG so the review card shows a real preview without any file on disk. */
+function placeholderImage(label, fill) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="320" viewBox="0 0 480 320"><rect width="480" height="320" fill="${fill}"/><circle cx="240" cy="130" r="64" fill="#2a2f3a" opacity=".85"/><path d="M96 300c22-68 74-104 144-104s122 36 144 104z" fill="#2a2f3a" opacity=".85"/><text x="240" y="40" text-anchor="middle" font-family="Manrope, sans-serif" font-size="18" fill="#2a2f3a">${label}</text></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+function seedUpload({ kind, format, bytes, status, url = null, owner, origin = "upload", review = null, at }) {
+  const u = {
+    id: randomUUID(),
+    kind,
+    format,
+    bytes,
+    sha256: fakeSha(),
+    status,
+    url,
+    created_at: iso(at),
+    owner,
+    origin,
+    review: review ? { id: randomUUID(), reason: review.reason, status: review.status ?? "pending", decision_note: review.decision_note ?? null, reviewer_email: review.reviewer_email ?? null, decided_at: review.decided_at ? iso(review.decided_at) : null } : null,
+  };
+  customerUploads.push(u);
+  return u;
+}
+const REJECTION_NOTE = "We can't print copyrighted heroes, but your own hero is welcome";
+seedUpload({ kind: "image", format: "png", bytes: 812_344, status: "pending_review", url: placeholderImage("Uploaded photo (mock) · batman_cake.png", "#e9d8a6"), owner: { user_id: c1.id, guest_id: null, phone: c1.phone }, review: { reason: "trademark_terms: batman" }, at: ago(3 * HOUR) });
+seedUpload({ kind: "model", format: "stl", bytes: 2_418_776, status: "pending_review", owner: { user_id: null, guest_id: randomUUID(), phone: null }, review: { reason: "filename_terms: marvel_ironman.stl" }, at: ago(40 * 60_000) });
+seedUpload({ kind: "image", format: "jpg", bytes: 1_204_113, status: "ready", url: placeholderImage("Family portrait (mock) · approved", "#cfe3d4"), owner: { user_id: c2.id, guest_id: null, phone: c2.phone }, review: { reason: "trademark_terms: superman", status: "approved", decision_note: "The customer's own costume photo, not the trademark.", reviewer_email: "studio@aakar.local", decided_at: ago(DAY) }, at: ago(DAY + 2 * HOUR) });
+seedUpload({ kind: "model", format: "obj", bytes: 5_104_220, status: "rejected", owner: { user_id: c3.id, guest_id: null, phone: c3.phone }, review: { reason: "trademark_terms: pikachu", status: "rejected", decision_note: REJECTION_NOTE, reviewer_email: "karigar@aakar.local", decided_at: ago(2 * DAY) }, at: ago(2 * DAY + 3 * HOUR) });
+const cleanModel = seedUpload({ kind: "model", format: "3mf", bytes: 934_112, status: "ready", owner: { user_id: c5.id, guest_id: null, phone: c5.phone }, at: ago(5 * HOUR) });
+cleanModel.url = `${BASE}/mock-assets/customer-uploads/${cleanModel.id}`;
+recordAudit("karigar@aakar.local", "review.decide", customerUploads[3].review.id, { status: "pending_review", review_status: "pending" }, { status: "rejected", review_status: "rejected", note: REJECTION_NOTE }, ago(2 * DAY));
+recordAudit("studio@aakar.local", "review.decide", customerUploads[2].review.id, { status: "pending_review", review_status: "pending" }, { status: "ready", review_status: "approved", note: "The customer's own costume photo, not the trademark." }, ago(DAY));
+
 notifications.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
 audit.sort((a, b) => (a.at < b.at ? 1 : -1));
 
@@ -612,6 +719,11 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": up.contentType, "Content-Length": up.bytes.length, ...CORS });
       return res.end(up.bytes);
     }
+    if ((m = p.match(/^\/mock-assets\/customer-uploads\/([^/]+)$/))) {
+      const up = customerUploads.find((u) => u.id === m[1]);
+      if (!up) return problem(res, 404, "not_found", "No such upload.");
+      return binary(res, "application/octet-stream", Buffer.from(`Aakar mock ${up.format.toUpperCase()} placeholder for customer upload ${up.id}.\nThe real API serves the stored file from its object store.\n`), `upload.${up.format}`);
+    }
     if ((m = p.match(/^\/mock-tracking\/(.+)$/))) {
       res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", ...CORS });
       return res.end(`Mock carrier tracking page for ${m[1]}. A real carrier would show scans here.\n`);
@@ -763,7 +875,12 @@ const server = http.createServer(async (req, res) => {
       validate(mat, `Unknown material '${body.material}'.`);
       validate(typeof body.extruded_volume_cm3 === "number" && body.extruded_volume_cm3 > 0, "extruded_volume_cm3 must be a positive number.");
       validate(Number.isInteger(body.print_seconds) && body.print_seconds > 0, "print_seconds must be a positive integer.");
-      return json(res, 200, priceWith(normalisePolicy(body.policy), "preview", mat, body.extruded_volume_cm3, body.print_seconds));
+      let family;
+      if (body.family_id !== undefined && body.family_id !== null && body.family_id !== "") {
+        family = familyById(body.family_id);
+        if (!family) return problem(res, 422, "unknown_family", `Unknown family '${body.family_id}'.`);
+      }
+      return json(res, 200, priceWith(normalisePolicy(body.policy), "preview", mat, body.extruded_volume_cm3, body.print_seconds, { family }));
     }
 
     if (p === "/admin/api/materials" && method === "GET") return json(res, 200, [...materials].sort((a, b) => a.sort_order - b.sort_order));
@@ -810,6 +927,74 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, existing);
     }
 
+    if (p === "/admin/api/catalog/shelves" && method === "GET") return json(res, 200, shelves);
+
+    if (p === "/admin/api/families" && method === "GET") return json(res, 200, [...families].sort((a, b) => a.sort_order - b.sort_order).map(familyView));
+    if (p === "/admin/api/families" && method === "POST") {
+      requireOwner(who);
+      const input = normaliseFamily(await readJson(req));
+      if (familyById(input.id)) return problem(res, 409, "family_exists", `Family '${input.id}' already exists.`);
+      const created = { ...input, updated_at: iso(now()) };
+      families.push(created);
+      recordAudit(who.email, "family.create", created.id, null, input);
+      return json(res, 201, familyView(created));
+    }
+    if ((m = p.match(/^\/admin\/api\/families\/([^/]+)$/)) && method === "PUT") {
+      requireOwner(who);
+      const existing = familyById(decodeURIComponent(m[1]));
+      if (!existing) return problem(res, 404, "unknown_family", "No such family.");
+      const input = normaliseFamily({ ...(await readJson(req)), id: existing.id }); // the id in the path wins
+      const before = omit(existing, "updated_at");
+      Object.assign(existing, input, { updated_at: iso(now()) });
+      recordAudit(who.email, "family.update", existing.id, before, input);
+      return json(res, 200, familyView(existing));
+    }
+
+    if (p === "/admin/api/hardware" && method === "GET") return json(res, 200, hardwareItems);
+    if (p === "/admin/api/hardware" && method === "POST") {
+      requireOwner(who);
+      const input = normaliseHardware(await readJson(req));
+      if (hardwareBySku(input.sku)) return problem(res, 409, "hardware_exists", `Hardware '${input.sku}' already exists.`);
+      const created = { ...input, updated_at: iso(now()) };
+      hardwareItems.push(created);
+      recordAudit(who.email, "hardware.create", created.sku, null, input);
+      return json(res, 201, created);
+    }
+    if ((m = p.match(/^\/admin\/api\/hardware\/([^/]+)$/)) && method === "PUT") {
+      requireOwner(who);
+      const existing = hardwareBySku(decodeURIComponent(m[1]));
+      if (!existing) return problem(res, 404, "not_found", "No such hardware item.");
+      const input = normaliseHardware(await readJson(req));
+      validate(input.sku === existing.sku, "The sku in the body must match the path.");
+      const before = omit(existing, "updated_at");
+      Object.assign(existing, input, { updated_at: iso(now()) });
+      recordAudit(who.email, "hardware.update", existing.sku, before, input);
+      return json(res, 200, existing);
+    }
+
+    if (p === "/admin/api/uploads" && method === "GET") {
+      const status = url.searchParams.get("status");
+      validate(!status || UPLOAD_STATUSES.includes(status), `status must be one of ${UPLOAD_STATUSES.join(", ")}.`);
+      const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit") ?? 50) || 50));
+      const list = customerUploads.filter((u) => !status || u.status === status).sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+      return json(res, 200, list.slice(0, limit));
+    }
+    if ((m = p.match(/^\/admin\/api\/content-reviews\/([^/]+)$/)) && method === "POST") {
+      // Studio or owner may decide; no requireOwner here.
+      const upload = customerUploads.find((u) => u.review?.id === m[1]);
+      if (!upload) return problem(res, 404, "not_found", "No content review with that id.");
+      if (upload.review.status !== "pending") return problem(res, 409, "review_already_decided", `This upload was ${upload.review.status} by ${upload.review.reviewer_email ?? "staff"} already.`);
+      const body = await readJson(req);
+      validate(body.decision === "approved" || body.decision === "rejected", "decision must be approved or rejected.");
+      validate(body.note === undefined || (typeof body.note === "string" && body.note.length <= 200), "note must be at most 200 characters.");
+      const before = { status: upload.status, review_status: upload.review.status };
+      upload.review = { ...upload.review, status: body.decision, decision_note: body.note?.trim() || null, reviewer_email: who.email, decided_at: iso(now()) };
+      upload.status = body.decision === "approved" ? "ready" : "rejected";
+      if (upload.status === "ready" && !upload.url) upload.url = `${BASE}/mock-assets/customer-uploads/${upload.id}`;
+      recordAudit(who.email, "review.decide", upload.review.id, before, { status: upload.status, review_status: upload.review.status, note: upload.review.decision_note });
+      return json(res, 200, upload);
+    }
+
     if (p === "/admin/api/templates" && method === "GET") return json(res, 200, templates.map(templateView));
     if ((m = p.match(/^\/admin\/api\/templates\/([^/]+)$/)) && method === "PUT") {
       requireOwner(who);
@@ -845,9 +1030,19 @@ function validatePolicy(policy) {
   validate(Number.isInteger(policy.round_to_rupees_ending_in) && policy.round_to_rupees_ending_in >= 0 && policy.round_to_rupees_ending_in <= 9, "round_to_rupees_ending_in must be 0–9.");
   validate(typeof policy.shipping_label === "string" && policy.shipping_label.length <= 60, "shipping_label must be at most 60 characters.");
   validate(policy.finishing_fee_paise && typeof policy.finishing_fee_paise === "object" && Object.values(policy.finishing_fee_paise).every((v) => Number.isInteger(v) && v >= 0), "finishing_fee_paise must map finish classes to non-negative integers.");
+  if (policy.hardware_markup_pct !== undefined) validate(typeof policy.hardware_markup_pct === "number" && policy.hardware_markup_pct >= 0 && policy.hardware_markup_pct <= 500, "hardware_markup_pct must be between 0 and 500.");
+  if (policy.family_rules !== undefined) {
+    validate(policy.family_rules && typeof policy.family_rules === "object" && !Array.isArray(policy.family_rules), "family_rules must map family ids to rule objects.");
+    for (const [familyId, rule] of Object.entries(policy.family_rules)) {
+      if (!familyById(familyId)) throw Object.assign(new Error(`family_rules names unknown family '${familyId}'.`), { status: 422, code: "unknown_family" });
+      validate(rule && typeof rule === "object", `family_rules.${familyId} must be an object.`);
+      for (const k of ["minimum_subtotal_paise", "setup_fee_paise"]) if (rule[k] !== undefined) validate(Number.isInteger(rule[k]) && rule[k] >= 0, `family_rules.${familyId}.${k} must be a non-negative integer (paise).`);
+      if (rule.qty_breaks !== undefined) validate(Array.isArray(rule.qty_breaks) && rule.qty_breaks.every((b) => Number.isInteger(b.min_qty) && b.min_qty >= 2 && typeof b.discount_pct === "number" && b.discount_pct >= 0 && b.discount_pct <= 90), `family_rules.${familyId}.qty_breaks must list {min_qty ≥ 2, discount_pct 0–90}.`);
+    }
+  }
 }
 function normalisePolicy(p) {
-  return {
+  const out = {
     machine_rate_paise_per_hour: p.machine_rate_paise_per_hour,
     finishing_fee_paise: { ...p.finishing_fee_paise },
     packaging_fee_paise: p.packaging_fee_paise,
@@ -857,6 +1052,20 @@ function normalisePolicy(p) {
     free_shipping_above_paise: p.free_shipping_above_paise,
     shipping_label: p.shipping_label,
   };
+  if (p.hardware_markup_pct !== undefined) out.hardware_markup_pct = p.hardware_markup_pct;
+  if (p.family_rules !== undefined) {
+    out.family_rules = Object.fromEntries(
+      Object.entries(p.family_rules).map(([id, r]) => [
+        id,
+        {
+          ...(r.minimum_subtotal_paise !== undefined ? { minimum_subtotal_paise: r.minimum_subtotal_paise } : {}),
+          ...(r.setup_fee_paise !== undefined ? { setup_fee_paise: r.setup_fee_paise } : {}),
+          ...(r.qty_breaks !== undefined ? { qty_breaks: r.qty_breaks.map((b) => ({ min_qty: b.min_qty, discount_pct: b.discount_pct })) } : {}),
+        },
+      ]),
+    );
+  }
+  return out;
 }
 function normaliseMaterial(b) {
   validate(typeof b.id === "string" && /^[a-z][a-z0-9_]*$/.test(b.id), "id must be snake_case starting with a letter.");
@@ -890,7 +1099,11 @@ function normaliseMaterial(b) {
 function normaliseCatalogItem(b) {
   validate(typeof b.slug === "string" && /^[a-z0-9-]{3,60}$/.test(b.slug), "slug must be 3–60 lowercase letters, digits or dashes.");
   validate(typeof b.name === "string" && b.name.trim() && b.name.length <= 80, "name is required (max 80 characters).");
-  validate(["home_decor", "nameplates", "kitchen", "desk_tech", "gifting"].includes(b.category), "category is not one of the five shelves.");
+  validate(typeof b.category === "string" && shelfById(b.category), `category must be a shelf id: ${shelves.map((sh) => sh.id).join(", ")}.`);
+  if (b.family_id !== undefined && b.family_id !== null) {
+    validate(typeof b.family_id === "string", "family_id must be a string or null.");
+    if (!familyById(b.family_id)) throw Object.assign(new Error(`Unknown family '${b.family_id}'.`), { status: 422, code: "unknown_family" });
+  }
   validate(typeof b.template_id === "string" && b.template_id.trim(), "template_id is required.");
   validate(b.default_params && typeof b.default_params === "object" && !Array.isArray(b.default_params), "default_params must be an object.");
   validate(typeof b.default_material === "string" && materialById(b.default_material), "default_material must be a known material id.");
@@ -901,6 +1114,7 @@ function normaliseCatalogItem(b) {
     slug: b.slug,
     name: b.name.trim(),
     category: b.category,
+    family_id: b.family_id ?? null,
     description: typeof b.description === "string" ? b.description.slice(0, 500) : "",
     template_id: b.template_id.trim(),
     default_params: b.default_params,
@@ -913,9 +1127,90 @@ function normaliseCatalogItem(b) {
   };
 }
 
+function normaliseHardware(b) {
+  validate(typeof b.sku === "string" && ID_RE.test(b.sku) && b.sku.length <= 40, "sku must be snake_case starting with a letter (max 40).");
+  validate(typeof b.name === "string" && b.name.trim() && b.name.length <= 120, "name is required (max 120 characters).");
+  validate(Number.isInteger(b.unit_cost_paise) && b.unit_cost_paise >= 0, "unit_cost_paise must be a non-negative integer.");
+  if (b.weight_g !== undefined) validate(typeof b.weight_g === "number" && b.weight_g >= 0, "weight_g must be a non-negative number.");
+  for (const [k, max] of [["supplier", 120], ["url", 500], ["notes", 200]]) if (b[k] !== undefined) validate(typeof b[k] === "string" && b[k].length <= max, `${k} must be a string of at most ${max} characters.`);
+  return {
+    sku: b.sku,
+    name: b.name.trim(),
+    unit_cost_paise: b.unit_cost_paise,
+    ...(b.weight_g !== undefined ? { weight_g: b.weight_g } : {}),
+    ...(b.supplier ? { supplier: b.supplier } : {}),
+    ...(b.url ? { url: b.url } : {}),
+    ...(b.notes ? { notes: b.notes } : {}),
+    available: b.available ?? true,
+  };
+}
+function normaliseFamily(b) {
+  validate(typeof b.id === "string" && ID_RE.test(b.id) && b.id.length <= 40, "id must be snake_case starting with a letter (max 40).");
+  validate(typeof b.codename === "string" && b.codename.trim() && b.codename.length <= 40, "codename is required (max 40 characters).");
+  validate(typeof b.name === "string" && b.name.trim() && b.name.length <= 80, "name is required (max 80 characters).");
+  if (b.tagline !== undefined) validate(typeof b.tagline === "string" && b.tagline.length <= 120, "tagline must be at most 120 characters.");
+  if (b.description !== undefined) validate(typeof b.description === "string" && b.description.length <= 500, "description must be at most 500 characters.");
+  validate(FAMILY_KINDS.includes(b.kind), `kind must be one of ${FAMILY_KINDS.join(", ")}.`);
+  validate(FAMILY_TIERS.includes(b.tier), `tier must be one of ${FAMILY_TIERS.join(", ")}.`);
+  validate(typeof b.shelf === "string" && shelfById(b.shelf), `shelf must be a shelf id: ${shelves.map((sh) => sh.id).join(", ")}.`);
+  if (b.demand_rank !== undefined) validate(Number.isInteger(b.demand_rank) && b.demand_rank >= 1, "demand_rank must be an integer of at least 1.");
+  validate(typeof b.default_template_id === "string" && ID_RE.test(b.default_template_id), "default_template_id must be snake_case starting with a letter.");
+  if (b.environment !== undefined) validate(ENVIRONMENTS.includes(b.environment), `environment must be one of ${ENVIRONMENTS.join(", ")}.`);
+  if (b.size_envelope_mm !== undefined) {
+    const e = b.size_envelope_mm;
+    validate(e && typeof e.min_longest_mm === "number" && e.min_longest_mm > 0 && typeof e.max_longest_mm === "number" && e.max_longest_mm > 0, "size_envelope_mm needs positive min_longest_mm and max_longest_mm.");
+    validate(e.min_longest_mm <= e.max_longest_mm, "size_envelope_mm.min_longest_mm must not exceed max_longest_mm.");
+  }
+  if (b.hardware !== undefined) {
+    validate(Array.isArray(b.hardware) && b.hardware.every((h) => h && typeof h.sku === "string" && Number.isInteger(h.qty) && h.qty >= 1), "hardware must list {sku, qty ≥ 1}.");
+    for (const h of b.hardware) validate(hardwareBySku(h.sku), `hardware sku '${h.sku}' is not a known hardware item.`);
+  }
+  if (b.material_rules !== undefined) {
+    const r = b.material_rules;
+    validate(r && typeof r === "object", "material_rules must be an object.");
+    if (r.heat_safe_only !== undefined) validate(typeof r.heat_safe_only === "boolean", "material_rules.heat_safe_only must be a boolean.");
+    if (r.allowed !== undefined && r.allowed !== null) validate(Array.isArray(r.allowed) && r.allowed.every((id) => typeof id === "string" && ID_RE.test(id)), "material_rules.allowed must be a list of material ids or null.");
+    if (r.excluded_finish_classes !== undefined) validate(Array.isArray(r.excluded_finish_classes) && r.excluded_finish_classes.every((c) => FINISH_CLASSES.includes(c)), "material_rules.excluded_finish_classes must list matte or silk.");
+  }
+  validate(SHAPE_TOLERANCES.includes(b.shape_tolerance), `shape_tolerance must be one of ${SHAPE_TOLERANCES.join(", ")}.`);
+  const slot = b.content_slot;
+  validate(slot && typeof slot === "object" && Array.isArray(slot.accepts) && slot.accepts.every((f) => FEATURE_TYPES.includes(f)), `content_slot.accepts must list feature types from ${FEATURE_TYPES.join(", ")}.`);
+  validate(new Set(slot.accepts).size === slot.accepts.length, "content_slot.accepts must not repeat a feature type.");
+  if (slot.anchors !== undefined) validate(Array.isArray(slot.anchors) && slot.anchors.every((a) => typeof a === "string" && a.trim()), "content_slot.anchors must be a list of anchor ids.");
+  if (slot.hero_volume !== undefined) validate(typeof slot.hero_volume === "boolean", "content_slot.hero_volume must be a boolean.");
+  if (slot.max_text_chars !== undefined) validate(Number.isInteger(slot.max_text_chars) && slot.max_text_chars >= 1 && slot.max_text_chars <= 40, "content_slot.max_text_chars must be 1–40.");
+  validate(typeof b.available === "boolean", "available must be a boolean.");
+  return {
+    id: b.id,
+    codename: b.codename.trim(),
+    name: b.name.trim(),
+    ...(b.tagline !== undefined ? { tagline: b.tagline } : {}),
+    ...(b.description !== undefined ? { description: b.description } : {}),
+    kind: b.kind,
+    tier: b.tier,
+    shelf: b.shelf,
+    ...(b.demand_rank !== undefined ? { demand_rank: b.demand_rank } : {}),
+    default_template_id: b.default_template_id,
+    environment: b.environment ?? "studio",
+    ...(b.size_envelope_mm !== undefined ? { size_envelope_mm: { min_longest_mm: b.size_envelope_mm.min_longest_mm, max_longest_mm: b.size_envelope_mm.max_longest_mm } } : {}),
+    hardware: (b.hardware ?? []).map((h) => ({ sku: h.sku, qty: h.qty })),
+    material_rules: { heat_safe_only: b.material_rules?.heat_safe_only ?? false, allowed: b.material_rules?.allowed ?? null, excluded_finish_classes: [...(b.material_rules?.excluded_finish_classes ?? [])] },
+    shape_tolerance: b.shape_tolerance,
+    content_slot: {
+      accepts: [...slot.accepts],
+      anchors: [...(slot.anchors ?? [])],
+      hero_volume: slot.hero_volume ?? false,
+      ...(slot.max_text_chars !== undefined ? { max_text_chars: slot.max_text_chars } : {}),
+    },
+    available: b.available,
+    sort_order: Number.isInteger(b.sort_order) ? b.sort_order : 100,
+  };
+}
+
 server.listen(PORT, () => {
   console.log(`Aakar mock management API on ${BASE}`);
   console.log(`  owner  : studio@aakar.local / aakar-studio`);
   console.log(`  studio : karigar@aakar.local / aakar-karigar   (read-only configuration)`);
-  console.log(`  ${orders.size} orders, ${materials.length} materials, ${catalog.length} catalog items, ${templates.length} template, ${policies.length} pricing policy versions`);
+  console.log(`  ${orders.size} orders, ${materials.length} materials, ${catalog.length} catalog items, ${templates.length} templates, ${policies.length} pricing policy versions`);
+  console.log(`  ${shelves.length} shelves, ${families.length} families (Avatars), ${hardwareItems.length} hardware items, ${customerUploads.filter((u) => u.status === "pending_review").length} uploads pending review`);
 });

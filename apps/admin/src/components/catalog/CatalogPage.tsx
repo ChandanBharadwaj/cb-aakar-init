@@ -4,7 +4,8 @@ import { useState } from "react";
 import { formatPaise } from "@aakar/design-tokens";
 import { api, toProblem } from "@/lib/api/client";
 import type { CatalogItem, Problem } from "@/lib/api/types";
-import { categoryLabel } from "@/lib/catalog";
+import { shelfLabel } from "@/lib/catalog";
+import { familyTitle } from "@/lib/families";
 import { useQuery } from "@/lib/useQuery";
 import { useCanWrite } from "@/store/session";
 import { CatalogDrawer, toInput } from "./CatalogDrawer";
@@ -20,6 +21,8 @@ export function CatalogPage() {
   const items = useQuery(() => api.catalog.list(), "catalog");
   const materials = useQuery(() => api.materials.list(), "materials");
   const templates = useQuery(() => api.templates.list(), "templates");
+  const shelves = useQuery(() => api.catalog.shelves(), "shelves");
+  const families = useQuery(() => api.families.list(), "families");
   const [editing, setEditing] = useState<CatalogItem | null | undefined>(undefined);
   const [toggling, setToggling] = useState<string>();
   const [problem, setProblem] = useState<Problem>();
@@ -46,15 +49,16 @@ export function CatalogPage() {
 
   const templateName = (id: string) => templates.data?.find((t) => t.id === id);
   const materialName = (id: string) => materials.data?.find((m) => m.id === id)?.name ?? id;
+  const familyOf = (id: string | null | undefined) => (id ? families.data?.find((f) => f.id === id) : undefined);
 
   return (
     <>
       <PageHeader
         eyebrow="Configuration"
         title="Catalog"
-        description="Shop items: which template and default parameters each starts from, its default finish, base price and whether it is on sale. Items whose template isn't in the geometry service yet show as 'coming soon'."
+        description="Shop items: the shelf each sits on, the Avatar (outcome family) it belongs to, which template and default parameters it starts from, its default finish, base price and whether it is on sale. Items whose template isn't in the geometry service yet show as 'coming soon'."
         actions={
-          <button type="button" className="ak-btn ak-btn-primary ak-btn-sm" onClick={() => setEditing(null)} disabled={!canWrite || !materials.data} title={canWrite ? undefined : "Owner only"}>
+          <button type="button" className="ak-btn ak-btn-primary ak-btn-sm" onClick={() => setEditing(null)} disabled={!canWrite || !materials.data || !shelves.data} title={canWrite ? undefined : "Owner only"}>
             Add item
           </button>
         }
@@ -72,7 +76,8 @@ export function CatalogPage() {
               <thead>
                 <tr>
                   <th>Item</th>
-                  <th>Category</th>
+                  <th>Shelf</th>
+                  <th>Avatar</th>
                   <th>Template</th>
                   <th>Default material</th>
                   <th className="num">Base price</th>
@@ -92,7 +97,21 @@ export function CatalogPage() {
                           <span className="text-xs text-surface-muted">{it.specs_line}</span>
                         </div>
                       </td>
-                      <td>{categoryLabel(it.category)}</td>
+                      <td>{shelfLabel(shelves.data, it.category)}</td>
+                      <td>
+                        {it.family_id ? (
+                          (() => {
+                            const f = familyOf(it.family_id);
+                            return (
+                              <span className="text-[13px]" title={it.family_id}>
+                                {f ? familyTitle(f) : it.family_id}
+                              </span>
+                            );
+                          })()
+                        ) : (
+                          <span className="text-xs text-surface-muted">—</span>
+                        )}
+                      </td>
                       <td>
                         <div className="grid gap-0.5">
                           <span className="font-mono text-[12px]">{it.template_id}</span>
@@ -108,7 +127,7 @@ export function CatalogPage() {
                         </div>
                       </td>
                       <td>
-                        <button type="button" className="ak-btn ak-btn-secondary ak-btn-sm" onClick={() => setEditing(it)} disabled={!materials.data}>
+                        <button type="button" className="ak-btn ak-btn-secondary ak-btn-sm" onClick={() => setEditing(it)} disabled={!materials.data || !shelves.data}>
                           {canWrite ? "Edit" : "View"}
                         </button>
                       </td>
@@ -120,7 +139,7 @@ export function CatalogPage() {
           </div>
         </div>
       )}
-      <CatalogDrawer item={editing} materials={materials.data ?? []} templates={templates.data ?? []} onClose={() => setEditing(undefined)} onSaved={saved} />
+      <CatalogDrawer item={editing} materials={materials.data ?? []} templates={templates.data ?? []} shelves={shelves.data ?? []} families={families.data ?? []} onClose={() => setEditing(undefined)} onSaved={saved} />
     </>
   );
 }
