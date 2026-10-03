@@ -175,7 +175,7 @@ class PlinthRound(Template):
         ),
     )
     constraints = TemplateConstraints(min_wall_mm=1.2, max_overhang_deg=55, bed_mm=(250, 250, 250))
-    style_variants = ()
+    style_variants = ("comic_pop",)  # Katha's comic-book look: names and motifs raised and bolder by default (features.styles)
     features_supported = ("hero_mesh", "emboss_text")
     hardware = ()
     min_feature_mm = 0.8
@@ -247,17 +247,13 @@ class PlinthRound(Template):
         return f"A {shape} Pratima plinth, {L.D:g} mm across and {L.h:g} mm tall, printed standing as modelled."
 
     @classmethod
-    def karigar_note_for(cls, params: Mapping[str, Any], features: Sequence[Mapping[str, Any]] = ()) -> str:
-        """The plinth's note, a line on the customer's form when there is one, then the names set into it."""
+    def karigar_note_for(cls, params: Mapping[str, Any], features: Sequence[Mapping[str, Any]] = (), style: str | None = None) -> str:
+        """The plinth's note, a line on the customer's form when there is one, then the names set into it and the
+        style's sentence (``Template.join_note``)."""
         note = cls.karigar_note(params)
         if any(f.get("type") == "hero_mesh" for f in features or []):
             note += (
                 " The customer's form stands fused on its top: support its overhangs, and print small, detailed "
                 "forms (under 100 mm) in resin."
             )
-        if not features:
-            return note
-        from ..features import content_note
-
-        extra = content_note(cls, features)
-        return f"{note} {extra}" if extra else note
+        return cls.join_note(note, features, style)

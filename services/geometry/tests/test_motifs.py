@@ -40,9 +40,9 @@ def test_the_library_loads_from_the_repo_and_matches_its_files():
 def test_every_motif_is_one_closed_original_path(motif_id):
     row = next(m for m in INDEX["motifs"] if m["id"] == motif_id)
     assert re.fullmatch(r"[a-z][a-z0-9_]*", motif_id) and row["file"] == f"{motif_id}.svg"
-    # a plain, codename-free label and some tags for the storefront's picker
+    # a plain, codename-free label and some tags for the storefront's picker (snake_case: a shared tag names a pack)
     assert re.fullmatch(r"[A-Z][a-z]+( [a-z]+)*", row["label"]) and not set(row["label"].split()) & CODENAMES
-    assert row["tags"] and all(re.fullmatch(r"[a-z]+", t) for t in row["tags"])
+    assert row["tags"] and all(re.fullmatch(r"[a-z][a-z0-9_]*", t) for t in row["tags"])
     assert 0.2 <= row["min_scale"] <= 1
     root = ET.fromstring((LIBRARY / row["file"]).read_bytes())
     tags = [el.tag.split("}")[-1] for el in root.iter()]
@@ -69,6 +69,26 @@ def test_every_motif_prints_on_the_30_mm_reference_down_to_its_min_scale(motif_i
         assert fitted.ok and fitted.stroke.ok, (motif_id, scale, fitted.stroke, fitted.openings)
         assert max(fitted.size_mm) == pytest.approx(30.0 * scale, rel=1e-6)
         assert (fitted.openings is None) == outlines.openings(fitted.region).is_empty
+
+
+COMIC_PACK = ["action_burst", "speech_bubble", "thought_bubble", "lightning_bolt", "domino_mask", "hero_cape"]
+
+
+def test_the_comic_pack_is_a_tag_on_original_comic_motifs():
+    """Katha's motif pack (``comic_bursts``) is a tag the comic motifs share, so the storefront and the validator
+    resolve it without a list of its own; every pack entry of every experience names a motif or a tag."""
+    library = load_library().motifs
+    assert [m for m in IDS if "comic_bursts" in library[m].tags] == COMIC_PACK  # in library order, 4–6 of them
+    assert all("comic" in library[m].tags for m in COMIC_PACK)
+    known = set(IDS) | {t for m in library.values() for t in m.tags}
+    experiences = json.loads((REPO / "packages/design-tokens/experiences.json").read_text(encoding="utf-8"))["experiences"]
+    for experience in experiences:
+        assert set(experience.get("motif_pack") or []) <= known, experience["id"]
+    assert next(x for x in experiences if x["id"] == "comics")["motif_pack"] == ["comic_bursts"]
+    # generic shapes: the mask has its two eye openings, the thought bubble trails two bubbles off its cloud
+    assert len(outlines.polygons(outlines.openings(library["domino_mask"].region))) == 2
+    assert len(outlines.polygons(library["thought_bubble"].region)) == 3
+    assert len(outlines.polygons(library["lightning_bolt"].region)) == 1 and library["lightning_bolt"].fill_rule == "nonzero"
 
 
 def test_the_library_holds_several_kinds_of_outline():

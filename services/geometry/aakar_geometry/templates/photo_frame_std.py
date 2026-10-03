@@ -21,7 +21,8 @@ Pieces
           (``RIM_MM`` round it); built lying on its back, the front facing +Z, as it hangs flat on a wall.
 Both print face down (the front on the bed) with no supports: the rabbet, the feet and the tab all open
 upward from there. That is why names and motifs are cut into the face, never raised: raised ones would lift
-the front off the bed (``validate_content``).
+the front off the bed, so both anchors list only ``deboss`` (``Anchor.modes``, refused in feature validation in
+the frame's own words, ``mode_refusal``).
 
 Anchors (surface, the front face; u = the viewer's right, v = up the picture, normal out of the face)
   border      the top rail: the band between the window's top edge and the frame's top edge,
@@ -41,7 +42,6 @@ import trimesh
 from shapely.geometry import Polygon, box
 
 from .. import cad
-from ..errors import UnsupportedFeature
 from ..features.frames import AnchorFrame
 from . import plates
 from .base import Anchor, HardwareRef, Param, Template, TemplateConstraints
@@ -206,13 +206,14 @@ class PhotoFrameStd(Template):
     environment = "teak_table_candlelight"
     params = PARAMS
     anchors = (
+        # the frame prints face down: names and motifs are cut in, never raised
         Anchor(
             "border", "Top rail", "planar", max_text_height_mm=_size("border")[1], size_mm=_size("border"),
-            bleed_mm=BLEED_MM, accepts=("motif", "emboss_text"), max_relief_mm=MAX_RELIEF_MM,
+            bleed_mm=BLEED_MM, accepts=("motif", "emboss_text"), max_relief_mm=MAX_RELIEF_MM, modes=("deboss",),
         ),
         Anchor(
             "base_front", "Bottom rail", "planar", max_text_height_mm=_size("base_front")[1], size_mm=_size("base_front"),
-            bleed_mm=BLEED_MM, accepts=("emboss_text",), max_relief_mm=MAX_RELIEF_MM,
+            bleed_mm=BLEED_MM, accepts=("emboss_text",), max_relief_mm=MAX_RELIEF_MM, modes=("deboss",),
         ),
     )
     constraints = TemplateConstraints(min_wall_mm=1.2, max_overhang_deg=55, bed_mm=(250, 250, 250))
@@ -222,21 +223,12 @@ class PhotoFrameStd(Template):
     min_feature_mm = 0.8
 
     @classmethod
-    def validate_content(cls, params: Mapping[str, Any], features: Sequence[Mapping[str, Any]]) -> None:
-        """Names and motifs are cut in (the frame prints face down). How deep is capped by ``max_relief_mm``,
-        which leaves at least ``MIN_SKIN_MM`` of the lip over the rabbet, so no skin check is needed here."""
-        for index, feature in enumerate(features or []):
-            ftype = feature.get("type")
-            if ftype not in ("emboss_text", "motif"):
-                continue
-            mode = feature.get("mode", "emboss" if ftype == "emboss_text" else "deboss")
-            if mode != "deboss":
-                noun = "name" if ftype == "emboss_text" else "motif"
-                raise UnsupportedFeature(
-                    f"On a Chaukhat frame the {noun} is cut into the face, not raised (the frame prints face down); "
-                    "choose cut-in",
-                    {"feature": index, "mode": mode, "needs": "deboss", "key": f"features[{index}].mode"},
-                )
+    def mode_refusal(cls, anchor: Anchor, ftype: str, mode: str) -> str | None:
+        """Names and motifs are cut in (both anchors list only ``deboss``: the frame prints face down). How deep is
+        capped by ``max_relief_mm``, which leaves at least ``MIN_SKIN_MM`` of the lip over the rabbet, so no skin
+        check is needed here."""
+        noun = "name" if ftype == "emboss_text" else "motif"
+        return f"On a Chaukhat frame the {noun} is cut into the face, not raised (the frame prints face down); choose cut-in"
 
     @classmethod
     def build_body(cls, params: Mapping[str, Any]) -> trimesh.Trimesh:

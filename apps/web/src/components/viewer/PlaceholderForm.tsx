@@ -1,16 +1,22 @@
 "use client";
 
 import { useMemo } from "react";
+import { useThree } from "@react-three/fiber";
+import { Outlines } from "@react-three/drei";
 import * as THREE from "three";
+import type { ModelOutline } from "./Model";
 
 export interface PlaceholderFormProps {
   material: THREE.Material;
   /** Ghost mode while a real preview loads. */
   ghost?: boolean;
+  /** An ink line round the form (the comic_pop look); never on the ghost. */
+  outline?: ModelOutline;
 }
 
 /** A stand-in form (a fluted, lathe-turned vessel) shown while the preview loads or when there is none yet. */
-export function PlaceholderForm({ material, ghost }: PlaceholderFormProps) {
+export function PlaceholderForm({ material, ghost, outline }: PlaceholderFormProps) {
+  const dpr = useThree((s) => s.viewport.dpr);
   const geometry = useMemo(() => {
     const pts: THREE.Vector2[] = [];
     const steps = 28;
@@ -29,5 +35,9 @@ export function PlaceholderForm({ material, ghost }: PlaceholderFormProps) {
     [],
   );
 
-  return <mesh geometry={geometry} material={ghost ? ghostMaterial : material} castShadow receiveShadow position={[0, 0, 0]} />;
+  return (
+    <mesh geometry={geometry} material={ghost ? ghostMaterial : material} castShadow receiveShadow position={[0, 0, 0]}>
+      {outline && !ghost && <Outlines color={outline.color} thickness={outline.thicknessPx * dpr} />}
+    </mesh>
+  );
 }

@@ -63,6 +63,10 @@ def test_descriptor():
     assert border["id"] == "border" and border["accepts"] == ["motif", "emboss_text"]
     assert base_front["id"] == "base_front" and base_front["accepts"] == ["emboss_text"]
     assert border["max_relief_mm"] == base_front["max_relief_mm"] == MAX_RELIEF_MM
+    # it prints face down, so both rails take cut-in content only; neither needs content
+    assert border["modes"] == base_front["modes"] == ["deboss"]
+    assert "required" not in border and "required" not in base_front
+    assert desc["style_variants"] == []  # no comic_pop: its raised lettering would lift the face off the bed
     assert desc["hardware"] == [{"sku": "acrylic_4x6", "qty": 1}]
 
 

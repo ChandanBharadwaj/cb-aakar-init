@@ -35,23 +35,24 @@ Pieces
 Anchor
   plate  the photo area inside the bevel, on the front of the bare plate (the ``max_mm`` plane; normal +Z
          lying, −Y standing), u = the viewer's right, v = up the picture, bleed 0 (the photo runs to the
-         frame). It takes only ``relief_image`` in ``lithophane`` mode: ``validate_content`` refuses a spec
-         without the photo, and a photo raised or cut into the plate (``emboss`` / ``deboss``). The
-         feature's ``relief_mm`` does not apply: ``min_mm`` and ``max_mm`` set the plate.
+         frame). It takes only ``relief_image`` in ``lithophane`` mode and needs it (``Anchor.modes`` and
+         ``required``): feature validation refuses a spec without the photo and a photo raised or cut into the
+         plate (``emboss`` / ``deboss``), in the night light's own words (``missing_content``,
+         ``mode_refusal``). The feature's ``relief_mm`` does not apply: ``min_mm`` and ``max_mm`` set the plate.
 The family (``lithophane``, families.json) allows only ``basic_white``: light must pass through the plate.
 """
 
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping
 
 import numpy as np
 import trimesh
 from shapely.geometry import box
 
 from .. import cad
-from ..errors import InvalidSpec, ParamOutOfRange, UnsupportedFeature
+from ..errors import ParamOutOfRange
 from ..features.booleans import union
 from ..features.frames import AnchorFrame
 from ..features.heightfield import grid_solid
@@ -225,10 +226,11 @@ class LithophanePlate(Template):
     environment = "teak_table_candlelight"
     params = PARAMS
     anchors = (
+        # the photo is the plate itself: never raised or cut into it, and the night light can't be made without it
         Anchor(
             "plate", "Photo plate", "planar",
             size_mm=(round(_DEFAULT_LAYOUT.inner_w, 1), round(_DEFAULT_LAYOUT.inner_h, 1)), bleed_mm=0.0,
-            accepts=("relief_image",),
+            accepts=("relief_image",), modes=("lithophane",), required=True,
         ),
     )
     # the lightest parts of the photo are 0.8 mm: two lines of a 0.4 mm nozzle, the contract's thinnest wall
@@ -256,18 +258,15 @@ class LithophanePlate(Template):
             )
 
     @classmethod
-    def validate_content(cls, params: Mapping[str, Any], features: Sequence[Mapping[str, Any]]) -> None:
-        photos = [(i, f) for i, f in enumerate(features or []) if f.get("type") == "relief_image"]
-        if not photos:
-            raise InvalidSpec(MISSING_PHOTO, {"template": cls.ref(), "needs": "one relief_image in lithophane mode on the plate anchor"})
-        index, photo = photos[0]  # check_features allows one photo per anchor, and plate is the only anchor
-        mode = photo.get("mode", "emboss")
-        if mode != "lithophane":
-            raise UnsupportedFeature(
-                "In a Roshni night light your photo becomes the glowing plate itself, so it can't be raised or cut "
-                "into it; choose the night-light (lithophane) photo",
-                {"feature": index, "mode": mode, "needs": "lithophane"},
-            )
+    def missing_content(cls, anchor: Anchor) -> str | None:
+        return MISSING_PHOTO
+
+    @classmethod
+    def mode_refusal(cls, anchor: Anchor, ftype: str, mode: str) -> str | None:
+        return (
+            "In a Roshni night light your photo becomes the glowing plate itself, so it can't be raised or cut "
+            "into it; choose the night-light (lithophane) photo"
+        )
 
     @classmethod
     def build_body(cls, params: Mapping[str, Any]) -> trimesh.Trimesh:

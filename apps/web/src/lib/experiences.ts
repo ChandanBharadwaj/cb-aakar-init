@@ -91,7 +91,7 @@ export const STYLE_LABELS: Record<ExperienceStyle, string> = {
 
 /**
  * The experience's default style when the template offers it as a variant (`style_variants`); otherwise nothing, and
- * the style is ignored silently. No live template lists style variants yet.
+ * the style is ignored silently. Today the carriers list `comic_pop` (Katha); the night light and the frame list none.
  */
 export function presetStyle(style: ExperienceStyle | undefined, template: Pick<TemplateDescriptor, "style_variants"> | undefined): ExperienceStyle | undefined {
   if (!style || style === "none" || !template) return undefined;
@@ -116,7 +116,7 @@ export interface DuniyaPreset {
   motifPack: string[];
 }
 
-/** An available experience as presets; an unavailable one (Katha before PR 12) presets nothing. */
+/** An available experience as presets; an unavailable one (Katha until staff switch it on) presets nothing. */
 export function duniyaPreset(experience: Experience, environments?: readonly Environment[]): DuniyaPreset | undefined {
   if (!experience.available) return undefined;
   const key = presetKeyFor(experience.environment, environments);

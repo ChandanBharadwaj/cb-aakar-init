@@ -6,7 +6,8 @@ Buti: looked up, fitted, stroke rule) so that every refusal comes before any boo
 order, resolve the anchor frame and apply: names and motifs are raised or cut into the body
 (``outlines.set_into``), photos become heightfield reliefs (``relief_image``, Chhavi), customer forms
 are repaired and fused on or stand alone (``hero_mesh``, Roop). A name and a motif on the same anchor
-sit side by side (``placement``). ``content_note`` describes the names and motifs for the karigar's note.
+sit side by side (``placement``). ``content_note`` describes the names and motifs for the karigar's note;
+``styles`` holds what a style variant changes (``comic_pop``: names and motifs raised and bolder by default).
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ from typing import Any, Iterable, Mapping
 import trimesh
 
 from ..errors import ContentUnusable, GeometryError, InvalidSpec, UnsupportedFeature
-from . import booleans, emboss_text, hero_mesh, motif, outlines, placement, relief_image, validate
+from . import booleans, emboss_text, hero_mesh, motif, outlines, placement, relief_image, styles, validate
 from .fetch import ContentFetcher, HttpFetcher, LocalFileFetcher, content_kind, resolve_format
 from .frames import AnchorFrame
 from .heightfield import heightfield_solid, heightfield_volume
@@ -225,5 +226,6 @@ __all__ = [
     "prepare_marks",
     "relief_heightmap",
     "relief_image",
+    "styles",
     "validate",
 ]

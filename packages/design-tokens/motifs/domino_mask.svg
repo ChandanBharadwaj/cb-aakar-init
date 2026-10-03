@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <title>Domino mask</title>
+  <desc>Aakar Buti motif library: original artwork, one closed path, evenodd fill.</desc>
+  <path fill="#000" fill-rule="evenodd" d="M3 44C7 31 16 25 27 25C37 25 43 29 50 29C57 29 63 25 73 25C84 25 93 31 97 44C93 56 86 63 77 63C68 63 62 58 57 55Q50 49 43 55C38 58 32 63 23 63C14 63 7 56 3 44ZM19 44Q31 30 43 43Q31 56 19 44ZM81 44Q69 30 57 43Q69 56 81 44Z"/>
+</svg>

@@ -73,8 +73,12 @@ def test_descriptor():
     assert (p["min_mm"]["min"], p["min_mm"]["max"], p["min_mm"]["default"]) == (0.8, 1.8, 0.8)
     assert (p["max_mm"]["min"], p["max_mm"]["max"], p["max_mm"]["default"]) == (2.0, 3.0, 3.0)
     assert p["stand"]["options"] == ["none", "night_light"] and p["stand"]["default"] == "night_light"
+    # the photo is the plate itself (lithophane mode only) and the night light can't be made without it
     assert desc["anchors"] == [
-        {"id": "plate", "label": "Photo plate", "kind": "surface", "projection": "planar", "size_mm": [95.0, 131.0], "bleed_mm": 0.0, "accepts": ["relief_image"]},
+        {
+            "id": "plate", "label": "Photo plate", "kind": "surface", "projection": "planar", "size_mm": [95.0, 131.0],
+            "bleed_mm": 0.0, "accepts": ["relief_image"], "modes": ["lithophane"], "required": True,
+        },
     ]
     assert desc["materials"] == ["basic_white"]  # the family's rule: light must pass through the plate
     assert desc["constraints"]["min_wall_mm"] == 0.8

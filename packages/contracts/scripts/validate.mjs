@@ -59,11 +59,13 @@ for (const [file, id] of examples) {
 
 // Experiences name environments, presets, families, motifs and styles that live elsewhere: check what a schema cannot.
 {
-  // Backdrops whose storefront preset has not landed yet. PR 12 (Katha) adds comic_rooftop_night to tokens.json
-  // environments and the viewer; delete it from this list then (the check below says when).
-  const PENDING_PRESETS = new Set(["comic_rooftop_night"]);
-  // Motif packs whose artwork has not landed in the motif library yet (Katha's comic_bursts, PR 12).
-  const PENDING_MOTIF_PACKS = new Set(["comic_bursts"]);
+  // Backdrops whose storefront preset has not landed yet: none now (Katha's comic_rooftop_night landed in tokens.json
+  // and the viewer with PR 12b). Name a preset key here when an experience needs a backdrop before its preset is
+  // built; the check below says when to remove it.
+  const PENDING_PRESETS = new Set([]);
+  // Motif packs whose artwork has not landed in the motif library yet: none now (Katha's comic_bursts is a tag on the
+  // comic motifs since PR 12b).
+  const PENDING_MOTIF_PACKS = new Set([]);
   const { environments, experiences } = read("../design-tokens/experiences.json");
   const motifLibrary = read("../design-tokens/motifs/index.json").motifs;
   const motifIds = new Set([...motifLibrary.map((m) => m.id), ...motifLibrary.flatMap((m) => m.tags ?? [])]);

@@ -9,7 +9,7 @@ import { api, toProblem } from "@/lib/api/client";
 import { boundsMm, glbUrl, type DesignVersion, type Environment, type Experience, type Family, type PrintabilityReport, type Problem, type TemplateDescriptor } from "@/lib/api/types";
 import { duniyaPreset, presetStyle, STYLE_LABELS, type DuniyaPreset } from "@/lib/experiences";
 import { allowedMaterialIds, hardwareNames, isRawFamily, namedHardware, RAW_FAMILY_ID } from "@/lib/families";
-import { familyLabel, featuresForSubmit, featuresFromSpec, hasContentSlot, sameFeatures } from "@/lib/features";
+import { familyLabel, featuresForSubmit, featuresFromSpec, hasContentSlot, missingContent, missingContentLine, sameFeatures } from "@/lib/features";
 import { formatGrams, formatMm, formatPrintTime } from "@/lib/format";
 import { REJECTED_COPY } from "@/lib/uploads";
 import { environmentLabel } from "@/lib/viewer/environments";
@@ -256,6 +256,8 @@ export function DesignStudio({ designId, jobId: urlJobId, duniya: duniyaSlug }: 
   const busy = Boolean(job && job.stage !== "failed");
   const hold = uploadHold(store.featuresDraft, store.uploads);
   const needsForm = raw && !store.featuresDraft.some((f) => f.type === "hero_mesh");
+  // A spot the piece can't be made without (an anchor's `required`: Roshni's photo) must keep its content.
+  const need = template && !raw ? missingContentLine(missingContent(template, sending), template) : undefined;
 
   // Finishes: the family's material_rules and the template's list, the same rule the composers apply.
   const allowedFinishes = useMemo(() => allowedMaterialIds(store.materials, family, template), [store.materials, family, template]);
@@ -266,7 +268,7 @@ export function DesignStudio({ designId, jobId: urlJobId, duniya: duniyaSlug }: 
   }, [material, allowedFinishes]);
 
   async function sculpt() {
-    if (!activeVersion || !material || hold || needsForm) return;
+    if (!activeVersion || !material || hold || needsForm || need) return;
     setSculpting(true);
     setSculptProblem(undefined);
     try {
@@ -318,7 +320,10 @@ export function DesignStudio({ designId, jobId: urlJobId, duniya: duniyaSlug }: 
   const model = glbUrl(activeVersion);
   // A Duniya's backdrop wins when the viewer has its preset; otherwise the piece keeps its own.
   const environment = duniya?.environment ?? template?.environment ?? family?.environment;
-  const look = presetStyle(duniya?.style, template);
+  // The look on stage and in the Chhaap: the design's own style, else (while it carries none) the Duniya's preset when
+  // the template offers it. comic_pop draws the piece cel-shaded with ink outlines.
+  const specLook = activeVersion?.spec.style;
+  const look = specLook && specLook !== "none" ? specLook : presetStyle(duniya?.style, template);
   const hardware = hardwareNames(namedHardware(activeVersion?.hardware, family));
   const minWall = template?.constraints.min_wall_mm ?? activeVersion?.spec.constraints?.min_wall_mm ?? 1.2;
   const nudge = raw && !busy ? rawNudge(activeVersion?.printability, minWall) : undefined;
@@ -439,6 +444,7 @@ export function DesignStudio({ designId, jobId: urlJobId, duniya: duniyaSlug }: 
                   motifPack={duniya?.motifPack}
                   motifPackLabel={duniya?.codename}
                   raw={raw}
+                  look={look}
                   disabled={busy || sculpting}
                 />
               )}
@@ -447,18 +453,20 @@ export function DesignStudio({ designId, jobId: urlJobId, duniya: duniyaSlug }: 
                   type="button"
                   className="ak-btn ak-btn-primary"
                   onClick={sculpt}
-                  disabled={!dirty || busy || sculpting || !activeVersion || Boolean(hold) || needsForm}
+                  disabled={!dirty || busy || sculpting || !activeVersion || Boolean(hold) || needsForm || Boolean(need)}
                   aria-busy={sculpting}
                 >
                   {sculpting ? "Sending to the studio…" : "Sculpt"}
                 </button>
-                {(hold || needsForm) && (
+                {(hold || needsForm || need) && (
                   <p role="status" className="text-[11px] leading-snug text-warning">
                     {hold === "checking"
                       ? "The studio is checking a file you added. Sculpt opens as soon as it's cleared."
                       : hold === "rejected"
                         ? "A file you added can't be printed. Choose a different one to sculpt."
-                        : "Add your model file to sculpt."}
+                        : needsForm
+                          ? "Add your model file to sculpt."
+                          : need}
                   </p>
                 )}
                 {dirty && activeVersion && (
@@ -489,6 +497,7 @@ export function DesignStudio({ designId, jobId: urlJobId, duniya: duniyaSlug }: 
               glbUrl={model}
               pbr={(material ?? store.materials[0])?.pbr ?? { color: "#C4785A", roughness: 0.3, metalness: 0.1 }}
               environment={environment}
+              look={look}
               dimmed={busy}
               onModelError={() => setModelNotice("The preview couldn't be loaded, so you're looking at a stand-in form.")}
             />

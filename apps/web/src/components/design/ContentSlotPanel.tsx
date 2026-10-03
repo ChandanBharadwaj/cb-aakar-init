@@ -6,11 +6,15 @@ import { sizeHint } from "@/lib/families";
 import {
   addWords,
   anchorAccepts,
+  anchorModes,
   CHHAAP,
   clampDepth,
   clampScale,
+  clampText,
   clearFeature,
+  COMIC_POP,
   contentAnchors,
+  contentWords,
   crowdedBy,
   detectScript,
   featureCodename,
@@ -20,18 +24,24 @@ import {
   featurePhrase,
   featuresOn,
   featureSummary,
+  isRequired,
   isSolo,
   isThinPiece,
   longestMmRange,
+  markDefaults,
   maxTextChars,
+  MODE_OPTIONS,
   motifDepthRange,
   motifScaleRange,
   ORIENTATIONS,
   placeFeature,
   reliefRange,
+  TEXT_MAX_CHARS,
   templateTakes,
   textDepthRange,
+  textLength,
   uploadIdOf,
+  type ContentMode,
   type ContentSource,
   type EmbossText,
   type Feature,
@@ -69,14 +79,33 @@ export interface ContentSlotPanelProps {
    * orientation toggle, and its file can be replaced but never removed.
    */
   raw?: boolean;
+  /**
+   * The piece's style variant (the design's, or a Duniya's preset while composing). Under `comic_pop` a new name or
+   * motif starts raised and bolder wherever its spot allows raised content.
+   */
+  look?: string;
   disabled?: boolean;
   className?: string;
 }
 
-const RELIEF_MODES = [
-  { value: "emboss", label: "Raised", description: "Stands out from the surface" },
-  { value: "deboss", label: "Cut in", description: "Sunk into the surface" },
-] as const;
+/** The raised / cut-in toggle's options for the modes a spot allows. */
+function reliefOptions(modes: readonly ReliefMode[]) {
+  return modes.map((m) => ({ ...MODE_OPTIONS[m], value: m }));
+}
+
+/** The modes a spot allows for a name or a motif (a photo's lithophane aside). */
+function reliefModes(anchor: TemplateAnchor, type: "emboss_text" | "motif"): ReliefMode[] {
+  return anchorModes(anchor, type).filter((m): m is ReliefMode => m !== "lithophane");
+}
+
+/** "Cut into the top rail.": what a spot with one mode does, instead of a toggle with one choice. */
+function onlyModeLine(mode: ContentMode | undefined, spot: string): string {
+  if (mode === "deboss") return `Cut into the ${spot}.`;
+  if (mode === "lithophane") return `Becomes the ${spot}, lit from behind.`;
+  return `Raised on the ${spot}.`;
+}
+
+const LITHOPHANE_COPY = "Darker parts of the photo become thicker plastic, so they glow less.";
 
 const ACTION_LINK = "text-left text-[11px] font-semibold underline underline-offset-2 disabled:opacity-60";
 const QUIET_LINK = "justify-self-start text-left text-[11px] text-surface-muted underline-offset-2 hover:underline";
@@ -89,9 +118,10 @@ const QUIET_LINK = "justify-self-start text-left text-[11px] text-surface-muted 
  * review states live in the design store, so they survive remounts; a file the studio is still checking is polled
  * until it is cleared or turned down.
  */
-export function ContentSlotPanel({ template, family, features, onChange, motifPack, motifPackLabel, raw, disabled, className }: ContentSlotPanelProps) {
+export function ContentSlotPanel({ template, family, features, onChange, motifPack, motifPackLabel, raw, look, disabled, className }: ContentSlotPanelProps) {
   const headingId = useId();
-  const anchors = contentAnchors(template);
+  // Spots the piece can't be made without come first, so the customer is asked for them up front.
+  const anchors = [...contentAnchors(template)].sort((a, b) => Number(isRequired(b)) - Number(isRequired(a)));
   const takesMotifs = anchors.some((a) => anchorAccepts(a, template).includes("motif"));
   const library = useMotifs(takesMotifs);
   if (anchors.length === 0) return null;
@@ -126,6 +156,7 @@ export function ContentSlotPanel({ template, family, features, onChange, motifPa
           motifPack={motifPack}
           motifPackLabel={motifPackLabel}
           thin={thin}
+          look={look}
         />
       ))}
     </section>
@@ -146,6 +177,7 @@ interface AnchorCardProps {
   motifPack?: readonly string[];
   motifPackLabel?: string;
   thin: boolean;
+  look?: string;
 }
 
 function areaHint(anchor: TemplateAnchor): string | undefined {
@@ -172,8 +204,11 @@ function crowdingHint(accepts: readonly FeatureType[], onSpot: readonly Feature[
   return undefined;
 }
 
-function AnchorCard({ anchor, template, family, onSpot, onChange, lockForm, disabled, library, motifPack, motifPackLabel, thin }: AnchorCardProps) {
+function AnchorCard({ anchor, template, family, onSpot, onChange, lockForm, disabled, library, motifPack, motifPackLabel, thin, look }: AnchorCardProps) {
   const accepts = anchorAccepts(anchor, template);
+  const required = isRequired(anchor);
+  // A volume spot that takes only a customer's own form (Pratima's top) is "Your form", like Swaroop's one form.
+  const formSpot = (anchor.kind ?? "surface") === "volume" && accepts.length > 0 && accepts.every((t) => t === "hero_mesh");
   const [chosen, setChosen] = useState<FeatureType>();
   const [replacing, setReplacing] = useState(false);
   const tabsId = useId();
@@ -182,9 +217,10 @@ function AnchorCard({ anchor, template, family, onSpot, onChange, lockForm, disa
   const blocked = (type: FeatureType) => crowdedBy(onSpot, type).length > 0;
   const active: FeatureType | undefined =
     (chosen && accepts.includes(chosen) && !blocked(chosen) ? chosen : undefined) ?? onSpot[0]?.type ?? accepts.find((t) => !blocked(t)) ?? accepts[0];
-  const title = lockForm ? "Your form" : anchor.label;
+  const title = lockForm || formSpot ? "Your form" : anchor.label;
   const spot = anchor.label.toLowerCase();
-  const hint = areaHint(anchor);
+  const area = areaHint(anchor);
+  const hint = formSpot && !lockForm ? [anchor.label, area].filter(Boolean).join(" · ") : area;
   const crowded = accepts.length > 1 ? crowdingHint(accepts, onSpot, spot) : undefined;
   const others = onSpot.filter((f) => f.type !== active);
   const has = (type: FeatureType) => onSpot.some((f) => f.type === type);
@@ -211,7 +247,9 @@ function AnchorCard({ anchor, template, family, onSpot, onChange, lockForm, disa
           <h3 className="text-sm font-semibold leading-tight">{title}</h3>
           {hint && <span className="text-[11px] text-surface-muted">{hint}</span>}
         </div>
-        {lockForm ? null : onSpot.length > 0 ? (
+        {lockForm ? null : required ? (
+          onSpot.length > 0 ? null : <span className="text-[11px] font-semibold text-warning">Needed</span>
+        ) : onSpot.length > 0 ? (
           <button type="button" className="text-[11px] text-surface-muted underline-offset-2 hover:underline" onClick={() => clear()} disabled={disabled}>
             Leave plain
           </button>
@@ -219,6 +257,11 @@ function AnchorCard({ anchor, template, family, onSpot, onChange, lockForm, disa
           <span className="text-[11px] text-surface-muted">Plain</span>
         )}
       </header>
+      {required && !lockForm && onSpot.length === 0 && (
+        <p className="text-[11px] leading-snug text-surface-muted">
+          The piece is made from this: add {contentWords(anchor, template)} here to sculpt.
+        </p>
+      )}
 
       {accepts.length > 1 && (
         <div role="tablist" aria-label={`Content for ${title}`} className="flex flex-wrap gap-1.5">
@@ -261,6 +304,7 @@ function AnchorCard({ anchor, template, family, onSpot, onChange, lockForm, disa
             family={family}
             current={featureOfType(onSpot, anchor.id, "emboss_text")}
             beside={has("motif")}
+            look={look}
             onPlace={place}
             onClear={() => clear("emboss_text")}
             disabled={disabled}
@@ -275,6 +319,7 @@ function AnchorCard({ anchor, template, family, onSpot, onChange, lockForm, disa
             motifPack={motifPack}
             motifPackLabel={motifPackLabel}
             thin={thin}
+            look={look}
             onPlace={place}
             onClear={() => clear("motif")}
             disabled={disabled}
@@ -357,26 +402,35 @@ interface NaamPanelProps {
   current?: EmbossText;
   /** A motif shares this spot. */
   beside: boolean;
+  look?: string;
   onPlace(feature: EmbossText): void;
   onClear(): void;
   disabled?: boolean;
 }
 
-function NaamPanel({ anchor, family, current, beside, onPlace, onClear, disabled }: NaamPanelProps) {
+/**
+ * Naam: up to the family's `max_text_chars` letters (counted as a reader counts them: an Indic vowel sign is part of
+ * its letter), raised or cut in where the spot allows both (one mode: no toggle, that mode sent), at a depth within
+ * the spot's `max_relief_mm` (Kunji: three letters, at most 0.6 mm).
+ */
+function NaamPanel({ anchor, family, current, beside, look, onPlace, onClear, disabled }: NaamPanelProps) {
   const id = useId();
   const max = maxTextChars(family);
   const range = textDepthRange(anchor);
+  const modes = reliefModes(anchor, "emboss_text");
+  const start = markDefaults(anchor, "emboss_text", { look });
   const text = current?.text ?? "";
-  const mode = current?.mode ?? "emboss";
+  const mode = current?.mode ?? start.mode;
+  const length = textLength(text);
 
   function update(patch: Partial<Pick<EmbossText, "text" | "mode" | "depth_mm">>) {
-    const nextText = (patch.text ?? text).slice(0, max);
+    const nextText = clampText(patch.text ?? text, max);
     // Only an empty box takes the name off; spaces stay while typing and are trimmed when the piece is sent.
     if (nextText.length === 0) {
       onClear();
       return;
     }
-    const base: EmbossText = current ?? { type: "emboss_text", text: "", anchor: anchor.id, depth_mm: range.default, mode: "emboss" };
+    const base: EmbossText = current ?? { type: "emboss_text", text: "", anchor: anchor.id, depth_mm: start.depth_mm, mode: start.mode };
     const next: EmbossText = { ...base, ...patch, text: nextText };
     const script = detectScript(next.text);
     if (script) next.script = script;
@@ -388,8 +442,8 @@ function NaamPanel({ anchor, family, current, beside, onPlace, onClear, disabled
     <div className="grid gap-2.5">
       <label htmlFor={id} className="flex items-baseline justify-between gap-3 text-xs text-surface-muted">
         <span>Your {featurePhrase("emboss_text")}</span>
-        <span aria-live="polite" className={text.length >= max ? "font-semibold text-warning" : ""}>
-          {text.length} / {max}
+        <span aria-live="polite" className={length >= max ? "font-semibold text-warning" : ""}>
+          {length} / {max}
         </span>
       </label>
       <input
@@ -397,13 +451,17 @@ function NaamPanel({ anchor, family, current, beside, onPlace, onClear, disabled
         type="text"
         className="ak-input min-h-10 py-1.5 text-sm"
         value={text}
-        maxLength={max}
-        placeholder="Asha"
+        maxLength={TEXT_MAX_CHARS}
+        placeholder={max < 4 ? "AK" : "Asha"}
         autoComplete="off"
         disabled={disabled}
         onChange={(e) => update({ text: e.target.value })}
       />
-      <Segmented label="Letters" options={RELIEF_MODES} value={mode} onChange={(m) => update({ mode: m })} disabled={disabled || !current} />
+      {modes.length > 1 ? (
+        <Segmented label="Letters" options={reliefOptions(modes)} value={mode} onChange={(m) => update({ mode: m })} disabled={disabled || !current} />
+      ) : (
+        <p className="text-[11px] text-surface-muted">{onlyModeLine(modes[0], anchor.label.toLowerCase())}</p>
+      )}
       {current && (
         <RangeField
           label="Depth"
@@ -435,6 +493,7 @@ interface ButiPanelProps {
   motifPackLabel?: string;
   /** A thin piece: raised by default, and a cut-in motif gets a warning. */
   thin: boolean;
+  look?: string;
   onPlace(feature: MotifFeature): void;
   onClear(): void;
   disabled?: boolean;
@@ -442,16 +501,18 @@ interface ButiPanelProps {
 
 /**
  * Buti: a motif from the library (the Duniya experience's pack first), its size from the motif's smallest printable
- * scale up to filling the spot, raised or cut in (cut in by default, raised on thin pieces) and a depth within the
- * spot's `max_relief_mm`.
+ * scale up to filling the spot, raised or cut in where the spot allows both (cut in by default; raised on thin pieces
+ * and, bolder, in the comic look; one mode: no toggle, that mode sent) and a depth within the spot's `max_relief_mm`.
  */
-function ButiPanel({ anchor, current, beside, library, motifPack, motifPackLabel, thin, onPlace, onClear, disabled }: ButiPanelProps) {
+function ButiPanel({ anchor, current, beside, library, motifPack, motifPackLabel, thin, look, onPlace, onClear, disabled }: ButiPanelProps) {
   const depth = motifDepthRange(anchor);
   const chosenMotif = current ? library.motifs?.find((m) => m.id === current.motif_id) : undefined;
   const scale = motifScaleRange(chosenMotif);
-  const defaultMode: ReliefMode = thin ? "emboss" : "deboss";
-  const mode = current?.mode ?? defaultMode;
+  const modes = reliefModes(anchor, "motif");
+  const start = markDefaults(anchor, "motif", { thin, look });
+  const mode = current?.mode ?? start.mode;
   const spot = anchor.label.toLowerCase();
+  const comic = look === COMIC_POP;
 
   function choose(motif: Motif) {
     const range = motifScaleRange(motif);
@@ -461,8 +522,8 @@ function ButiPanel({ anchor, current, beside, library, motifPack, motifPackLabel
       motif_id: motif.id,
       anchor: anchor.id,
       scale: clampScale(current?.scale ?? range.default, range),
-      depth_mm: clampDepth(current?.depth_mm ?? depth.default, depth),
-      mode: current?.mode ?? defaultMode,
+      depth_mm: clampDepth(current?.depth_mm ?? start.depth_mm, depth),
+      mode: current?.mode ?? start.mode,
     });
   }
 
@@ -496,7 +557,11 @@ function ButiPanel({ anchor, current, beside, library, motifPack, motifPackLabel
             disabled={disabled}
             onChange={(v) => onPlace({ ...current, scale: clampScale(v, scale) })}
           />
-          <Segmented label="Motif" options={RELIEF_MODES} value={mode} onChange={(m) => onPlace({ ...current, mode: m })} disabled={disabled} />
+          {modes.length > 1 ? (
+            <Segmented label="Motif" options={reliefOptions(modes)} value={mode} onChange={(m) => onPlace({ ...current, mode: m })} disabled={disabled} />
+          ) : (
+            <p className="text-[11px] text-surface-muted">{onlyModeLine(modes[0], spot)}</p>
+          )}
           <RangeField
             label="Depth"
             min={depth.min}
@@ -507,7 +572,7 @@ function ButiPanel({ anchor, current, beside, library, motifPack, motifPackLabel
             disabled={disabled}
             onChange={(v) => onPlace({ ...current, depth_mm: clampDepth(v, depth) })}
           />
-          {thin && mode === "deboss" && (
+          {thin && mode === "deboss" && modes.includes("emboss") && (
             <p role="status" className="text-[11px] leading-snug text-warning">
               This piece is thin: a cut-in motif can leave too little wall behind it. Raised is the safer choice.
             </p>
@@ -524,7 +589,13 @@ function ButiPanel({ anchor, current, beside, library, motifPack, motifPackLabel
       ) : (
         library.motifs && (
           <p className="text-[11px] leading-snug text-surface-muted">
-            {thin ? "Raised by default on this thin piece." : "Cut into the surface by default; you can raise it instead."}
+            {modes.length < 2
+              ? onlyModeLine(modes[0], spot)
+              : start.mode === "emboss"
+                ? comic
+                  ? "Raised and bold by default in the comic look; you can cut it in instead."
+                  : "Raised by default on this thin piece."
+                : "Cut into the surface by default; you can raise it instead."}
             {beside ? ` It sits beside your name on the ${spot}.` : ""}
           </p>
         )
@@ -628,8 +699,26 @@ function sourceOf(upload: Upload, file: File): ContentSource {
   return { upload_id: upload.id, url: upload.url ?? undefined, format: fileFormat(file.name) };
 }
 
+/** A photo in another mode: the plate itself drops its relief depth; raised or cut in gets one back. */
+function withMode(relief: ReliefImage, mode: ContentMode, range: { default: number }): ReliefImage {
+  if (mode === "lithophane") {
+    const plate: ReliefImage = { ...relief, mode };
+    delete plate.relief_mm;
+    return plate;
+  }
+  return { ...relief, mode, relief_mm: relief.relief_mm ?? range.default };
+}
+
+/**
+ * Chhavi: a photo raised or cut in where the spot allows both, at a depth within its `max_relief_mm`; on a spot that
+ * takes it only as the plate itself (Roshni's night light) the photo is sent in `lithophane` mode, with no toggle and
+ * no depth (the plate's own thickness range makes the picture).
+ */
 function ChhaviPanel({ anchor, feature: relief, onPlace, disabled, review, replacing, onReplace }: UploadPanelProps<ReliefImage>) {
   const range = reliefRange(anchor);
+  const modes = anchorModes(anchor, "relief_image");
+  const startMode: ContentMode = modes.includes("emboss") ? "emboss" : (modes[0] ?? "emboss");
+  const spot = anchor.label.toLowerCase();
   if (!relief || replacing) {
     return (
       <div className="grid gap-2">
@@ -642,10 +731,15 @@ function ChhaviPanel({ anchor, feature: relief, onPlace, disabled, review, repla
           onUploaded={(upload, file) => {
             useDesignStore.getState().rememberUpload(upload, file.name);
             const source = sourceOf(upload, file);
+            const fresh: ReliefImage =
+              startMode === "lithophane"
+                ? { type: "relief_image", source, anchor: anchor.id, mode: "lithophane", fit: "contain" }
+                : { type: "relief_image", source, anchor: anchor.id, mode: startMode, relief_mm: range.default, fit: "contain" };
             // A new photo keeps the relief already chosen for this spot.
-            onPlace(relief ? { ...relief, source } : { type: "relief_image", source, anchor: anchor.id, mode: "emboss", relief_mm: range.default, fit: "contain" });
+            onPlace(relief ? { ...relief, source } : fresh);
           }}
         />
+        {startMode === "lithophane" && <p className="text-[11px] leading-snug text-surface-muted">{LITHOPHANE_COPY}</p>}
         {relief && !review.rejected && (
           <button type="button" className={QUIET_LINK} onClick={() => onReplace(false)} disabled={disabled}>
             Keep the current photo
@@ -656,6 +750,7 @@ function ChhaviPanel({ anchor, feature: relief, onPlace, disabled, review, repla
   }
   const url = relief.source.url ?? review.url;
   const depth = clampDepth(relief.relief_mm ?? range.default, range);
+  const mode: ContentMode = relief.mode ?? "emboss";
   return (
     <div className="grid gap-3">
       <div className="flex items-center gap-3">
@@ -670,27 +765,31 @@ function ChhaviPanel({ anchor, feature: relief, onPlace, disabled, review, repla
         )}
         <div className="grid min-w-0 gap-0.5 text-xs">
           <span className="truncate font-semibold">{review.name ?? "Your photo"}</span>
-          <span className="text-surface-muted">Set in relief on the {anchor.label.toLowerCase()}</span>
+          <span className="text-surface-muted">{mode === "lithophane" ? `Becomes the ${spot}, lit from behind` : `Set in relief on the ${spot}`}</span>
           <button type="button" className={QUIET_LINK} onClick={() => onReplace(true)} disabled={disabled}>
             Replace photo
           </button>
         </div>
       </div>
-      {relief.mode === "lithophane" ? (
-        <p className="text-[11px] text-surface-muted">Lithophane: light through the plate draws the picture.</p>
+      {modes.length > 1 ? (
+        <Segmented label="Relief" options={modes.map((m) => MODE_OPTIONS[m])} value={mode} onChange={(m) => onPlace(withMode(relief, m, range))} disabled={disabled} />
+      ) : mode !== "lithophane" ? (
+        <p className="text-[11px] text-surface-muted">{onlyModeLine(modes[0], spot)}</p>
+      ) : null}
+      {mode === "lithophane" ? (
+        <p className="text-[11px] leading-snug text-surface-muted">{LITHOPHANE_COPY}</p>
       ) : (
-        <Segmented label="Relief" options={RELIEF_MODES} value={relief.mode === "deboss" ? "deboss" : "emboss"} onChange={(m) => onPlace({ ...relief, mode: m })} disabled={disabled} />
+        <RangeField
+          label="Depth"
+          min={range.min}
+          max={range.max}
+          step={0.1}
+          value={depth}
+          format={(v) => formatMm(v, 1)}
+          disabled={disabled}
+          onChange={(v) => onPlace({ ...relief, relief_mm: clampDepth(v, range) })}
+        />
       )}
-      <RangeField
-        label="Depth"
-        min={range.min}
-        max={range.max}
-        step={0.1}
-        value={depth}
-        format={(v) => formatMm(v, 1)}
-        disabled={disabled}
-        onChange={(v) => onPlace({ ...relief, relief_mm: clampDepth(v, range) })}
-      />
     </div>
   );
 }

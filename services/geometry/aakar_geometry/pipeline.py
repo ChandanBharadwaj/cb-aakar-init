@@ -1,7 +1,8 @@
 """``build_design``: design.generate payload -> design.completed (or design.failed) payload.
 
-Steps (PLAN §7.11): validate request + spec → resolve template → check family / features / style /
-material → validate params → ``Template.validate_content`` (limits coupling params and content) →
+Steps (PLAN §7.11): validate request + spec → resolve template → check family / features (anchor modes,
+required content) / style / material → validate params → normalise (a style the template offers may put its own
+content defaults first) → ``Template.validate_content`` (limits coupling params and content) →
 progress ``understanding`` → progress ``sculpting`` → CAD body + features (Chhaap: names and motifs
 shaped and set in, photo reliefs and hero forms fetched through the ``ContentFetcher``) → refuse an
 empty result → export + store → progress ``checking`` → inspect → assemble and validate the completed
@@ -90,13 +91,15 @@ def http_status_for(payload: Mapping[str, Any]) -> int:
 def normalise_spec(template: type[Template], spec: Mapping[str, Any], params: Mapping[str, Any]) -> dict[str, Any]:
     constraints = template.constraints.descriptor()
     constraints.update({k: v for k, v in (spec.get("constraints") or {}).items() if v is not None})
+    style = spec.get("style") or "none"
     out: dict[str, Any] = {
         "spec_version": "1.0",
         "family": template.family,
         "template": template.ref(),
         "params": dict(params),
-        "features": feature_validation.normalise_features(spec.get("features") or []),
-        "style": spec.get("style") or "none",
+        # a style the template offers may put its own content defaults first (comic_pop: raised, bolder names)
+        "features": feature_validation.normalise_features(spec.get("features") or [], template=template, style=style),
+        "style": style,
         "constraints": constraints,
     }
     if spec.get("material"):
@@ -111,8 +114,8 @@ def _check_spec_against_template(template: type[Template], spec: Mapping[str, An
             f"Template {template.ref()} belongs to family {template.family}, not {spec.get('family')}",
             {"family": spec.get("family"), "template_family": template.family},
         )
-    # Feature semantics: type supported, anchor exists and accepts it, one photo/form per anchor,
-    # relief depth within the anchor's cap, text length within the family's cap.
+    # Feature semantics: type supported, anchor exists and accepts it, the modes it lists, one photo/form per
+    # anchor, relief depth within the anchor's cap, text length within the family's cap, required anchors filled.
     feature_validation.check(template, spec)
     style = spec.get("style") or "none"
     if style != "none" and style not in template.style_variants:
@@ -249,7 +252,7 @@ def build_design(
             "assets": {kind: rec.to_dict() for kind, rec in assets.items()},
             "printability": report,
             "print_estimate": estimate,
-            "karigar_note": template.karigar_note_for(params, normalised["features"]),
+            "karigar_note": template.karigar_note_for(params, normalised["features"], style=normalised["style"]),
             "build_ms": int(round((time.perf_counter() - started) * 1000)),
         }
         try:

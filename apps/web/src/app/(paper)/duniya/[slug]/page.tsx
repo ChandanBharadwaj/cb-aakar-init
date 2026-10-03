@@ -42,8 +42,8 @@ export async function generateMetadata({ params }: DuniyaPageProps): Promise<Met
 /**
  * A Duniya (experience) page: the page takes the experience's accent (and hero once shot), a stage strip shows its
  * backdrop through the studio viewer's presets, then its orderable Avatars (→ `/create/{family}?duniya=<slug>`), its
- * Buti and its curated Shop items. An experience that isn't open yet (Katha until its backdrop, look and motifs land)
- * gets a "coming soon" page with its copy. Unknown slugs are a 404.
+ * Buti and its curated Shop items. An experience that isn't open yet (staff keep it closed, `available: false`) gets a
+ * "coming soon" page with its copy. Unknown slugs are a 404.
  */
 export default async function DuniyaPage({ params }: DuniyaPageProps) {
   const { slug } = await params;
@@ -77,7 +77,8 @@ export default async function DuniyaPage({ params }: DuniyaPageProps) {
   const buti = orderByPack(motifs, experience.motif_pack).picks;
   const label = experienceLabel(experience);
 
-  // The stage: the experience's backdrop when the viewer has its preset, else the studio standing in for it.
+  // The stage: the experience's backdrop when the viewer has its preset, else the studio standing in for it, with the
+  // stand-in form in the experience's look (Katha's comic_pop: cel-shaded with ink outlines).
   const presetKey = presetKeyFor(experience.environment, environments);
   const backdropName = environments?.find((e) => e.id === experience.environment)?.label ?? environmentLabel(presetKey);
   const built = hasViewerPreset(presetKey);
@@ -87,6 +88,7 @@ export default async function DuniyaPage({ params }: DuniyaPageProps) {
       label={built ? backdropName : environmentLabel("studio")}
       standIn={built ? undefined : `${backdropName} arrives soon`}
       pbr={{ color: experience.surface.accent, roughness: 0.38, metalness: 0.12, clearcoat: 0.3, clearcoat_roughness: 0.4 }}
+      look={experience.style}
     />
   );
   const facts = [
@@ -216,8 +218,8 @@ function MotifRow({ codename, motifs }: { codename: string; motifs: Motif[] }) {
 }
 
 /**
- * An experience that isn't open yet (Katha until PR 12 brings its backdrop, look and motif pack): its own copy on a
- * band in its backdrop's palette, no Avatars (nothing there can be ordered yet), and the way back to the open worlds.
+ * An experience that isn't open yet (Katha until staff switch it on): its own copy on a band in its backdrop's palette,
+ * no Avatars (nothing there can be ordered yet), and the way back to the open worlds.
  */
 function ComingSoon({ experience, environments }: { experience: Experience; environments?: Environment[] }) {
   const palette = environments?.find((e) => e.id === experience.environment)?.palette ?? [];

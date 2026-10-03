@@ -8,7 +8,18 @@ import { api, toProblem } from "@/lib/api/client";
 import type { CatalogItem, Family, Material, ParamValues, Problem } from "@/lib/api/types";
 import { presetStyle, STYLE_LABELS, type DuniyaPreset } from "@/lib/experiences";
 import { allowedMaterialIds, defaultTemplate, envelopeLine, hardwareNames, hardwareSentence, packedHardware, priceFromLabel } from "@/lib/families";
-import { CHHAAP, contentAnchors, familyLabel, featureSummary, featuresFitting, featuresForSubmit, templateTakes, type Feature } from "@/lib/features";
+import {
+  CHHAAP,
+  contentAnchors,
+  familyLabel,
+  featureSummary,
+  featuresFitting,
+  featuresForSubmit,
+  missingContent,
+  missingContentLine,
+  templateTakes,
+  type Feature,
+} from "@/lib/features";
 import { capitalise } from "@/lib/format";
 import { REJECTED_COPY } from "@/lib/uploads";
 import { FALLBACK_MATERIALS } from "@/lib/viewer/materials";
@@ -46,7 +57,8 @@ function primitiveParams(values: Record<string, unknown> | undefined): ParamValu
  * The Avatar composer: pick a template when the family has several, fill the Chhaap, choose a finish,
  * then "Sculpt" → `POST /api/designs {source: "create", family_id, template_id, features, material, title,
  * experience_id?}` → the studio with the job, exactly like the Shop and Remix paths. Sculpt waits while the studio
- * is still checking a file in the Chhaap, and after a file is turned down until it is replaced.
+ * is still checking a file in the Chhaap, after a file is turned down until it is replaced, and until every spot the
+ * piece can't be made without (an anchor's `required`: Roshni's photo) has its content.
  */
 export function ContentComposer({ family, materials: materialsProp, item, prompt, duniya }: ContentComposerProps) {
   const router = useRouter();
@@ -74,6 +86,8 @@ export function ContentComposer({ family, materials: materialsProp, item, prompt
   const anchors = template ? contentAnchors(template) : [];
   const motifs = useMotifs(template ? templateTakes(template).includes("motif") : false).motifs;
   const look = presetStyle(duniya?.style, template);
+  const missing = template ? missingContent(template, sending) : [];
+  const need = template ? missingContentLine(missing, template) : undefined;
 
   function pickTemplate(id: string) {
     setTemplateId(id);
@@ -83,7 +97,7 @@ export function ContentComposer({ family, materials: materialsProp, item, prompt
   }
 
   async function sculpt() {
-    if (!template || !materialId || busy || hold) return;
+    if (!template || !materialId || busy || hold || need) return;
     setBusy(true);
     setProblem(undefined);
     try {
@@ -170,6 +184,7 @@ export function ContentComposer({ family, materials: materialsProp, item, prompt
                 onChange={setFeatures}
                 motifPack={duniya?.motifPack}
                 motifPackLabel={duniya?.codename}
+                look={look}
                 disabled={busy}
               />
             ) : (
@@ -186,15 +201,23 @@ export function ContentComposer({ family, materials: materialsProp, item, prompt
             </div>
 
             <div className="grid gap-2">
-              <button type="button" className="ak-btn ak-btn-primary ak-btn-pill justify-self-start px-8" onClick={sculpt} disabled={busy || !template || !materialId || Boolean(hold)} aria-busy={busy}>
+              <button
+                type="button"
+                className="ak-btn ak-btn-primary ak-btn-pill justify-self-start px-8"
+                onClick={sculpt}
+                disabled={busy || !template || !materialId || Boolean(hold) || Boolean(need)}
+                aria-busy={busy}
+              >
                 {busy ? "Sending to the studio…" : "Sculpt"}
               </button>
-              <p className={hold ? "text-[12px] text-warning" : "text-[12px] text-surface-muted"} role={hold ? "status" : undefined}>
+              <p className={hold || need ? "text-[12px] text-warning" : "text-[12px] text-surface-muted"} role={hold || need ? "status" : undefined}>
                 {hold === "checking"
                   ? "The studio is checking a file you added. Sculpt opens as soon as it's cleared."
                   : hold === "rejected"
                     ? "A file you added can't be printed. Choose a different one to sculpt."
-                    : sending.length === 0
+                    : need
+                      ? need
+                      : sending.length === 0
                       ? `You can sculpt it plain and add ${CHHAAP.phrase} in the studio.`
                       : "Sculpt opens the studio, where size, finish and price are live."}
               </p>

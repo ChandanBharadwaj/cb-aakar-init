@@ -6,7 +6,7 @@
 // required on the response side, so the UI keeps this discriminated union with optional
 // defaults instead. Keep it in step with the schema whenever a feature changes.
 import type { DesignSpec, Family, Motif, TemplateAnchor, TemplateDescriptor } from "@/lib/api/types";
-import { capitalise, formatMm } from "@/lib/format";
+import { capitalise, formatMm, joinList } from "@/lib/format";
 
 export type FeatureType = "emboss_text" | "motif" | "relief_image" | "hero_mesh";
 
@@ -87,9 +87,18 @@ export type Feature = EmbossText | MotifFeature | ReliefImage | HeroMesh;
 
 export type Orientation = NonNullable<HeroMesh["orientation"]>;
 export type ReliefMode = "emboss" | "deboss";
+/** How content sits in the piece: raised, cut in, or (a photo only) the glowing plate itself. */
+export type ContentMode = ReliefMode | "lithophane";
 
 // Schema limits, so sliders and counters never offer a value the API would refuse.
 export const TEXT_MAX_CHARS = 40;
+/**
+ * Katha's comic look (`comic_pop`): names and motifs stand raised and bolder by default, this deep or the anchor's
+ * `max_relief_mm` if that is less. Mirrors the geometry service (`features/styles.py`), which applies the same default
+ * to a name or motif that leaves its mode or depth out.
+ */
+export const COMIC_POP = "comic_pop";
+export const COMIC_POP_DEPTH_MM = 1.5;
 export const RELIEF_MM = { min: 0.2, max: 3, default: 0.6 } as const;
 export const TEXT_DEPTH_MM = { min: 0.4, max: 3, default: 1.2 } as const;
 export const MOTIF_DEPTH_MM = { min: 0.4, max: 3, default: 1 } as const;
@@ -168,16 +177,95 @@ export function detectScript(text: string): TextScript | undefined {
 
 type ContentTemplate = Pick<TemplateDescriptor, "anchors" | "features_supported">;
 
+// ---- Modes: raised, cut in, or the plate itself -------------------------------------------------------------------
+//
+// A descriptor's anchor may list the only `modes` its content takes (template-descriptor.v1.json): Chaukhat's rails
+// cut in only (the frame prints face down), Roshni's plate takes its photo as the plate itself (lithophane). The panel
+// offers just those, hides the raised / cut-in toggle when one is left, and always sends the mode explicitly (a mode
+// left out is the type's default, which the API refuses when the anchor does not list it).
+
+/** The modes each type can take (design-spec.v1.json), in the order the toggle offers them. */
+const TYPE_MODES: Record<Exclude<FeatureType, "hero_mesh">, readonly ContentMode[]> = {
+  emboss_text: ["emboss", "deboss"],
+  motif: ["emboss", "deboss"],
+  relief_image: ["emboss", "deboss", "lithophane"],
+};
+
+/** The toggle's words for each mode. */
+export const MODE_OPTIONS: Record<ContentMode, { value: ContentMode; label: string; description: string }> = {
+  emboss: { value: "emboss", label: "Raised", description: "Stands out from the surface" },
+  deboss: { value: "deboss", label: "Cut in", description: "Sunk into the surface" },
+  lithophane: { value: "lithophane", label: "Lit from behind", description: "The photo becomes the plate that glows" },
+};
+
+/**
+ * The modes this anchor offers for a type: the anchor's `modes` narrowed to the type's. An anchor that lists none
+ * offers raised and cut in; a photo becomes the plate (lithophane) only where an anchor lists it, since only a night
+ * light's template can build one. A hero form has no mode.
+ */
+export function anchorModes(anchor: Pick<TemplateAnchor, "modes">, type: FeatureType): ContentMode[] {
+  if (type === "hero_mesh") return [];
+  const allowed = TYPE_MODES[type];
+  const listed: readonly string[] | undefined = anchor.modes;
+  return listed ? allowed.filter((m) => listed.includes(m)) : allowed.filter((m) => m !== "lithophane");
+}
+
+/** The type's default when a feature leaves its mode out (design-spec.v1.json). */
+function typeDefaultMode(type: Exclude<FeatureType, "hero_mesh">): ContentMode {
+  return type === "motif" ? "deboss" : "emboss";
+}
+
 /**
  * Feature types an anchor takes: its own `accepts` (else the template's `features_supported`, the contract's
- * default), never more than the template supports; a descriptor without `features_supported` supports nothing.
- * Only a volume anchor holds a hero form; a surface anchor holds the rest.
+ * default), never more than the template supports, and only in a mode the anchor lists; a descriptor without
+ * `features_supported` supports nothing. Only a volume anchor holds a hero form; a surface anchor holds the rest.
  */
 export function anchorAccepts(anchor: TemplateAnchor, template: Pick<TemplateDescriptor, "features_supported">): FeatureType[] {
   const supported: readonly string[] = template.features_supported ?? [];
   const list: readonly string[] = anchor.accepts ?? supported;
   const volume = (anchor.kind ?? "surface") === "volume";
-  return FEATURE_TYPES.filter((t) => list.includes(t) && supported.includes(t) && (volume ? t === "hero_mesh" : t !== "hero_mesh"));
+  return FEATURE_TYPES.filter(
+    (t) =>
+      list.includes(t) &&
+      supported.includes(t) &&
+      (volume ? t === "hero_mesh" : t !== "hero_mesh") &&
+      (t === "hero_mesh" || anchorModes(anchor, t).length > 0),
+  );
+}
+
+// ---- Required content ----------------------------------------------------------------------------------------------
+
+/** True when the piece can't be made without content on this anchor (the night light's photo). */
+export function isRequired(anchor: Pick<TemplateAnchor, "required">): boolean {
+  return anchor.required === true;
+}
+
+/** The anchors a customer must fill before Sculpt, in descriptor order. */
+export function requiredAnchors(template: ContentTemplate): TemplateAnchor[] {
+  return contentAnchors(template).filter(isRequired);
+}
+
+/** Required anchors with nothing on them yet: Sculpt waits for these. */
+export function missingContent(template: ContentTemplate, features: readonly Feature[]): TemplateAnchor[] {
+  return requiredAnchors(template).filter((a) => !features.some((f) => f.anchor === a.id));
+}
+
+const NEED_WORDS: Record<FeatureType, string> = {
+  relief_image: "a photo",
+  hero_mesh: "your model file",
+  emboss_text: "a name",
+  motif: "a motif",
+};
+
+/** "a photo", "a name or a motif": what an anchor needs, in plain words. */
+export function contentWords(anchor: TemplateAnchor, template: Pick<TemplateDescriptor, "features_supported">): string {
+  return joinList(anchorAccepts(anchor, template).map((t) => NEED_WORDS[t]), "or") || "something";
+}
+
+/** "Add a photo to the photo plate to sculpt.": why Sculpt waits, for the first empty required anchor. */
+export function missingContentLine(missing: readonly TemplateAnchor[], template: Pick<TemplateDescriptor, "features_supported">): string | undefined {
+  const first = missing[0];
+  return first ? `Add ${contentWords(first, template)} to the ${first.label.toLowerCase()} to sculpt.` : undefined;
 }
 
 /** Anchors a customer can fill (at least one feature type the anchor and the template both take), in descriptor order. */
@@ -274,6 +362,25 @@ export function defaultMotifMode(template: Pick<TemplateDescriptor, "id" | "fami
   return isThinPiece(template, family) ? "emboss" : "deboss";
 }
 
+/**
+ * The mode and depth a new name or motif starts with on this anchor: raised for a name, cut in for a motif (raised on
+ * a thin piece), raised and bolder under the comic look (`COMIC_POP_DEPTH_MM`, capped by the anchor), always a mode
+ * the anchor lists (Chaukhat's rails: cut in).
+ */
+export function markDefaults(
+  anchor: Pick<TemplateAnchor, "modes" | "max_relief_mm">,
+  type: "emboss_text" | "motif",
+  options: { thin?: boolean; look?: string } = {},
+): { mode: ReliefMode; depth_mm: number } {
+  const modes = anchorModes(anchor, type).filter((m): m is ReliefMode => m !== "lithophane");
+  const comic = options.look === COMIC_POP;
+  const preferred: ReliefMode = comic || type === "emboss_text" || options.thin ? "emboss" : "deboss";
+  const mode = modes.includes(preferred) ? preferred : (modes[0] ?? preferred);
+  const range = type === "emboss_text" ? textDepthRange(anchor) : motifDepthRange(anchor);
+  const depth = comic && mode === "emboss" ? clampDepth(COMIC_POP_DEPTH_MM, range) : range.default;
+  return { mode, depth_mm: depth };
+}
+
 export interface DepthRange {
   min: number;
   max: number;
@@ -324,6 +431,33 @@ export function maxTextChars(family: Pick<Family, "content_slot"> | undefined): 
   return Math.min(TEXT_MAX_CHARS, family?.content_slot.max_text_chars ?? TEXT_MAX_CHARS);
 }
 
+const MARK_OR_JOINER = /[\p{M}\p{Cf}]/u;
+
+/**
+ * Characters as a reader counts them, like the geometry service and the API: marks (Indic vowel signs and viramas,
+ * accents) and joiners do not add, so "नमस्ते" is 4 and "श्री" is 2.
+ */
+export function textLength(text: string): number {
+  let n = 0;
+  for (const ch of text) if (!MARK_OR_JOINER.test(ch)) n += 1;
+  return n;
+}
+
+/** The text cut to at most `max` characters (`textLength`), never inside a letter and its vowel signs. */
+export function clampText(text: string, max: number): string {
+  if (textLength(text) <= max) return text;
+  const clusters =
+    typeof Intl !== "undefined" && "Segmenter" in Intl
+      ? Array.from(new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(text), (s) => s.segment)
+      : Array.from(text);
+  let out = "";
+  for (const cluster of clusters) {
+    if (textLength(out + cluster) > max) break;
+    out += cluster;
+  }
+  return out;
+}
+
 export interface LongestRange {
   min: number;
   max: number;
@@ -355,11 +489,37 @@ export function featuresFromSpec(spec: Pick<DesignSpec, "features"> | undefined)
 /** An edit to the Chhaap as a whole list, applied functionally so an upload finishing late never undoes other edits. */
 export type FeatureEdit = (features: Feature[]) => Feature[];
 
-/** Features that still fit a template after a switch: the spot exists and still takes that type. */
+/**
+ * A feature brought onto an anchor's rules: a mode the anchor lists (its first when the feature's is not; a night-light
+ * photo drops its relief depth) and a depth within its `max_relief_mm`.
+ */
+export function fitToAnchor(feature: Feature, anchor: Pick<TemplateAnchor, "modes" | "max_relief_mm">): Feature {
+  if (feature.type === "hero_mesh") return feature;
+  const modes = anchorModes(anchor, feature.type);
+  const current = feature.mode ?? typeDefaultMode(feature.type);
+  const mode = modes.includes(current) ? current : (modes[0] ?? current);
+  if (feature.type === "relief_image") {
+    if (mode === "lithophane") {
+      const plate: ReliefImage = { ...feature, mode };
+      delete plate.relief_mm;
+      return plate;
+    }
+    const range = reliefRange(anchor);
+    return { ...feature, mode, relief_mm: clampDepth(feature.relief_mm ?? range.default, range) };
+  }
+  const relief: ReliefMode = mode === "deboss" ? "deboss" : "emboss";
+  const range = feature.type === "emboss_text" ? textDepthRange(anchor) : motifDepthRange(anchor);
+  return { ...feature, mode: relief, depth_mm: clampDepth(feature.depth_mm ?? range.default, range) };
+}
+
+/**
+ * Features that still fit a template after a switch: the spot exists and still takes that type, brought onto the new
+ * spot's modes and depth cap (`fitToAnchor`).
+ */
 export function featuresFitting(features: readonly Feature[], template: ContentTemplate): Feature[] {
-  return features.filter((f) => {
+  return features.flatMap((f) => {
     const anchor = (template.anchors ?? []).find((a) => a.id === f.anchor);
-    return anchor !== undefined && anchorAccepts(anchor, template).includes(f.type);
+    return anchor !== undefined && anchorAccepts(anchor, template).includes(f.type) ? [fitToAnchor(f, anchor)] : [];
   });
 }
 
@@ -416,7 +576,8 @@ export function featureSummary(feature: Feature, motifs?: readonly Pick<Motif, "
     case "emboss_text":
       return `${head} · “${feature.text.trim()}”`;
     case "relief_image": {
-      const how = feature.mode === "deboss" ? "cut in" : feature.mode === "lithophane" ? "lit from behind" : "raised";
+      if (feature.mode === "lithophane") return `${head} · the glowing plate`;
+      const how = feature.mode === "deboss" ? "cut in" : "raised";
       return `${head} · ${how} ${formatMm(feature.relief_mm ?? RELIEF_MM.default, 1)}`;
     }
     case "hero_mesh":

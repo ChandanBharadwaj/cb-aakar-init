@@ -39,14 +39,63 @@ export function physicalMaterialFrom(pbr: MaterialPbr): THREE.MeshPhysicalMateri
   return mat;
 }
 
-/** Apply one material to every mesh in a loaded scene (shadows on). */
-export function applyMaterial(root: THREE.Object3D, material: THREE.Material): void {
+// ---- Cel shading (comic_pop) ------------------------------------------------------------------------------------------
+
+/** Style variants the viewer draws cel-shaded with ink outlines: Katha's comic book look. Every other style is PBR. */
+const CEL_SHADED_LOOKS: ReadonlySet<string> = new Set(["comic_pop"]);
+
+export function isCelShaded(look: string | undefined): boolean {
+  return look !== undefined && CEL_SHADED_LOOKS.has(look);
+}
+
+/** The ink line round a cel-shaded piece: near-black indigo, a few pixels wide whatever the zoom. */
+export const INK_OUTLINE = { color: "#0E1220", thicknessPx: 2.4 } as const;
+
+/** Light bands of the toon shading, darkest to lightest (four steps: shadow, core, light, highlight). */
+const TOON_STEPS = [64, 128, 200, 255];
+let toonGradient: THREE.DataTexture | undefined;
+
+/** The shared gradient map: one texel per band, sampled without filtering so the bands stay hard. */
+function toonGradientMap(): THREE.DataTexture {
+  if (!toonGradient) {
+    toonGradient = new THREE.DataTexture(new Uint8Array(TOON_STEPS), TOON_STEPS.length, 1, THREE.RedFormat);
+    toonGradient.minFilter = THREE.NearestFilter;
+    toonGradient.magFilter = THREE.NearestFilter;
+    toonGradient.generateMipmaps = false;
+    toonGradient.needsUpdate = true;
+  }
+  return toonGradient;
+}
+
+/**
+ * The finish as comic art: a `MeshToonMaterial` in the finish's own colour, shaded in four hard bands, so a Terracotta
+ * Silk piece still reads terracotta. The gradient map is shared and outlives the material.
+ */
+export function toonMaterialFrom(pbr: MaterialPbr): THREE.MeshToonMaterial {
+  const mat = new THREE.MeshToonMaterial({ color: new THREE.Color(pbr.color), gradientMap: toonGradientMap() });
+  mat.name = `aakar:toon:${pbr.color}`;
+  return mat;
+}
+
+/** The finish for a style: cel-shaded for comic_pop, the PBR preset otherwise. */
+export function materialFor(pbr: MaterialPbr, look?: string): THREE.MeshPhysicalMaterial | THREE.MeshToonMaterial {
+  return isCelShaded(look) ? toonMaterialFrom(pbr) : physicalMaterialFrom(pbr);
+}
+
+/** Every mesh in a loaded scene, collected once (before anything such as an ink outline is added under them). */
+export function meshesOf(root: THREE.Object3D): THREE.Mesh[] {
+  const list: THREE.Mesh[] = [];
   root.traverse((obj) => {
-    if ((obj as THREE.Mesh).isMesh) {
-      const mesh = obj as THREE.Mesh;
-      mesh.material = material;
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-    }
+    if ((obj as THREE.Mesh).isMesh) list.push(obj as THREE.Mesh);
   });
+  return list;
+}
+
+/** Dress the piece's own meshes in one material (shadows on); outline hulls added under them keep their ink. */
+export function applyMaterial(meshes: readonly THREE.Mesh[], material: THREE.Material): void {
+  for (const mesh of meshes) {
+    mesh.material = material;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+  }
 }

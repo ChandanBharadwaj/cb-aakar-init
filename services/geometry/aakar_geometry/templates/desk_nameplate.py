@@ -137,7 +137,7 @@ class DeskNameplate(Template):
         ),
     )
     constraints = TemplateConstraints(min_wall_mm=1.2, max_overhang_deg=55, bed_mm=(250, 250, 250))
-    style_variants = ()
+    style_variants = ("comic_pop",)  # Katha's comic-book look: names and motifs raised and bolder by default (features.styles)
     features_supported = ("emboss_text", "motif", "relief_image")
     hardware = (HardwareRef("adhesive_pads", 1),)
     min_feature_mm = 0.8

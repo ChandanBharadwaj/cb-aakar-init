@@ -155,7 +155,7 @@ class KeycapMx(Template):
     )
     # the walls are 1.5 mm; the MX stem is thinner at its cross's tips by the standard, so the check's floor is FDM's 0.8
     constraints = TemplateConstraints(min_wall_mm=0.8, max_overhang_deg=55, bed_mm=(250, 250, 250))
-    style_variants = ()
+    style_variants = ("comic_pop",)  # Katha's comic-book look: names and motifs raised and bolder by default (features.styles)
     features_supported = ("relief_image", "emboss_text")
     hardware = ()
     min_feature_mm = MIN_FEATURE_MM
