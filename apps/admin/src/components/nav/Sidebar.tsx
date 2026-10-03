@@ -16,6 +16,7 @@ export const NAV = [
   { href: "/hardware", label: "Hardware", glyph: "⚙" },
   { href: "/templates", label: "Templates", glyph: "◈" },
   { href: "/reviews", label: "Reviews", glyph: "◎" },
+  { href: "/content-rules", label: "Content rules", glyph: "⊘" },
   { href: "/messages", label: "Messages", glyph: "✉" },
   { href: "/audit", label: "Audit", glyph: "≡" },
 ] as const;

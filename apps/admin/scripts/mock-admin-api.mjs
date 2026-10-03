@@ -5,7 +5,8 @@
 // the six materials, catalog items, three templates, the shelves / hardware / outcome families (Avatars) from
 // packages/design-tokens/families.json, the Duniya experiences and viewer backdrops from
 // packages/design-tokens/experiences.json, the Buti motif library from packages/design-tokens/motifs/, a few customer
-// uploads with content reviews, a messages log and an audit log.
+// uploads with content reviews, the content rules of the trademark guardrail (the API's V13 seed), a messages log and an
+// audit log.
 //
 // Usage: node scripts/mock-admin-api.mjs [port=8080]
 //
@@ -516,6 +517,39 @@ recordAudit("studio@aakar.local", "hardware.update", "magnet_d10x3", { unit_cost
 recordAudit("studio@aakar.local", "experience.update", "festive", { tagline: "Gifts for every festival" }, { tagline: "Gifts that glow for every festival" }, ago(4 * DAY));
 
 // ---------------------------------------------------------------------------------------------------------
+// Content rules: the names the studio won't print, the trademark guardrail behind Katha. Mirrors the API's seed
+// (services/api V13__content_terms.sql) and its matcher: folded, lowercase, letters and digits only; terms of six or fewer
+// only match as whole words. The real API holds uploads and refuses names with them; here they are listed and edited.
+// ---------------------------------------------------------------------------------------------------------
+const CONTENT_TERM_KINDS = ["trademark", "character", "other"];
+const WHOLE_WORD_MAX = 6;
+const KIND_NOUN = { trademark: "trademark", character: "character", other: "term" };
+/** How the API compares a term: "Spider-Man" → "spiderman". */
+const normaliseTerm = (term) => String(term).normalize("NFKD").toLowerCase().replace(/[^\p{L}\p{Nd}]/gu, "");
+function contentTermRow(term, kind, reason, at, active = true) {
+  const normalised = normaliseTerm(term);
+  return { id: randomUUID(), term, kind, reason, active, normalised_term: normalised, whole_word: [...normalised].length <= WHOLE_WORD_MAX, created_at: iso(at), updated_at: iso(at) };
+}
+const MARVEL_CHARACTER = "Marvel character (Disney)";
+const DC_CHARACTER = "DC character (Warner Bros. Discovery)";
+const contentTerms = [
+  ["Marvel", "trademark", "Marvel Comics brand (Disney)"],
+  ["Marvel Studios", "trademark", "Marvel Studios brand (Disney)"],
+  ["DC", "trademark", "DC Comics brand (Warner Bros. Discovery)"],
+  ["DC Comics", "trademark", "DC Comics brand (Warner Bros. Discovery)"],
+  ...["Spider-Man", "Iron Man", "Captain America", "Thor", "Hulk", "Black Panther", "Wolverine", "Deadpool"].map((t) => [t, "character", MARVEL_CHARACTER]),
+  ...["Batman", "Superman", "Wonder Woman", "Joker", "Harley Quinn", "Aquaman", "The Flash", "Green Lantern"].map((t) => [t, "character", DC_CHARACTER]),
+  ["Chacha Chaudhary", "character", "Diamond Comics character"],
+  ...["Nagraj", "Super Commando Dhruv", "Doga"].map((t) => [t, "character", "Raj Comics character"]),
+].map(([term, kind, reason]) => contentTermRow(term, kind, reason, ago(9 * DAY)));
+const sortedContentTerms = () => [...contentTerms].sort((a, b) => (a.normalised_term < b.normalised_term ? -1 : a.normalised_term > b.normalised_term ? 1 : 0));
+/** The review reason the API's scanner writes for a file name that mentions a seeded term. */
+function scanReason(term) {
+  const t = contentTerms.find((x) => x.term === term);
+  return t ? `File name mentions "${t.term}", a protected ${KIND_NOUN[t.kind]}${t.reason ? ` · ${t.reason}` : ""}` : `File name mentions "${term}", a flagged term`;
+}
+
+// ---------------------------------------------------------------------------------------------------------
 // Customer uploads and content reviews (the Reviews queue). Flagged uploads wait as pending_review until staff decide.
 // ---------------------------------------------------------------------------------------------------------
 const UPLOAD_STATUSES = ["ready", "pending_review", "rejected"];
@@ -544,10 +578,10 @@ function seedUpload({ kind, format, bytes, status, url = null, owner, origin = "
   return u;
 }
 const REJECTION_NOTE = "We can't print copyrighted heroes, but your own hero is welcome";
-seedUpload({ kind: "image", format: "png", bytes: 812_344, status: "pending_review", url: placeholderImage("Uploaded photo (mock) · batman_cake.png", "#e9d8a6"), owner: { user_id: c1.id, guest_id: null, phone: c1.phone }, review: { reason: "trademark_terms: batman" }, at: ago(3 * HOUR) });
-seedUpload({ kind: "model", format: "stl", bytes: 2_418_776, status: "pending_review", owner: { user_id: null, guest_id: randomUUID(), phone: null }, review: { reason: "filename_terms: marvel_ironman.stl" }, at: ago(40 * 60_000) });
-seedUpload({ kind: "image", format: "jpg", bytes: 1_204_113, status: "ready", url: placeholderImage("Family portrait (mock) · approved", "#cfe3d4"), owner: { user_id: c2.id, guest_id: null, phone: c2.phone }, review: { reason: "trademark_terms: superman", status: "approved", decision_note: "The customer's own costume photo, not the trademark.", reviewer_email: "studio@aakar.local", decided_at: ago(DAY) }, at: ago(DAY + 2 * HOUR) });
-seedUpload({ kind: "model", format: "obj", bytes: 5_104_220, status: "rejected", owner: { user_id: c3.id, guest_id: null, phone: c3.phone }, review: { reason: "trademark_terms: pikachu", status: "rejected", decision_note: REJECTION_NOTE, reviewer_email: "karigar@aakar.local", decided_at: ago(2 * DAY) }, at: ago(2 * DAY + 3 * HOUR) });
+seedUpload({ kind: "image", format: "png", bytes: 812_344, status: "pending_review", url: placeholderImage("Uploaded photo (mock) · batman_cake.png", "#e9d8a6"), owner: { user_id: c1.id, guest_id: null, phone: c1.phone }, review: { reason: scanReason("Batman") }, at: ago(3 * HOUR) });
+seedUpload({ kind: "model", format: "stl", bytes: 2_418_776, status: "pending_review", owner: { user_id: null, guest_id: randomUUID(), phone: null }, review: { reason: scanReason("Iron Man") }, at: ago(40 * 60_000) });
+seedUpload({ kind: "image", format: "jpg", bytes: 1_204_113, status: "ready", url: placeholderImage("Family portrait (mock) · approved", "#cfe3d4"), owner: { user_id: c2.id, guest_id: null, phone: c2.phone }, review: { reason: scanReason("Superman"), status: "approved", decision_note: "The customer's own costume photo, not the trademark.", reviewer_email: "studio@aakar.local", decided_at: ago(DAY) }, at: ago(DAY + 2 * HOUR) });
+seedUpload({ kind: "model", format: "obj", bytes: 5_104_220, status: "rejected", owner: { user_id: c3.id, guest_id: null, phone: c3.phone }, review: { reason: scanReason("pikachu"), status: "rejected", decision_note: REJECTION_NOTE, reviewer_email: "karigar@aakar.local", decided_at: ago(2 * DAY) }, at: ago(2 * DAY + 3 * HOUR) });
 const cleanModel = seedUpload({ kind: "model", format: "3mf", bytes: 934_112, status: "ready", owner: { user_id: c5.id, guest_id: null, phone: c5.phone }, at: ago(5 * HOUR) });
 cleanModel.url = `${BASE}/mock-assets/customer-uploads/${cleanModel.id}`;
 recordAudit("karigar@aakar.local", "review.decide", customerUploads[3].review.id, { status: "pending_review", review_status: "pending" }, { status: "rejected", review_status: "rejected", note: REJECTION_NOTE }, ago(2 * DAY));
@@ -1067,6 +1101,32 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, upload);
     }
 
+    if (p === "/admin/api/content-terms" && method === "GET") return json(res, 200, sortedContentTerms());
+    if (p === "/admin/api/content-terms" && method === "POST") {
+      requireOwner(who);
+      const input = normaliseContentTerm(await readJson(req));
+      const twin = contentTerms.find((t) => t.normalised_term === input.normalised_term);
+      if (twin) {
+        return problem(res, 409, "content_term_exists", twin.term === input.term ? `“${input.term}” is already a content rule; edit it (or switch it back on) instead.`
+          : `“${input.term}” has the same letters and digits as the content rule “${twin.term}”; edit that one (or switch it back on) instead.`);
+      }
+      const created = contentTermRow(input.term, input.kind, input.reason, now(), input.active);
+      contentTerms.push(created);
+      recordAudit(who.email, "content_term.create", created.term, null, { ...created });
+      return json(res, 201, created);
+    }
+    if ((m = p.match(/^\/admin\/api\/content-terms\/([^/]+)$/)) && method === "PUT") {
+      requireOwner(who);
+      const existing = contentTerms.find((t) => t.id === decodeURIComponent(m[1]));
+      if (!existing) return problem(res, 404, "not_found", `Content term ${decodeURIComponent(m[1])} was not found.`);
+      const input = normaliseContentTerm(await readJson(req));
+      validate(input.normalised_term === existing.normalised_term, `A content rule's term can't be renamed: “${input.term}” is not “${existing.term}”. Add the new spelling as its own term and switch this one off.`);
+      const before = { ...existing };
+      Object.assign(existing, { kind: input.kind, reason: input.reason, active: input.active, updated_at: iso(now()) });
+      recordAudit(who.email, "content_term.update", existing.term, before, { ...existing });
+      return json(res, 200, existing);
+    }
+
     if (p === "/admin/api/templates" && method === "GET") return json(res, 200, templates.map(templateView));
     if ((m = p.match(/^\/admin\/api\/templates\/([^/]+)$/)) && method === "PUT") {
       requireOwner(who);
@@ -1280,6 +1340,19 @@ function normaliseFamily(b) {
   };
 }
 
+/** Shape of a content rule (ContentTermInput): 422 validation_failed with the field in the detail. */
+function normaliseContentTerm(b) {
+  validate(b && typeof b === "object", "Send a content rule object.");
+  validate(typeof b.term === "string" && b.term.trim() && b.term.length <= 80, "term is required (max 80 characters).");
+  const term = b.term.trim();
+  const normalised = normaliseTerm(term);
+  validate([...normalised].length >= 2, `A content rule needs at least two letters or digits; “${term}” has ${normalised ? "one" : "none"}.`);
+  validate(CONTENT_TERM_KINDS.includes(b.kind), `kind must be one of ${CONTENT_TERM_KINDS.join(", ")}.`);
+  if (b.reason !== undefined && b.reason !== null) validate(typeof b.reason === "string" && b.reason.length <= 200, "reason must be at most 200 characters.");
+  if (b.active !== undefined) validate(typeof b.active === "boolean", "active must be a boolean.");
+  return { term, normalised_term: normalised, kind: b.kind, reason: typeof b.reason === "string" && b.reason.trim() ? b.reason.trim() : null, active: b.active ?? true };
+}
+
 /** Shape of an experience (experience.v1.json#/$defs/experience): 422 validation_failed with the field in the detail. */
 function normaliseExperience(b) {
   validate(b && typeof b === "object", "Send an experience object.");
@@ -1364,4 +1437,5 @@ server.listen(PORT, () => {
   console.log(`  ${orders.size} orders, ${materials.length} materials, ${catalog.length} catalog items, ${templates.length} templates, ${policies.length} pricing policy versions`);
   console.log(`  ${shelves.length} shelves, ${families.length} families (Avatars), ${hardwareItems.length} hardware items, ${customerUploads.filter((u) => u.status === "pending_review").length} uploads pending review`);
   console.log(`  ${experiences.length} Duniya experiences (${experiences.filter((e) => e.available).length} available), ${environments.length} backgrounds, ${motifs.length} motifs`);
+  console.log(`  ${contentTerms.length} content rules (${contentTerms.filter((t) => t.kind === "trademark").length} trademarks, ${contentTerms.filter((t) => t.kind === "character").length} characters)`);
 });

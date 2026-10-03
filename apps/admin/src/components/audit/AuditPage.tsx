@@ -27,10 +27,11 @@ function targetHref(entry: AuditEntry): string | undefined {
   if (area === "family") return "/avatars";
   if (area === "hardware") return "/hardware";
   if (area === "review") return "/reviews";
+  if (area === "content_term") return "/content-rules";
   return undefined;
 }
 
-const AREA_TONE: Record<string, "accent" | "info" | "neutral" | "success" | "warning"> = { order: "accent", pricing: "info", material: "neutral", catalog: "neutral", template: "success", family: "accent", hardware: "neutral", review: "warning" };
+const AREA_TONE: Record<string, "accent" | "info" | "neutral" | "success" | "warning"> = { order: "accent", pricing: "info", material: "neutral", catalog: "neutral", template: "success", family: "accent", hardware: "neutral", review: "warning", content_term: "warning" };
 
 export function AuditPage() {
   const router = useRouter();

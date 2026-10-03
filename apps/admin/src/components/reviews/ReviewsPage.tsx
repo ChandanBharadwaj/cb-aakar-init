@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { api, toProblem } from "@/lib/api/client";
 import type { AdminUpload, Problem, ReviewDecision, UploadStatus } from "@/lib/api/types";
@@ -47,7 +48,15 @@ export function ReviewsPage() {
       <PageHeader
         eyebrow="Content"
         title="Reviews"
-        description="Customer uploads the content scanner flagged: photos for a Chhavi relief and model files for Roop or Swaroop. Approve to release the upload into its design; reject with a short note the customer sees. Studio and owner accounts may decide."
+        description={
+          <>
+            Customer uploads the content scanner flagged: photos for a Chhavi relief and model files for Roop or Swaroop whose file name mentions one of the{" "}
+            <Link href="/content-rules" className="text-surface-accent hover:underline">
+              content rules
+            </Link>
+            . Approve to release the upload into its design; reject with a short note the customer sees. Studio and owner accounts may decide.
+          </>
+        }
         actions={
           <button type="button" className="ak-btn ak-btn-secondary ak-btn-sm ak-btn-pill" onClick={() => void reload()} disabled={loading}>
             Refresh
