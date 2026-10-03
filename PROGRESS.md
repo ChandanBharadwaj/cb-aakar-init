@@ -128,7 +128,7 @@ Plan: [`docs/research/outcome-categories/implementation-plan.md`](docs/research/
 | 4 | PR 5 API uploads + review, content on designs, per-Avatar pricing, print pack | ✅ Done (`05599ea` + `046067f` + `2967d23`; API 175) | live smoke `make smoke-avatars` passed 27 Sep (`3a9763c`) |
 | 5 | PR 6 storefront · PR 7 portal | ✅ Done (web `e22c99e` + `e0f6e85` + `b929a04`; admin `31d9c8e` + `65ae76e`) | typecheck · lint · build clean |
 | 6 | PR 8 lithophane plate + night light, plinth, pet tag, photo frame, keycap | 🟨 geometry green (`a8f2a96` + `a8ddd09` + `9aa7ac8`; geometry 608); API fixtures carry the keepsakes (`907653e`); seed ranges and frame copy follow the templates (`V12`, `d3d6fc1`); anchors publish allowed `modes` and `required` content in the contract (`cccb468`) | next: geometry publishes `modes`/`required` and the composer reads them (with PR 12b); then `V14` switches on lithophane and figurine_base; photo_frame and keycap stay tier `next` until fit tests on real prints |
-| 7 | PRs 9–12 Duniya experiences + Katha | 🟨 PRs 9–11 and the motif endpoints done (API 200); PR 12 Katha relaunched 3 Oct as 12a (content-terms guardrail `V13__content_terms.sql`, portal Content rules, Naam and upload checks, experience style on designs, API checks of anchor modes) and 12b (comic motifs, `comic_pop`, rooftop backdrop, cel shading, geometry anchor modes, composer modes) | after both: `V14` switches on Katha with the keepsakes, fixtures re-synced, `make smoke-avatars` live, walk (7) |
+| 7 | PRs 9–12 Duniya experiences + Katha | 🟨 PRs 9–11 and the motif endpoints done; PR 12a done (`869c9fd`: content terms `V13`, portal Content rules, Naam and upload checks, experience style, API anchor modes and comic defaults; API 224); PR 12b in flight (comic motifs, `comic_pop`, rooftop backdrop, cel shading, geometry anchor modes, composer modes) | after 12b: `V14` switches on Katha with the keepsakes, fixtures re-synced, `make smoke-avatars` live, walk (7) |
 
 ## Decisions
 
@@ -154,10 +154,10 @@ Plan: [`docs/research/outcome-categories/implementation-plan.md`](docs/research/
 |---|---|---|
 | `services/inspect` pytest | 21 passed | 2026-09-27 |
 | `services/geometry` pytest | 608 passed | 2026-10-03 |
-| `services/api` Gradle test | 200 passed | 2026-10-03 |
+| `services/api` Gradle test | 224 passed | 2026-10-03 |
 | Avatar order smoke, live (`make smoke-avatars`: photo keychain + Swaroop raw print → cart → OTP → checkout → mock pay → print pack) | passed | 2026-09-27 |
 | `apps/web` typecheck · lint · build | clean | 2026-09-27 |
-| `apps/admin` typecheck · lint · build | clean | 2026-09-27 |
+| `apps/admin` typecheck · lint · build | clean | 2026-10-03 |
 | End-to-end slice (live services) | passed | 2026-09-26 |
 | Customer loop, live (guest design → cart → OTP → checkout → mock pay fail/retry/succeed → order queued → SSE) | passed, 1 finding (duplicate checkout) | 2026-09-27 |
 | Customer loop in the browser (sign-in → cart → checkout → mock pay → tracking) | passed, no page errors | 2026-09-27 |

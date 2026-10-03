@@ -17,6 +17,9 @@ All notable changes to Aakar. Format follows [Keep a Changelog](https://keepacha
 - **Duniya storefront and portal** (PRs 10–11): the Shop persona switch "Shelves | Duniya · Experiences", experience pages that take the theme's accent and render its backdrop, Create and the studio presetting backdrop, style and motif pack from `?duniya=`; Buti live in the Chhaap panel; portal Duniya editor and read-only Backgrounds page.
 - **Motif endpoints** (API): `GET /api/motifs`, `/api/motifs/{id}.svg`, `/admin/api/motifs`; the API's feature validator refuses at design time what the geometry service would refuse later (crowded anchors, unsupported scripts or fonts, motif scales outside the library's range). API 200 tests.
 - **Keepsakes and second wave** (PR 8, geometry): Roshni photo night light (`lithophane_plate@1`: the photo becomes the plate, 0.8–3 mm, with a night-light stand for the USB LED base, Basic White only), Pratima plinth (`plinth_round@1`: your form fused on top, plinth width worked out for stability, a name on the front), Saathi Pet tag (`pet_tag@1`), Chaukhat photo frame (`photo_frame_std@1`: 4 × 6 in, easel or hanger, name and motif cut in only) and Kunji keycap (`keycap_mx@1`: MX stem with adjustable slop, 1–3 letters or a photo at most 0.6 mm). Geometry 608 tests.
+- **Keepsake ranges** (`V12`): Saathi starts at 25 mm so the pet tag fits, Pratima at 40 mm for the narrowest plinth, and the Chaukhat copy promises only the 4 × 6 in frame; the migration never overwrites a portal edit.
+- **Anchor rules as data**: template descriptors say which modes an anchor allows (raised, cut in, or the photo as the plate) and whether it needs content, so the API refuses at design time what the geometry service would refuse later, and the composer reads the rules instead of special-casing products.
+- **Katha guardrail** (PR 12a): portal-controlled content terms (`V13`, 24 seeded publishers and characters, short terms matched only as whole words) hold matching uploads for review and refuse matching names with 422 `protected_term`; the portal's Content rules page; an experience's style becomes the design's style when the template supports it, with the comic defaults applied by the API. API 224 tests.
 - **Verified live**: `make smoke-avatars` orders a photo keychain and a raw print through the real API and geometry service down to the studio print pack.
 
 ### Decisions
@@ -36,6 +39,8 @@ All notable changes to Aakar. Format follows [Keep a Changelog](https://keepacha
 - Live studio loop: staff login → queue → advance through slicing, printing, finishing, QC and packed → print pack zip → packaging card PDF → share code resolves on the public endpoint and the storefront page; customer tracking board shows the studio card and AWB.
 
 ### Fixed
+- The API test fixtures now carry the keepsake templates; the suite was red on the branch after the keepsakes landed in geometry.
+- The staff-token test minted a token on a fixed date and failed once that date passed; it now mints at the current time.
 - A second checkout before paying created a duplicate pending order; checkout now consumes the cart (contract and API).
 
 ### Decisions
