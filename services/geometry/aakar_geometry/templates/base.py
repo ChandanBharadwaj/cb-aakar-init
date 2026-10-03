@@ -76,6 +76,9 @@ class Param:
         return value
 
 
+CONTENT_MODES = ("emboss", "deboss", "lithophane")
+
+
 @dataclass(frozen=True)
 class Anchor:
     """One entry of ``template-descriptor.v1.json#/$defs/anchor``: a place where content may land.
@@ -83,7 +86,10 @@ class Anchor:
     ``kind`` ``surface`` (text, motif, photo relief; ``size_mm`` = printable width × height, ``bleed_mm``
     the safe margin inside it) or ``volume`` (a customer's own 3D form; ``bounds_mm`` = width × depth ×
     height above the anchor's bottom plane). ``accepts`` narrows the template's ``features_supported``
-    for this anchor (None = all of them); ``max_relief_mm`` caps relief and emboss depth.
+    for this anchor (None = all of them); ``max_relief_mm`` caps relief and emboss depth. ``modes`` are the
+    only modes content may take here (raised ``emboss``, cut-in ``deboss``, or the photo as the plate itself,
+    ``lithophane``; None = every mode the feature type allows); ``required`` says the piece cannot be built
+    without content here. Both are published only when set and enforced in ``features.validate``.
     """
 
     id: str
@@ -96,6 +102,8 @@ class Anchor:
     bounds_mm: tuple[float, float, float] | None = None
     accepts: tuple[str, ...] | None = None
     max_relief_mm: float | None = None
+    modes: tuple[str, ...] | None = None
+    required: bool = False
 
     def __post_init__(self) -> None:
         if self.kind not in ("surface", "volume"):
@@ -106,6 +114,16 @@ class Anchor:
             object.__setattr__(self, "bounds_mm", tuple(float(b) for b in self.bounds_mm))
         if self.accepts is not None:
             object.__setattr__(self, "accepts", tuple(self.accepts))
+        if self.modes is not None:
+            modes = tuple(self.modes)
+            if not modes or len(set(modes)) != len(modes) or any(m not in CONTENT_MODES for m in modes):
+                raise ValueError(f"Anchor {self.id}: modes must be distinct values from {', '.join(CONTENT_MODES)}, got {modes!r}")
+            object.__setattr__(self, "modes", modes)
+        object.__setattr__(self, "required", bool(self.required))
+
+    def allows(self, mode: str) -> bool:
+        """True when content may take ``mode`` here (an anchor that lists no modes takes every mode)."""
+        return self.modes is None or mode in self.modes
 
     def descriptor(self) -> dict[str, Any]:
         out: dict[str, Any] = {"id": self.id, "label": self.label, "kind": self.kind, "projection": self.projection}
@@ -122,6 +140,10 @@ class Anchor:
             out["accepts"] = list(self.accepts)
         if self.max_relief_mm is not None:
             out["max_relief_mm"] = float(self.max_relief_mm)
+        if self.modes is not None:
+            out["modes"] = list(self.modes)
+        if self.required:
+            out["required"] = True
         return out
 
 
@@ -254,7 +276,29 @@ class Template:
     def validate_content(cls, params: Mapping[str, Any], features: Sequence[Mapping[str, Any]]) -> None:
         """Hook for limits that couple parameters and content (Chhaap), run before any CAD with the validated
         params and the normalised features, even when there are none: a cut-in photo must leave enough
-        plastic behind it, a raw print needs its model. Raise ``ParamOutOfRange`` / ``InvalidSpec``."""
+        plastic behind it, a raw print needs its model. Raise ``ParamOutOfRange`` / ``InvalidSpec``.
+        (Which modes an anchor takes and whether it needs content are anchor data, ``Anchor.modes`` and
+        ``Anchor.required``, checked for every template in ``features.validate``.)"""
+
+    @classmethod
+    def mode_refusal(cls, anchor: Anchor, ftype: str, mode: str) -> str | None:
+        """Customer words for content in a mode ``anchor.modes`` leaves out (a raised name on a frame that
+        prints face down); None keeps the generic sentence of ``features.validate``."""
+        return None
+
+    @classmethod
+    def missing_content(cls, anchor: Anchor) -> str | None:
+        """Customer words for a ``required`` anchor left empty (the night light's photo); None keeps the generic
+        sentence of ``features.validate``."""
+        return None
+
+    @classmethod
+    def style_note(cls, style: str | None, features: Sequence[Mapping[str, Any]] = ()) -> str:
+        """The karigar's sentence on the piece's style variant ("" for none, or for a style this template does
+        not list in ``style_variants``)."""
+        from ..features import styles
+
+        return styles.note(cls, style, features)
 
     @classmethod
     def anchor_frame(cls, anchor_id: str, params: Mapping[str, Any]) -> AnchorFrame:
@@ -317,13 +361,19 @@ class Template:
         raise NotImplementedError
 
     @classmethod
-    def karigar_note_for(cls, params: Mapping[str, Any], features: Sequence[Mapping[str, Any]] = ()) -> str:
+    def karigar_note_for(cls, params: Mapping[str, Any], features: Sequence[Mapping[str, Any]] = (), style: str | None = None) -> str:
         """The karigar's note for a finished piece: ``karigar_note(params)`` followed by a sentence naming the
-        names (Naam) and motifs (Buti) set into it, e.g. “Asha” stands 0.6 mm proud on the back."""
-        note = cls.karigar_note(params)
-        if not features:
-            return note
-        from ..features import content_note
+        names (Naam) and motifs (Buti) set into it, e.g. “Asha” stands 0.6 mm proud on the back, and one on its
+        style variant when it has one (``style_note``)."""
+        return cls.join_note(cls.karigar_note(params), features, style)
 
-        extra = content_note(cls, features)
-        return f"{note} {extra}" if extra else note
+    @classmethod
+    def join_note(cls, note: str, features: Sequence[Mapping[str, Any]] = (), style: str | None = None) -> str:
+        """``note``, then the sentence naming the names and motifs, then the style's sentence (empty parts skipped)."""
+        parts = [note]
+        if features:
+            from ..features import content_note
+
+            parts.append(content_note(cls, features))
+        parts.append(cls.style_note(style, features))
+        return " ".join(p for p in parts if p)
