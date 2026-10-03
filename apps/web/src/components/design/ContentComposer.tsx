@@ -292,7 +292,7 @@ export function ContentComposer({ family, materials: materialsProp, item, prompt
           )}
         </dl>
         <p className="text-[11px] leading-snug text-surface-muted">
-          {hardwareSentence(packed) ?? "Printed to order in the finish you choose."} Nothing is printed until you pay.
+          {hardwareSentence(packed) ? `${hardwareSentence(packed)}.` : "Printed to order in the finish you choose."} Nothing is printed until you pay.
         </p>
       </aside>
     </div>

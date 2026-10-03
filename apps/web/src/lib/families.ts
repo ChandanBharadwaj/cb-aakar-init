@@ -47,10 +47,13 @@ export function hardwareSentence(hardware: readonly HardwareRef[] | undefined): 
     const name = hardwareName(h);
     const pair = /,\s*pair$/i.test(name);
     const base = name.replace(/,\s*pair$/i, "");
-    const lower = base.charAt(0).toLowerCase() + base.slice(1);
+    // "USB LED puck base" keeps its capitals (and takes "a", as said aloud); other names start lower case mid-sentence
+    const acronym = /^[A-Z]{2}/.test(base);
+    const lower = acronym ? base : base.charAt(0).toLowerCase() + base.slice(1);
     if (h.qty > 1) return `${h.qty} × ${lower}`;
     if (pair) return `a pair of ${lower}`;
-    return `${/^[aeiou]/i.test(lower) ? "an" : "a"} ${lower}`;
+    const vowelSound = acronym ? /^[AEFHILMNORSX]/.test(base) : /^[aeiou]/i.test(lower);
+    return `${vowelSound ? "an" : "a"} ${lower}`;
   });
   return `Comes with ${joinList(parts)}`;
 }

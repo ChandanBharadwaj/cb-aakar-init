@@ -99,18 +99,21 @@ export function meshesOf(root: THREE.Object3D): THREE.Mesh[] {
  * caller to dispose.
  */
 export function applyMaterial(meshes: readonly THREE.Mesh[], material: THREE.Material): THREE.Material[] {
-  let flat: THREE.MeshToonMaterial | undefined;
+  let flat: THREE.Material | undefined;
   for (const mesh of meshes) {
-    const needsFlat = material instanceof THREE.MeshToonMaterial && !material.flatShading && !mesh.geometry.getAttribute("normal");
-    if (needsFlat && !flat) {
-      flat = (material as THREE.MeshToonMaterial).clone();
-      flat.flatShading = true;
-    }
+    const needsFlat = material instanceof THREE.MeshToonMaterial && !isFlatShaded(material) && !mesh.geometry.getAttribute("normal");
+    // three shades normal-less geometry flat by itself only for the Lambert, Phong and PBR materials; the toon shader
+    // takes the same FLAT_SHADED path (normals from screen-space derivatives) when the material asks for it
+    if (needsFlat && !flat) flat = Object.assign(material.clone(), { flatShading: true });
     mesh.material = needsFlat && flat ? flat : material;
     mesh.castShadow = true;
     mesh.receiveShadow = true;
   }
   return flat ? [flat] : [];
+}
+
+function isFlatShaded(material: THREE.Material): boolean {
+  return (material as THREE.Material & { flatShading?: boolean }).flatShading === true;
 }
 
 // ---- Ink outline (comic_pop) -------------------------------------------------------------------------------------------

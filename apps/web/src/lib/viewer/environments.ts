@@ -89,8 +89,8 @@ const COMIC_ROOFTOP_NIGHT: BackdropPreset = {
     { kind: "ambient", color: "#B8BDD0", intensity: 0.15 },
   ],
   glows: [
-    { color: NIGHT.spot, intensity: 2.2, position: [1.5, 3, 2.5], scale: [3, 1.2] },
-    { color: "#6B5BB8", intensity: 1.4, position: [-2, 1.5, -3.5], scale: [6, 2.5] },
+    { color: NIGHT.spot, intensity: 2.6, position: [1.5, 3, 2.5], scale: [3, 1.2] },
+    { color: "#6B5BB8", intensity: 0.8, position: [-2, 1.5, -3.5], scale: [6, 2.5] },
   ],
   backdrop: [
     `radial-gradient(circle at 82% 15%, ${NIGHT.moon} 0 2.4%, rgba(245,240,230,.14) 3%, transparent 9%)`,
