@@ -1,5 +1,5 @@
 {
-  "$comment": "Experiences (Duniya) and viewer environments (Mahaul). Validated against packages/contracts/schemas/experience.v1.json; seeded by services/api Flyway V11 (ExperiencesSeedTest fails if the two diverge); edited afterwards in the management portal (experiences) or read-only there (environments, until backdrop presets become uploadable data). An experience curates existing concepts (a backdrop, a default style, a motif pack, ordered Avatars, curated Shop items, seasons) and adds no geometry. Ids are snake_case English and never change; codename/title/tagline are brand copy and may, slugs are URLs (/duniya/<slug>). Environment labels and backdrop colours mirror tokens.json environments, whose keys are the storefront's preset keys; comic_rooftop_night waits for its preset (PR 12), so Katha stays unavailable until then. Accents come from the tokens.json brand colours; the cream paper stays (paper_tint null) and hero media arrives when shot.",
+  "$comment": "Experiences (Duniya) and viewer environments (Mahaul). Validated against packages/contracts/schemas/experience.v1.json; seeded by services/api Flyway V11 (ExperiencesSeedTest fails if the two diverge); edited afterwards in the management portal (experiences) or read-only there (environments, until backdrop presets become uploadable data). An experience curates existing concepts (a backdrop, a default style, a motif pack, ordered Avatars, curated Shop items, seasons) and adds no geometry. Ids are snake_case English and never change; codename/title/tagline are brand copy and may, slugs are URLs (/duniya/<slug>). Environment labels and backdrop colours mirror tokens.json environments, whose keys are the storefront's preset keys; comic_rooftop_night is Katha's comic backdrop, built offline in the storefront (PR 12). Accents come from the tokens.json brand colours; the cream paper stays (paper_tint null) and hero media arrives when shot.",
   "environments": [
     { "id": "studio", "label": "Studio", "surface": "stage", "preset_key": "studio", "palette": ["#1B2238"], "sort_order": 10 },
     { "id": "teak_table_candlelight", "label": "Chettinad teak · candlelight", "surface": "stage", "preset_key": "teak_table_candlelight", "palette": ["#1A1512"], "sort_order": 20 },
@@ -102,7 +102,7 @@
       "items": [],
       "collections": [],
       "season": [],
-      "available": false,
+      "available": true,
       "sort_order": 50
     }
   ]

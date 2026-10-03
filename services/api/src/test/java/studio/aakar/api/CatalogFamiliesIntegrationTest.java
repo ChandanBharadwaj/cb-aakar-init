@@ -50,10 +50,11 @@ class CatalogFamiliesIntegrationTest extends AbstractIntegrationTest {
         ResponseEntity<String> response = get("/api/families");
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         JsonNode families = body(response);
-        // the four planar carriers (keychain_tag + pet_tag, fridge_magnet, hanging_ornament, desk_nameplate), phone_stand
-        // (jharokha_phone_stand@1) and raw_print (raw_print@1) have live templates in the stub; the keepsakes (lithophane, figurine_base,
-        // photo_frame, keycap) have one too but are switched off in the catalog, so they may not appear.
-        assertThat(ids(families)).containsExactly("keychain", "fridge_magnet", "ornament", "nameplate", "phone_stand", "raw_print");
+        // the four planar carriers (keychain_tag + pet_tag, fridge_magnet, hanging_ornament, desk_nameplate), the keepsakes switched on
+        // in V14 (lithophane_plate, plinth_round), phone_stand (jharokha_phone_stand@1) and raw_print (raw_print@1) have live templates in
+        // the stub; the second-wave keepsakes (photo_frame, keycap) have one too but stay switched off, so they may not appear.
+        assertThat(ids(families)).containsExactly("keychain", "fridge_magnet", "ornament", "nameplate", "lithophane", "figurine_base",
+                "phone_stand", "raw_print");
         assertThat(families).allSatisfy(f -> {
             assertThat(f.get("available").asBoolean()).as("%s available", f.get("id")).isTrue();
             assertThat(f.get("ready").asBoolean()).as("%s ready", f.get("id")).isTrue();
@@ -62,9 +63,10 @@ class CatalogFamiliesIntegrationTest extends AbstractIntegrationTest {
         });
 
         assertThat(ids(body(get("/api/families?kind=raw")))).containsExactly("raw_print");
-        assertThat(ids(body(get("/api/families?kind=carrier")))).containsExactly("keychain", "fridge_magnet", "ornament", "nameplate");
+        assertThat(ids(body(get("/api/families?kind=carrier")))).containsExactly("keychain", "fridge_magnet", "ornament", "nameplate", "lithophane",
+                "figurine_base");
         assertThat(ids(body(get("/api/families?kind=object")))).containsExactly("phone_stand");
-        assertThat(ids(body(get("/api/families?kind=")))).hasSize(6);
+        assertThat(ids(body(get("/api/families?kind=")))).hasSize(8);
         assertProblem(get("/api/families?kind=gadget"), HttpStatus.BAD_REQUEST, "validation_failed");
 
         // Every family row is a template-family.v1.json family once the read-only state is stripped, and every
@@ -149,18 +151,24 @@ class CatalogFamiliesIntegrationTest extends AbstractIntegrationTest {
         assertThat(body.get("accepts")).extracting(JsonNode::asText).containsExactly("hero_mesh");
         assertThat(raw.get("templates").get(0).get("features_supported")).extracting(JsonNode::asText).containsExactly("hero_mesh");
 
-        // families that are not orderable still resolve by id, flagged, so a deep link can say "coming soon": the keepsakes have a
-        // live template since PR 8 (ready) but stay switched off in the catalog until the studio turns them on
+        // the keepsakes switched on in V14: their rules, their live template (PR 8) and the placeholder minimum of 2026-10-keepsakes
         JsonNode lithophane = body(get("/api/families/lithophane"));
-        assertThat(lithophane.get("available").asBoolean()).isFalse();
+        assertThat(lithophane.get("available").asBoolean()).isTrue();
+        assertThat(lithophane.get("price_from_paise").asLong()).isEqualTo(59_900);
         assertThat(lithophane.get("ready").asBoolean()).isTrue();
         assertThat(lithophane.get("template_ids")).extracting(JsonNode::asText).containsExactly("lithophane_plate");
         assertThat(lithophane.get("material_rules").get("allowed")).extracting(JsonNode::asText).containsExactly("basic_white");
         assertThat(lithophane.get("hardware").get(0).get("name").asText()).isEqualTo("USB LED puck base 70 mm");
         JsonNode figurine = body(get("/api/families/figurine_base"));
-        assertThat(figurine.get("available").asBoolean()).isFalse();
+        assertThat(figurine.get("available").asBoolean()).isTrue();
+        assertThat(figurine.get("price_from_paise").asLong()).isEqualTo(69_900);
         assertThat(figurine.get("ready").asBoolean()).isTrue();
         assertThat(figurine.get("template_ids")).extracting(JsonNode::asText).containsExactly("plinth_round");
+        // families that are not orderable still resolve by id, flagged, so a deep link can say "coming soon": the photo frame has a
+        // live template (ready) but stays switched off until its fit is tested on real prints
+        JsonNode frame = body(get("/api/families/photo_frame"));
+        assertThat(frame.get("available").asBoolean()).isFalse();
+        assertThat(frame.get("ready").asBoolean()).isTrue();
         // and a family whose template the geometry service does not publish yet is neither
         JsonNode pendant = body(get("/api/families/pendant"));
         assertThat(pendant.get("available").asBoolean()).isFalse();

@@ -238,9 +238,11 @@ class CarrierDesignFlowIntegrationTest extends AbstractIntegrationTest {
         String create = "{\"source\": \"create\", \"family_id\": \"%s\", \"features\": [%s]}";
 
         assertProblem(post("/api/designs", create.formatted("dragon", RELIEF.formatted(photo, "face")), guest), HttpStatus.NOT_FOUND, "unknown_family");
-        JsonNode off = assertProblem(post("/api/designs", create.formatted("lithophane", RELIEF.formatted(photo, "plate")), guest),
+        // the photo frame has a live template (PR 8) but stays switched off until its fit is tested on real prints
+        JsonNode off = assertProblem(post("/api/designs", create.formatted("photo_frame",
+                "{\"type\": \"emboss_text\", \"text\": \"Asha\", \"anchor\": \"base_front\", \"mode\": \"deboss\"}"), guest),
                 HttpStatus.UNPROCESSABLE_ENTITY, "family_not_available");
-        assertThat(off.get("detail").asText()).isEqualTo("Roshni · Photo night light is not available to order right now.");
+        assertThat(off.get("detail").asText()).isEqualTo("Chaukhat · Photo frame is not available to order right now.");
         assertProblem(post("/api/designs", "{\"source\": \"create\", \"family_id\": \"keychain\", \"template_id\": \"fridge_magnet\"}", guest),
                 HttpStatus.BAD_REQUEST, "validation_failed");
         assertProblem(post("/api/designs", "{\"source\": \"create\", \"family_id\": \"keychain\", \"template_id\": \"nope_tag\"}", guest),

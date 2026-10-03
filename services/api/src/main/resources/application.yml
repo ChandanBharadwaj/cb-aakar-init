@@ -119,11 +119,12 @@ aakar:
     seed-password: ${AAKAR_ADMIN_SEED_PASSWORD:aakar-studio}
     token-ttl: ${AAKAR_ADMIN_TOKEN_TTL:12h}
   # PLAN §7.10 · the SEED pricing policy (ADR-0008): V4__pricing_policies.sql inserted the first active row and
-  # V9__families_hardware_uploads.sql the current one (2026-10-carriers) with the same values as below; from then on
+  # V9__families_hardware_uploads.sql 2026-10-carriers, and V14__keepsakes_and_katha_available.sql the current one
+  # (2026-10-keepsakes, adding the night-light and plinth minimums) with the same values as below; from then on
   # the active policy lives in the pricing_policies table. Copied from packages/design-tokens/materials.json →
   # pricing_policy (MaterialsSeedTest fails on drift). Family keys are bracketed so Boot keeps the underscores.
   pricing:
-    version: 2026-10-carriers
+    version: 2026-10-keepsakes
     machine-rate-paise-per-hour: 20000
     finishing-fee-paise:
       matte: 8000
@@ -146,6 +147,10 @@ aakar:
         minimum-subtotal-paise: 34900
       "[nameplate]":
         minimum-subtotal-paise: 59900
+      "[lithophane]":
+        minimum-subtotal-paise: 59900
+      "[figurine_base]":
+        minimum-subtotal-paise: 69900
       "[raw_print]":
         minimum-subtotal-paise: 34900
         setup-fee-paise: 9900

@@ -84,10 +84,10 @@ BUILTIN_FAMILIES: list[dict[str, Any]] = [
     _row("nameplate", "carrier", "desk_nameplate", ["emboss_text", "motif", "relief_image"], ["face", "base_front"],
          max_text_chars=24, hardware=[{"sku": "adhesive_pads", "qty": 1}], envelope=(120, 250)),
     _row("lithophane", "carrier", "lithophane_plate", ["relief_image"], ["plate"],
-         hardware=[{"sku": "led_base_usb", "qty": 1}], allowed=["basic_white"], shape_tolerance="strict", available=False,
+         hardware=[{"sku": "led_base_usb", "qty": 1}], allowed=["basic_white"], shape_tolerance="strict",
          envelope=(100, 150)),
     _row("figurine_base", "carrier", "plinth_round", ["hero_mesh", "emboss_text"], ["top", "base_front"],
-         hero_volume=True, max_text_chars=16, available=False, envelope=(40, 200)),
+         hero_volume=True, max_text_chars=16, envelope=(40, 200)),
     _row("raw_print", "raw", "raw_print", ["hero_mesh"], ["body"], hero_volume=True, envelope=(20, 240)),
     # tier next, templates in PR 8 (Chaukhat, Kunji): the registry must resolve them without the seed too
     _row("photo_frame", "carrier", "photo_frame_std", ["emboss_text", "motif"], ["base_front", "border"],

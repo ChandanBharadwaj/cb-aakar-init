@@ -132,7 +132,7 @@ takes the first `packages/design-tokens/motifs` above its working directory (`se
 | `AdminLoopIntegrationTest` | Management API (ADR-0012): seeded owner sign-in, staff vs customer tokens (401 both ways), dashboard, queue filters and `next_actions`, queued → delivered with events, messages (`printing_timelapse`, `shipped`, `delivered`) and audit, print pack zip (WireMock serves the model files), QC photo upload (+ 413), packaging card 409 → `%PDF` and the share code, pricing publish (409 / 422) and preview, materials (hidden from the storefront), catalog, template live switch (422 `template_not_available`), messages and audit pages, `studio` role 403 on configuration |
 | `admin/internal/StaffTokensTest` · `identity/internal/JwtTokensTest` | Staff tokens are `typ: staff`; the customer parser refuses them and the staff parser refuses customer tokens |
 | `admin/internal/StaffPrincipalTest` · `DashboardServiceTest` · `PrintSheetTest` · `PrintPackTest` · `ShareCodesTest` · `PackagingCardTest` | Owner-only gating (403), studio-day windows and `awaiting_action`, print-sheet text with Hardware and Content rows (labels, never a file URL), zip contents, missing-file notes and the packing list adding up hardware × quantity, 8-char base32 codes with collision retry, PDF bytes start with `%PDF` |
-| `MaterialsSeedTest` | `V3__seed_materials.sql`, `aakar.pricing` (incl. `hardware_markup_pct`, `family_rules`) and the seeded policy row (`2026-10-carriers`, `V9`) match `packages/design-tokens/materials.json`; the `V4` row reads back without rules |
+| `MaterialsSeedTest` | `V3__seed_materials.sql`, `aakar.pricing` (incl. `hardware_markup_pct`, `family_rules`) and the seeded policy row (`2026-10-keepsakes`, `V14`) match `packages/design-tokens/materials.json`; the `V4` row reads back without rules |
 | `FamiliesSeedTest` | `V9__families_hardware_uploads.sql`: `shelves`, `hardware_items`, every `template_families` row (JSONB columns included) and the Shop items' `family_id` backfill match `packages/design-tokens/families.json` |
 | `CatalogFamiliesIntegrationTest` | Shelves in order (storefront and portal), `GET /api/families` lists only available + ready families (`kind` filter, 400), family detail with hardware names and live descriptors (anchor `kind`/`size_mm`/`bounds_mm`/`accepts`, `hardware`, `min_feature_mm` round-trip; old fixtures unchanged), unavailable families resolve by id but are flagged, 404 `unknown_family`, responses validate against `template-family.v1.json` and `template-descriptor.v1.json`, Shop items refuse an unknown shelf (422 listing the shelves) and an unknown family (422 `unknown_family`) |
 | `UploadsIntegrationTest` | `POST /api/uploads` for every image and model format (sha256, served URL, owner folder without the guest id), 413 over 15 MB, 422 `unsupported_format` for a `.txt`, a kind mismatch or a renamed file, 400 / 401 / 415, owner-only `GET` (404 otherwise), guest uploads moving to the user on sign-in; a flagged file name → `pending_review` (the reason names the content term), a design with it → 409 `upload_not_ready`, the queue with owner and reason, a `studio` reviewer approves → `ready` → the design starts; a rejection → the note as `message`, 422 `upload_rejected`; 409 `review_already_decided`, queue filters, audit `review.decide` |
@@ -430,7 +430,9 @@ nameplate and a customer really named Nagraj or Thor are refused; an all-lowerca
 
 `pricing_policies` holds versioned policies; exactly one is active. `V4__pricing_policies.sql` seeds version
 `2026-09-phase0` from the same figures as `aakar.pricing.*` (which is now only the seed and a fallback when the table
-has no active row); `V9` deactivates it and seeds `2026-10-carriers`, which adds `hardware_markup_pct` (applied to
+has no active row); `V9` deactivates it and seeds `2026-10-carriers`, and `V14` derives `2026-10-keepsakes` from whatever policy is
+active then (so a policy published in the portal keeps its figures), adding placeholder minimums for `lithophane` (₹599) and
+`figurine_base` (₹699) where it has none. `2026-10-carriers` added `hardware_markup_pct` (applied to
 bought-in hardware unit costs) and `family_rules` (per family id: `minimum_subtotal_paise`, `setup_fee_paise`,
 `qty_breaks`); policies published before those fields read back with a 0 markup and no rules
 (`PricingPolicy.familyRuleFor(id)` returns an empty rule). `PriceCalculator.price(estimate, material, policy, context)` adds,
@@ -586,7 +588,8 @@ Flyway `V1` (catalog, materials, designs, versions, jobs, job events, outbox), `
 `catalog_items.family_id` (backfilled), `designs.source` gains `upload` + `designs.family_id`, `design_versions.hardware`,
 `uploads`, `content_reviews`, and the active pricing policy `2026-10-carriers`; `V10` the nameplate envelope, `V11` `environments`,
 `experiences`, `experience_avatars`, `experience_items` and `designs.experience_id`, `V12` the keepsake size ranges and photo-frame
-copy, `V13` `content_terms` (the trademark guardrail) with its 24-term seed.
+copy, `V13` `content_terms` (the trademark guardrail) with its 24-term seed, `V14` switches on `lithophane`, `figurine_base` and
+the Katha experience (`comics`) and activates the `2026-10-keepsakes` pricing policy.
 
 ## Docker
 

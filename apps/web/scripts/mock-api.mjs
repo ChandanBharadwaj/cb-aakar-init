@@ -65,15 +65,10 @@ const shelves = [...familiesSeed.shelves].sort((a, b) => (a.sort_order ?? 100) -
 const familyById = (id) => familiesSeed.families.find((f) => f.id === id);
 /** Customer copy never shows a codename alone: "Saathi · Keychain & bag charm". */
 const familyLabel = (f) => `${f.codename} · ${f.name}`;
-/** Placeholder price rules from the plan (open decision 3): family minimums, a setup fee for raw prints, hardware markup. */
-const FAMILY_RULES = {
-  keychain: { minimum_subtotal_paise: 24900 },
-  fridge_magnet: { minimum_subtotal_paise: 29900 },
-  ornament: { minimum_subtotal_paise: 34900 },
-  nameplate: { minimum_subtotal_paise: 59900 },
-  raw_print: { minimum_subtotal_paise: 34900, setup_fee_paise: 9900 },
-};
-const HARDWARE_MARKUP = 0.3;
+/** Price rules of the seed policy (materials.json → pricing_policy, the API's active version on a fresh database): family
+ * minimums, the raw-print setup fee and the hardware markup. Placeholders until the owner sets real values in the portal. */
+const FAMILY_RULES = materials.pricing_policy.family_rules ?? {};
+const HARDWARE_MARKUP = (materials.pricing_policy.hardware_markup_pct ?? 0) / 100;
 const withName = (h) => ({ sku: h.sku, qty: h.qty, ...(hardwareItems.get(h.sku) ? { name: hardwareItems.get(h.sku).name } : {}) });
 const familyReady = (f) => templates.some((t) => t.id === f.default_template_id);
 function familyView(f) {

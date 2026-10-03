@@ -15,8 +15,8 @@
       "pbr": { "color": "#34426B", "roughness": 0.78, "metalness": 0.0, "clearcoat": 0.0, "clearcoat_roughness": 0.0, "sheen": 0.0, "sheen_color": "#FFFFFF" } }
   ],
   "pricing_policy": {
-    "$comment": "PLAN §7.10. Placeholders reproducing the Checkout board: ₹389 material + ₹740 print time + ₹120 finishing = ₹1,249. Revisit monthly against measured costs. hardware_markup_pct (on bought-in parts) and the per-outcome family_rules (minimum subtotals, the raw-print setup fee) are placeholders too, to be replaced once real hardware quotes and studio labour times are measured; seeded by services/api Flyway V9 as the active policy version.",
-    "version": "2026-10-carriers",
+    "$comment": "PLAN §7.10. Placeholders reproducing the Checkout board: ₹389 material + ₹740 print time + ₹120 finishing = ₹1,249. Revisit monthly against measured costs. hardware_markup_pct (on bought-in parts) and the per-outcome family_rules (minimum subtotals, the raw-print setup fee) are placeholders too, to be replaced once real hardware quotes and studio labour times are measured; seeded by services/api Flyway V9 (2026-10-carriers) and V14 (2026-10-keepsakes, which adds the Roshni night light and Pratima plinth minimums) as the active policy version.",
+    "version": "2026-10-keepsakes",
     "machine_rate_paise_per_hour": 20000,
     "finishing_fee_paise": { "matte": 8000, "silk": 12000 },
     "packaging_fee_paise": 0,
@@ -31,6 +31,8 @@
       "fridge_magnet": { "minimum_subtotal_paise": 29900 },
       "ornament": { "minimum_subtotal_paise": 34900 },
       "nameplate": { "minimum_subtotal_paise": 59900 },
+      "lithophane": { "minimum_subtotal_paise": 59900 },
+      "figurine_base": { "minimum_subtotal_paise": 69900 },
       "raw_print": { "minimum_subtotal_paise": 34900, "setup_fee_paise": 9900 }
     }
   }

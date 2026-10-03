@@ -94,9 +94,13 @@ class AdminFamiliesIntegrationTest extends AbstractIntegrationTest {
             assertThat(keychain.get("template_ids")).extracting(JsonNode::asText).containsExactly("keychain_tag", "pet_tag");
             assertThat(keychain.get("templates")).as("the portal list names templates, it does not embed descriptors").isEmpty();
             assertThat(keychain.get("updated_at").asText()).endsWith("Z");
-            // a keepsake with a live template (PR 8) that the catalog keeps switched off, and a family with no template yet
+            // a keepsake switched on in V14 with its live template (PR 8), a second-wave one still switched off, and a family with no
+            // template yet
             JsonNode lithophane = find(all, "id", "lithophane");
-            assertThat(lithophane.get("available").asBoolean()).isFalse();
+            assertThat(lithophane.get("available").asBoolean()).isTrue();
+            JsonNode frame = find(all, "id", "photo_frame");
+            assertThat(frame.get("available").asBoolean()).isFalse();
+            assertThat(frame.get("ready").asBoolean()).isTrue();
             assertThat(lithophane.get("ready").asBoolean()).isTrue();
             assertThat(lithophane.get("template_ids")).extracting(JsonNode::asText).containsExactly("lithophane_plate");
             JsonNode pendant = find(all, "id", "pendant");
