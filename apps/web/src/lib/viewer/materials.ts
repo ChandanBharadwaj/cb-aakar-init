@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { materials as tokenMaterials } from "@aakar/design-tokens";
 import type { Material, MaterialPbr } from "../api/types";
 
@@ -91,11 +92,75 @@ export function meshesOf(root: THREE.Object3D): THREE.Mesh[] {
   return list;
 }
 
-/** Dress the piece's own meshes in one material (shadows on); outline hulls added under them keep their ink. */
-export function applyMaterial(meshes: readonly THREE.Mesh[], material: THREE.Material): void {
+/**
+ * Dress the piece's own meshes in one material (shadows on); outline hulls added under them keep their ink. A mesh
+ * without normals (the geometry service's GLBs carry none) is shaded flat: three does that by itself for the PBR
+ * finishes, but a toon material needs telling, so it gets a flat-shaded copy. Returns the materials made here, for the
+ * caller to dispose.
+ */
+export function applyMaterial(meshes: readonly THREE.Mesh[], material: THREE.Material): THREE.Material[] {
+  let flat: THREE.MeshToonMaterial | undefined;
   for (const mesh of meshes) {
-    mesh.material = material;
+    const needsFlat = material instanceof THREE.MeshToonMaterial && !material.flatShading && !mesh.geometry.getAttribute("normal");
+    if (needsFlat && !flat) {
+      flat = (material as THREE.MeshToonMaterial).clone();
+      flat.flatShading = true;
+    }
+    mesh.material = needsFlat && flat ? flat : material;
     mesh.castShadow = true;
     mesh.receiveShadow = true;
   }
+  return flat ? [flat] : [];
+}
+
+// ---- Ink outline (comic_pop) -------------------------------------------------------------------------------------------
+
+/**
+ * The hull an ink outline is drawn from: the mesh's positions welded where they coincide (whatever units the model is
+ * in) and given smooth normals, so the hull opens no cracks at sharp edges.
+ */
+export function outlineHull(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
+  const positions = new THREE.BufferGeometry();
+  positions.setAttribute("position", geometry.getAttribute("position"));
+  if (geometry.index) positions.setIndex(geometry.index);
+  positions.computeBoundingBox();
+  const extent = positions.boundingBox ? positions.boundingBox.getSize(new THREE.Vector3()).length() : 1;
+  const welded = mergeVertices(positions, Math.max(extent * 1e-6, 1e-9));
+  welded.computeVertexNormals();
+  return welded;
+}
+
+/**
+ * The ink itself: the hull's back faces in one flat colour, each vertex pushed `thicknessPx` CSS pixels out along its
+ * normal on screen, so the line is the same width at any zoom (set `size` to the canvas size in CSS pixels).
+ */
+export function inkMaterial(color: string, thicknessPx: number): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    name: "aakar:ink",
+    side: THREE.BackSide,
+    uniforms: {
+      color: { value: new THREE.Color(color) },
+      thickness: { value: thicknessPx },
+      size: { value: new THREE.Vector2(1, 1) },
+    },
+    vertexShader: /* glsl */ `
+      uniform float thickness;
+      uniform vec2 size;
+      void main() {
+        vec4 clipPosition = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        vec2 clipNormal = (projectionMatrix * modelViewMatrix * vec4(normal, 0.0)).xy;
+        float len = length(clipNormal);
+        if (len > 1e-6) clipPosition.xy += clipNormal / len * thickness / size * clipPosition.w * 2.0;
+        gl_Position = clipPosition;
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform vec3 color;
+      void main() {
+        gl_FragColor = vec4(color, 1.0);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }
+    `,
+  });
 }
