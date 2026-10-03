@@ -98,10 +98,10 @@ curl -s -OJ $API/admin/api/orders/<order_id>/packaging-card.pdf -H "$STAFF"     
 
 Integration tests run against a real PostgreSQL database **`aakar_test`** (no Docker/Testcontainers):
 the schema is dropped and re-migrated when the test context starts (`TestFlywayConfig`). The geometry
-service is stubbed with WireMock (`support/GeometryStub`): six descriptors from `fixtures/templates.json` (the Jharokha
-stand, the four planar carriers `keychain_tag`, `fridge_magnet`, `hanging_ornament`, `desk_nameplate` and `raw_print` with its
-volume anchor; the five are copies of `packages/contracts/examples/template-descriptors.json`, guarded by
-`TemplateFixturesTest`) and a `POST /v1/build` that answers with `packages/contracts/examples/design.completed.example.json`
+service is stubbed with WireMock (`support/GeometryStub`): the eleven descriptors of `fixtures/templates.json` (the Jharokha
+stand, kept by hand, and copies of every descriptor in `packages/contracts/examples/template-descriptors.json`, guarded by
+`TemplateFixturesTest`: the carriers, `raw_print` with its volume anchor and the PR 8 keepsakes, with the `comic_pop` style
+variants and the anchor `modes` / `required` the geometry service publishes) and a `POST /v1/build` that answers with `packages/contracts/examples/design.completed.example.json`
 (ids rewritten from the request; `arch_cusps` 3 = slow build, 4 = ready but `printability.passed=false`, 7 = failed build).
 Builds keyed on `$.spec.template` (`keychain_tag@1`, `fridge_magnet@1`, `raw_print@1`) echo the request's spec (features
 included) with the template's `hardware` (the magnet reports `magnet_count` magnets) and a small estimate; a `hero_mesh`
@@ -135,13 +135,16 @@ takes the first `packages/design-tokens/motifs` above its working directory (`se
 | `MaterialsSeedTest` | `V3__seed_materials.sql`, `aakar.pricing` (incl. `hardware_markup_pct`, `family_rules`) and the seeded policy row (`2026-10-carriers`, `V9`) match `packages/design-tokens/materials.json`; the `V4` row reads back without rules |
 | `FamiliesSeedTest` | `V9__families_hardware_uploads.sql`: `shelves`, `hardware_items`, every `template_families` row (JSONB columns included) and the Shop items' `family_id` backfill match `packages/design-tokens/families.json` |
 | `CatalogFamiliesIntegrationTest` | Shelves in order (storefront and portal), `GET /api/families` lists only available + ready families (`kind` filter, 400), family detail with hardware names and live descriptors (anchor `kind`/`size_mm`/`bounds_mm`/`accepts`, `hardware`, `min_feature_mm` round-trip; old fixtures unchanged), unavailable families resolve by id but are flagged, 404 `unknown_family`, responses validate against `template-family.v1.json` and `template-descriptor.v1.json`, Shop items refuse an unknown shelf (422 listing the shelves) and an unknown family (422 `unknown_family`) |
-| `UploadsIntegrationTest` | `POST /api/uploads` for every image and model format (sha256, served URL, owner folder without the guest id), 413 over 15 MB, 422 `unsupported_format` for a `.txt`, a kind mismatch or a renamed file, 400 / 401 / 415, owner-only `GET` (404 otherwise), guest uploads moving to the user on sign-in; a flagged file name → `pending_review`, a design with it → 409 `upload_not_ready`, the queue with owner and reason, a `studio` reviewer approves → `ready` → the design starts; a rejection → the note as `message`, 422 `upload_rejected`; 409 `review_already_decided`, queue filters, audit `review.decide` |
+| `UploadsIntegrationTest` | `POST /api/uploads` for every image and model format (sha256, served URL, owner folder without the guest id), 413 over 15 MB, 422 `unsupported_format` for a `.txt`, a kind mismatch or a renamed file, 400 / 401 / 415, owner-only `GET` (404 otherwise), guest uploads moving to the user on sign-in; a flagged file name → `pending_review` (the reason names the content term), a design with it → 409 `upload_not_ready`, the queue with owner and reason, a `studio` reviewer approves → `ready` → the design starts; a rejection → the note as `message`, 422 `upload_rejected`; 409 `review_already_decided`, queue filters, audit `review.decide` |
 | `CarrierDesignFlowIntegrationTest` | Walk (1): a guest's photos on both faces of a keychain (`family_id` + `features`), the spec carrying each photo by its internal URL (never the client's), the build request WireMock saw, the version's named split ring, the price with the hardware line and the ₹249 keychain minimum, cart and checkout snapshots, the print pack's Hardware/Content rows and `packing-list.txt`; the magnet's reported `magnet_count` hardware, edits that keep (`features` absent), replace or clear the content, stranger uploads 404; `unknown_family`, `family_not_available`, template of another family, a name on the keychain's back (accepted since the PR 3b descriptors) but not a motif or a 3D form (customer labels), relief depth cap, model-as-photo, 8-feature cap, default template/finish, a prompt as the working title, family material rules |
 | `RawPrintIntegrationTest` | Walk (2), Swaroop: `source: upload` + `raw_print` + one `hero_mesh` (fit longest 80) → ready with the `setup` line; resize by feature, finish swap keeps the form; missing form, 10 / 245 mm (never clamped), no fit, template params, a photo as the model, a relief on the body, wrong source → 4xx; a model the geometry stub cannot repair → job `failed` with `content_unusable` |
-| `templates/internal/FeatureValidatorTest` | Every feature rule (type supported, anchor exists and accepts, surface vs volume, one photo or form per anchor, one text and one motif per anchor side by side, a photo beside a text or a motif refused as crowded whichever came first, flat lettering only (a curved projection or anchor → `unsupported_feature`), `max_relief_mm` with the lithophane exemption, `max_text_height_mm`, family text length counting Devanagari without marks ("नमस्ते" = 4), one line in one of the seven launch scripts matching `script`, only the bundled lettering as `font`, motifs from the library between their `min_scale` and 1 (and left to the geometry service when the library is not loaded), the raw family's single form inside 20–240 mm, contract shapes and ranges) and customer-worded details |
+| `templates/internal/FeatureValidatorTest` | Every feature rule (type supported, anchor exists and accepts, surface vs volume, one photo or form per anchor, one text and one motif per anchor side by side, a photo beside a text or a motif refused as crowded whichever came first, flat lettering only (a curved projection or anchor → `unsupported_feature`), `max_relief_mm` with the lithophane exemption, `max_text_height_mm`, family text length counting Devanagari without marks ("नमस्ते" = 4), one line in one of the seven launch scripts matching `script`, only the bundled lettering as `font`, motifs from the library between their `min_scale` and 1 (and left to the geometry service when the library is not loaded), the raw family's single form inside 20–240 mm, contract shapes and ranges) and customer-worded details; with inline frame, night-light and badge descriptors: an anchor's `modes` (default modes included, "On the Top rail names and motifs are cut in, not raised; choose cut-in", `field: features[i].mode`), `required` anchors ("Add the photo for the Photo plate", after every other check), descriptors without either unchanged and round-tripping, and the `comic_pop` defaults (names and motifs raised where allowed, 1.5 mm within the anchor's cap, explicit choices and photos untouched) |
+| `design/internal/DesignStyleTest` | Experience style on designs with inline descriptors and mocked repositories: the experience's style becomes `spec.style` when the template lists it in `style_variants`, else `none` (another style, no variants, no experience); the feature checks receive the style; 422 `unknown_experience`; a params edit keeps the parent's style |
 | `templates/internal/MotifLibraryTest` | The monorepo's motif library read in index order (labels, tags, `min_scale`, `svg_url`, artwork), the default folder found from the working directory, the geometry service's entry rules (id pattern, no repeats, `min_scale` 0.2–1, defaults), file names that cannot leave the folder (`../`, absolute, sub-folders, backslashes, NUL, a symbolic link out), and a missing or broken library: empty with a warning locally, a failed start with `aakar.profile=production` |
 | `MotifsIntegrationTest` | `GET /api/motifs` equals `index.json` in order with `svg_url` = `{aakar.api.public-url}/api/motifs/{id}.svg`; every artwork served as `image/svg+xml` byte for byte with `Cache-Control: max-age=86400, public`, an ETag (304 on revalidation) and a CSP; `GET /admin/api/motifs` for owner and `studio` roles, 401 without a staff token; 404 `unknown_motif` for an unknown id and for every trick that reaches the controller, and encoded slashes, backslashes and dot segments refused before routing (never a file); `POST /api/designs` refuses an unknown motif, a scale under the motif's `min_scale` and a photo crowded by a motif or a text with 422 before any build, and accepts a text and a motif side by side |
-| `media/internal/UploadFormatsTest` · `TermsContentScannerTest` · `templates/TemplateFixturesTest` | Magic-byte sniffing of every format and renamed or damaged files; flagged terms ignoring case, spaces and punctuation; fixtures equal the exported descriptors |
+| `media/internal/UploadFormatsTest` · `TermsContentScannerTest` · `templates/TemplateFixturesTest` | Magic-byte sniffing of every format and renamed or damaged files; the portal's content terms first (most specific first, reason with kind and why), then the configured flag terms, ignoring case, spaces and punctuation; fixtures equal the exported descriptors |
+| `media/internal/TermMatcherTest` | The guardrail's word rule: folding (accents, full-width letters, ligatures, Indic marks), long terms anywhere ("IRONMAN", "Marvel_IronMan-poster.png"), short terms (six letters or digits or fewer) only on word boundaries ("D.C.", "Bat Man", "ThorHammer", "DC2024" caught; "Adcock", "Thorat", "Author", "Marvellous", "Nagrajan" not) |
+| `ContentTermsIntegrationTest` | The 24 seeded content terms (4 trademark, 20 character; literal keys checked), any staff role reads, owner CRUD (201, 409 `content_term_exists` for another spelling, 422 for no letters, a bad kind, sizes and a rename, 404), `studio` 403, audit `content_term.create|update` with the term as target; a text (Naam) naming a hero refused with 422 `protected_term` in every spelling (case, spaces, punctuation), never echoing the term; "Asha Thorat", "Marvellous Mum", "Adcock", "Nagrajan" accepted; params edits checked (new and kept texts); a term switched off no longer blocks; uploads such as `IronMan_final.stl` held for review with the term in the reason |
 | `AdminFamiliesIntegrationTest` | Owner creates and updates hardware and families (201/200; 409 `hardware_exists` / `family_exists`; 422 for an unknown shelf, backdrop, hardware SKU or allowed material, a `min > max` envelope, bad enums), the path id wins on PUT, an available family without a live template stays off the storefront, the pricing preview with a `family_id` (hardware line, minimum, setup) and `family_rules` checks, `studio` role 403, audit `family.create|update` and `hardware.create|update` with before/after |
 | `ExperiencesSeedTest` | `V11__experiences_environments.sql`: every `environments` row and every `experiences` row (JSONB `surface`, `motif_pack`, `collections`, `season` included) with its ordered `experience_avatars` and `experience_items` match `packages/design-tokens/experiences.json`; `catalog_items`, `template_families` and `experiences` reference `environments`; `designs.experience_id` exists |
 | `ExperiencesIntegrationTest` | `GET /api/experiences` lists Utsav, Adda, Yaadein, Masti in order (Katha is unavailable) with only their orderable avatars expanded in order (lithophane, figurine, keycap… have no live template in the stub, so they are left out there and kept in the portal rows), curated items, `price_from_paise` = the lowest avatar floor, rows valid against `experience.v1.json`; slugs resolve any experience (Katha flagged), 404 `unknown_experience`; `GET /api/environments` and the portal copy; owner CRUD (201/200, 409 `experience_exists` / `slug_exists`, 422 for an unknown backdrop naming the known ones, unknown family, unknown item, repeats, mixed or backwards or impossible season windows, bad style, slug or accent), path id wins, a reorder, a new slug and the switch off leave the Shop, defaults, `studio` 403, audit `experience.create|update` before/after; families and Shop items accept the comic rooftop and refuse an unknown backdrop; designs keep `experience_id` (Shop and Avatar paths, 422 `unknown_experience`) |
@@ -185,8 +188,8 @@ before the customer chain); `GET /admin/api/auth/me` returns the account. Furthe
 (no endpoint yet).
 
 **Roles.** `owner` may do everything; `studio` runs fulfilment (orders, advance, print pack, QC photos, packaging card,
-preview, content reviews) and reads configuration — writes to pricing, materials, catalog, families, hardware, experiences and
-templates answer 403 `forbidden`.
+preview, content reviews) and reads configuration — writes to pricing, materials, catalog, families, hardware, experiences,
+content rules and templates answer 403 `forbidden`.
 
 **Endpoints.**
 
@@ -221,12 +224,14 @@ templates answer 403 `forbidden`.
 | PUT | `/admin/api/templates/{templateId}` | `{live}` (owner; 404); `live: false` hides it from `GET /api/templates` and makes `POST /api/designs` answer 422 `template_not_available` |
 | GET | `/admin/api/uploads?status&limit` | Customer uploads newest first (`status` ready · pending_review · rejected, 422 otherwise; `limit` 1–200, default 50) as `AdminUpload`: the `Upload` fields with a `url` staff can open in any status, `owner {user_id, guest_id, phone}`, `origin` and the latest `review {id, reason, status, decision_note, reviewer_email, decided_at}` |
 | POST | `/admin/api/content-reviews/{reviewId}` | `{decision: approved|rejected, note?}` (any staff role) → `AdminUpload`; approved → upload `ready`, rejected → `rejected` with the note as the customer's `message`; 404; 409 `review_already_decided`; audit `review.decide` (before/after review and upload status) |
+| GET · POST | `/admin/api/content-terms` | The content rules (see below), any staff role, by `normalised_term`: `ContentTerm {id, term, kind, reason, active, normalised_term, whole_word, created_at, updated_at}`; create `ContentTermInput {term, kind: trademark|character|other, reason?, active?}` (owner; 409 `content_term_exists` for a term with the same letters and digits; 422 for fewer than two letters or digits); audit `content_term.create`, target the term |
+| PUT | `/admin/api/content-terms/{termId}` | Kind, reason and the active switch (owner; the term is the key: the body names the same term, any spelling with the same letters and digits, 422 otherwise; 404); audit `content_term.update` |
 | GET | `/admin/api/notifications?order_id&page&size` | Messages log (`NotificationRecord` with `order_id`, `rendered_text`), newest first, `size` ≤ 200 |
 | GET | `/admin/api/audit?page&size` | `AuditEntry` rows (`staff_email`, `action`, `target`, `before`, `after`), newest first |
 
 Schema violations on admin bodies answer **422** `validation_failed` (the storefront API uses 400). Every write records an
 `audit_log` row (`order.advance`, `order.qc_photo`, `pricing.publish`, `material.create|update`, `catalog.create|update`, `family.create|update`,
-`hardware.create|update`, `experience.create|update`, `template.live`, `review.decide`).
+`hardware.create|update`, `experience.create|update`, `template.live`, `review.decide`, `content_term.create|update`).
 
 **Print pack.** Built in memory: for each order item a `print-sheet.txt` (order number, piece and version, template `id@version`
 and params from the version spec, the **content** it carries by label — `photo relief (Chhavi) on face · text (Naam) "Asha" on
@@ -263,7 +268,7 @@ and the default is the mock. A real adapter is a new `@Component` implementing t
 | Payments | `payment.PaymentGateway` | `aakar.payments.gateway` (`mock`) | `pay_url` = `{aakar.web.url}/checkout/pay/{paymentId}`, `gateway_ref` = `mock_…`; the pay page confirms through `POST /api/payments/{id}/mock/complete` (409 `payment_final` for a non-mock or already final payment). A real gateway's webhook handler calls the same `Payments.confirm(paymentId, outcome, method, gatewayRef)` |
 | Shipping | `shipping.ShippingCarrier` | `aakar.shipping.carrier` (`mock`) | `mock-delhivery`: every 6-digit pincode is serviceable in 4 days without COD, except pincodes starting with `9`; shipments get `MOCK` + 10 digits, no tracking URL |
 | Messaging | `notification.MessageSender` | `aakar.messaging.sender` (`log`) | Records the row in `notifications` with status `logged` instead of sending (template `order_confirmed` on payment success, channel `whatsapp` or `sms` per `notify_whatsapp`) |
-| Content scanning | `media.ContentScanner` | `aakar.uploads.scanner` (`terms`) | Not a mock: flags an upload whose file name mentions one of `aakar.uploads.flag-terms` (empty by default; the seed of the trademark guardrail) into the review queue. `noop` flags nothing. A malware or image-moderation scanner is a drop-in `ContentScanner` (`ScanResult.malware` refuses the file, 422 `upload_rejected`) |
+| Content scanning | `media.ContentScanner` | `aakar.uploads.scanner` (`terms`) | Not a mock: the trademark guardrail. Flags an upload whose file name mentions an active content term (the portal's Content rules) or one of `aakar.uploads.flag-terms` (empty by default) into the review queue. `noop` flags nothing. A malware or image-moderation scanner is a drop-in `ContentScanner` (`ScanResult.malware` refuses the file, 422 `upload_rejected`) |
 
 **Production guard.** `aakar.profile` is `local` by default. With `aakar.profile=production` the context refuses to start
 (`shared/ProductionGuard`) while any adapter above is `mock`/`log`, `expose-dev-code` is `true`, the JWT secret is the
@@ -312,6 +317,14 @@ four tables seeded from [`packages/design-tokens/experiences.json`](../../packag
 `experience_id` (any known experience, on the Shop or not; 422 `unknown_experience` otherwise) and `Design.experience_id` echoes it,
 so the karigar's note and packaging card can name the theme.
 
+**Style.** The design also takes the experience's `style` as `spec.style` when the resolved template lists it in its descriptor's
+`style_variants`, and `none` otherwise, silently (a theme never asks for a look its template can't make): Katha on a keychain
+whose descriptor offers `comic_pop` builds in `comic_pop`, Katha on the Jharokha stand builds plain. A params edit keeps the
+parent's style. The feature checks apply the style's defaults: under `comic_pop` a text or motif that leaves its `mode` out is
+raised where its anchor allows it (no `modes`, or `modes` with emboss), and a raised one that leaves its `depth_mm` out stands
+1.5 mm proud, capped at the anchor's `max_relief_mm` (the geometry service's comic defaults, which the API must fill because it
+fills every default before a spec reaches the geometry service); explicit choices and photos are left alone.
+
 `GET /api/experiences` lists the `available` experiences by `sort_order` in the storefront shape: `avatars` are the experience's
 families that can be ordered today (`available` and `ready`, the `GET /api/families` view with templates and `price_from_paise`)
 in the experience's order, `items` its curated Shop items in order (unavailable ones keep their Coming soon state), and
@@ -357,9 +370,13 @@ what it would refuse at build time:
 | `font`, when given, names the bundled lettering: Noto Sans or the script's own Noto Sans, bold or not (case, spaces and punctuation ignored) | `unsupported_feature` on `features[i].font`: "The lettering style “Comic Sans” is not available yet; leave the font empty for our standard Latin lettering" |
 | `motif_id` is in the motif library | `validation_failed` on `features[i].motif_id`: "We don't have a motif (Buti) called “peacock”; choose one from the motif library" |
 | `scale` between the motif's `min_scale` and 1 (1 fills the spot; the contract caps it at 1) | `param_out_of_range` on `features[i].scale`: "The Paisley motif (Buti) can't be printed smaller than scale 0.3; choose a larger scale" |
+| A feature's `mode` (its type's default when left out: text and photo `emboss`, motif `deboss`) is one of its anchor's `modes`, when the anchor lists them (contract `cccb468`: Chaukhat's rails `[deboss]`, Roshni's plate `[lithophane]`) | `unsupported_feature` on `features[i].mode` (with `anchor` and `modes`): "On the Top rail names and motifs are cut in, not raised; choose cut-in", "On the Photo plate your photo becomes the glowing plate itself; choose the night-light photo" |
+| An anchor marked `required` holds content (checked last, after the raw family's own rule) | `validation_failed` with `anchor`: "Add the photo for the Photo plate" |
+| A text (Naam) does not name an active content term (see Content rules) | `protected_term` on `features[i].text`: "We can't print copyrighted heroes or their names, but your own hero is welcome. Try your own hero's name." |
 
-Left to the geometry service, which needs the font files and the anchor's size for them: characters the bundled fonts lack
-(an emoji, say), and whether a text or a motif fits its spot at a printable stroke. The detected script is not written into
+Templates whose descriptors carry no `modes` or `required` behave exactly as before. Left to the geometry service, which needs
+the font files and the anchor's size for them: characters the bundled fonts lack (an emoji, say), and whether a text or a motif
+fits its spot at a printable stroke. The detected script is not written into
 the stored spec; the geometry service detects it again for its build.
 
 Each `content_source.upload_id` must be the caller's upload (404), `ready` (409
@@ -377,6 +394,37 @@ repair fails the job with `error_code` `content_unusable`.
 **Hardware.** A version's `hardware` (`[{sku, qty}]` per piece) starts as the template descriptor's (else the family
 default) and is replaced by the `design.completed` result's `hardware` when it reports any (a magnet with two pockets
 reports two magnets). Responses name each part from `hardware_items`.
+
+## Content rules (the trademark guardrail, Katha)
+
+Marvel, DC and their characters are licensed IP, so Katha (Comics & heroes) ships as an original comic look in which the
+customer's own hero is the content (`docs/research/outcome-categories/implementation-plan.md` §8, open decision 16). The guardrail
+is portal data: `content_terms` (`V13__content_terms.sql`; `media.ContentTerms`, `media/internal/ContentTermService`) holds the
+names the studio won't print — `term`, `kind` (`trademark`, `character`, `other`), `reason` (for staff), `active` and the
+`normalised_term` it is compared under (unique). Seeded with 24 terms: Marvel, Marvel Studios, DC and DC Comics (trademark); Spider-Man,
+Iron Man, Captain America, Thor, Hulk, Black Panther, Wolverine, Deadpool, Batman, Superman, Wonder Woman, Joker, Harley Quinn,
+Aquaman, The Flash and Green Lantern; Chacha Chaudhary, Nagraj, Super Commando Dhruv and Doga (character). Staff edit the list in
+the portal (Content rules, `/admin/api/content-terms`); terms are never renamed or deleted, only switched off.
+
+- **Uploads.** The default scanner (`TermsContentScanner`) holds a file whose original name mentions an active term, or one of
+  `aakar.uploads.flag-terms`, in `pending_review`; the content review's reason names the term, e.g.
+  `File name mentions "Iron Man", a protected character · Marvel character (Disney)`. The portal's terms come first, most specific
+  (longest) first, then the configured ones.
+- **Names (Naam).** `POST /api/designs` and every `POST /api/versions/{v}/params` refuse a version whose `emboss_text` mentions an
+  active term — new texts and kept ones alike, since a term may have been added since — with 422 `protected_term`, `field`
+  `features[i].text` and the detail "We can't print copyrighted heroes or their names, but your own hero is welcome. Try your own
+  hero's name." The term and the list are never echoed (the API logs which term matched). The configured flag terms apply to uploads only.
+
+**Matching** (`media/internal/TermMatcher`). Text and term are folded (NFKD: accents, full-width letters and ligatures), lowercased
+and reduced to letters and digits, so "iron man", "Iron-Man" and "IRONMAN" are one term and Indic vowel signs never split a word.
+A term longer than six letters and digits matches anywhere, even run into other words. A term of six or fewer (DC, Thor, Hulk,
+Doga, Joker, Marvel, Batman, Nagraj; `whole_word: true`) must start and end on word boundaries of the text — words break at
+anything that is not a letter, digit or mark, at a lower-to-upper case change ("ThorHammer"), before the last capital of a
+capital run ("DCComics") and between letters and digits ("DC2024") — so spacing and punctuation inside it still don't count
+("Bat Man", "D.C.") but it never fires inside a longer word: "Adcock", "Thorat", "Author", "Marvellous" and "Nagrajan" pass.
+Known trade-offs, each fixed in the portal by switching the term off: "DC" or "D.C." as initials or a designation on a
+nameplate and a customer really named Nagraj or Thor are refused; an all-lowercase run-together file name hides a short term
+("marvelposter.png"). There is no cache: a term switched off stops holding uploads and refusing names at once, on every instance.
 
 ## Pricing policies (ADR-0008)
 
@@ -449,7 +497,7 @@ are de-duplicated on `event_id`, terminal jobs ignore late messages.
 | `AAKAR_MEDIA_INTERNAL_BASE_URL` | `aakar.media.internal-base-url` | blank = `aakar.api.public-url` | The API origin the geometry service fetches customer uploads from (`content_source.url`), e.g. `http://api:8080` in Compose while the public URL is the browser's |
 | `AAKAR_MOTIFS_DIR` | `aakar.motifs.dir` | blank = the first `packages/design-tokens/motifs` above the working directory | The motif library (Buti): `index.json` and the SVGs beside it, read once at start. The image sets `/design-tokens/motifs`. Missing or broken: `aakar.profile=production` refuses to start; locally a warning, `GET /api/motifs` is empty and motif ids and scales are left to the geometry service |
 | `AAKAR_UPLOADS_SCANNER` | `aakar.uploads.scanner` | `terms` | `terms` or `noop` (refused in production) |
-| `AAKAR_UPLOADS_FLAG_TERMS` | `aakar.uploads.flag-terms` | empty | Comma-separated words that send an upload whose file name mentions them to the review queue |
+| `AAKAR_UPLOADS_FLAG_TERMS` | `aakar.uploads.flag-terms` | empty | Comma-separated words that send an upload whose file name mentions them to the review queue, on top of the portal's content terms (uploads only) |
 | | `aakar.uploads.max-image-bytes` · `max-model-bytes` | `15MB` · `50MB` | Upload limits (`spring.servlet.multipart.max-file-size` / `max-request-size` are 52 MB) |
 | `AAKAR_CORS_ORIGINS` | `aakar.cors.origins` | `http://localhost:3000,http://localhost:3100` | Allowed browser origins (storefront, portal) |
 | `AAKAR_AMQP_URL` | `spring.rabbitmq.addresses` | `amqp://aakar:aakar@localhost:5672/` | RabbitMQ (`rabbit` profile only) |
@@ -475,10 +523,10 @@ pricing_policy`, including `hardware-markup-pct` and `family-rules`, whose famil
 | GET | `/media/{key}` | A stored media file (QC photos, customer uploads) |
 | POST | `/api/uploads` | Multipart `file` + `kind` (image · model) → 201 `Upload` (`ready`, or `pending_review` when flagged); 401 without an identity; 413 `payload_too_large`; 422 `unsupported_format`; 400 bad `kind` or empty file |
 | GET | `/api/uploads/{id}` | The caller's own upload (`message` explains a rejection); 404 for anybody else |
-| POST | `/api/designs` | 202 `DesignAccepted`; owned by the bearer's user or the `X-Aakar-Guest` id. `source=shop` + `catalog_item_slug`; `source=create|remix` + `template_id` (+ `params`, `material`); `family_id` (+ `template_id`) + `features` (the Chhaap); `source=upload` + `family_id: raw_print` + one `hero_mesh` (Swaroop); 404 `unknown_family`, 422 `family_not_available`, 409 `upload_not_ready`, 422 `upload_rejected` / `unsupported_feature` / `param_out_of_range`; a `prompt` without `family_id` → 422 `not_yet_available` |
+| POST | `/api/designs` | 202 `DesignAccepted`; owned by the bearer's user or the `X-Aakar-Guest` id. `source=shop` + `catalog_item_slug`; `source=create|remix` + `template_id` (+ `params`, `material`); `family_id` (+ `template_id`) + `features` (the Chhaap); `source=upload` + `family_id: raw_print` + one `hero_mesh` (Swaroop); `experience_id` presets `spec.style` when the template offers it; 404 `unknown_family`, 422 `family_not_available`, 409 `upload_not_ready`, 422 `upload_rejected` / `unsupported_feature` / `param_out_of_range` / `protected_term`; a `prompt` without `family_id` → 422 `not_yet_available` |
 | GET | `/api/designs/{id}` · `/api/designs/{id}/versions` | Design with latest version (status derived from it); history newest first |
 | GET | `/api/versions/{versionId}` | Version, with `family_id`, named `hardware` and `price` for its own material once ready |
-| POST | `/api/versions/{versionId}/params` | New version + job; optional `features` replaces the content (`[]` clears, absent keeps); 422 `param_out_of_range` lists keys, never clamps |
+| POST | `/api/versions/{versionId}/params` | New version + job, keeping the parent's style; optional `features` replaces the content (`[]` clears, absent keeps); 422 `param_out_of_range` lists keys, never clamps; 422 `protected_term` for a text, new or kept, naming an active content term |
 | GET | `/api/versions/{versionId}/printability` | 409 `version_not_ready` while generating or failed |
 | GET | `/api/versions/{versionId}/price?material=` | 409 while not ready; 404 `unknown_material` |
 | GET | `/api/jobs/{jobId}` · `/api/jobs/{jobId}/events` | Job status; SSE `stage` stream with replay after `Last-Event-ID` |
@@ -507,7 +555,7 @@ Errors are RFC 9457 Problem Details (`application/problem+json`) with a stable `
 `order_not_payable`, `invalid_transition`, `policy_version_exists`, `order_not_packed`, `material_exists`, `slug_exists`,
 `payload_too_large`, `unknown_family`, `family_not_available`, `family_exists`, `hardware_exists`, `unknown_hardware`,
 `unsupported_format`, `unsupported_feature`, `upload_not_ready`, `upload_rejected`, `review_already_decided`, `unknown_experience`,
-`experience_exists`, `unknown_motif`, `internal_error`;
+`experience_exists`, `unknown_motif`, `protected_term`, `content_term_exists`, `internal_error`;
 a job's `error_code` may also be `content_unusable` (the geometry service could not repair a customer's model).
 
 ## Modules (`studio.aakar.api.*`)
@@ -520,7 +568,7 @@ a job's `error_code` may also be `content_unusable` (the geometry service could 
 
 - `design → studio` starts jobs; `studio` publishes `GenerationCompleted` / `GenerationFailed` which `design` applies in the same transaction.
 - `identity → design, cart, media` for the sign-in hand-over (`Designs.attachGuest`, `Uploads.attachGuest`, `Carts.mergeGuestCart`).
-- `design → media` resolves content sources through `Uploads`; `media` depends on nothing above `shared`.
+- `design → media` resolves content sources through `Uploads` and checks texts against `ContentTerms`; `media` depends on nothing above `shared`.
 - `cart → design, catalog, pricing`; it empties itself on `payment.PaymentSucceeded` and prices lines with `Designs.priceContext`.
 - `catalog → templates` for family readiness (the live descriptors) and `catalog → pricing` for `price_from_paise`; `templates` and `pricing` depend on nothing above `shared` (family limits reach the feature checks as `templates.FamilyLimits`).
 - `order → cart, identity, design, payment, shipping, notification`; it listens for `PaymentSucceeded` / `PaymentFailed` from `payment`, which depends on nothing above `shared`.
@@ -536,7 +584,9 @@ Flyway `V1` (catalog, materials, designs, versions, jobs, job events, outbox), `
 `materials.available` / `updated_at`, `notifications.order_id` / `rendered_text`, `pricing_policies.note`, `V9` `shelves`
 (+ `catalog_items.category` FK), `hardware_items`, `template_families` (all seeded from `families.json`),
 `catalog_items.family_id` (backfilled), `designs.source` gains `upload` + `designs.family_id`, `design_versions.hardware`,
-`uploads`, `content_reviews`, and the active pricing policy `2026-10-carriers`.
+`uploads`, `content_reviews`, and the active pricing policy `2026-10-carriers`; `V10` the nameplate envelope, `V11` `environments`,
+`experiences`, `experience_avatars`, `experience_items` and `designs.experience_id`, `V12` the keepsake size ranges and photo-frame
+copy, `V13` `content_terms` (the trademark guardrail) with its 24-term seed.
 
 ## Docker
 

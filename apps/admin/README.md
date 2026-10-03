@@ -8,7 +8,8 @@ hardware markup and per-Avatar rules, materials, catalog items and shelves, outc
 copy, tier, shelf, envelope, hardware bill of materials, material rules, content slot), **Duniya** experiences (the
 Shop's themes: backdrop, accent, style, motif pack, ordered Avatars, curated items, collections, seasons,
 availability), the read-only **Backgrounds** (Mahaul) reference, bought-in **hardware**, the content **review** queue
-for flagged customer uploads, live templates, the messages log of the mock sender (ADR-0013) and the audit trail. Brand words follow the naming convention in
+for flagged customer uploads, the **content rules** (the names the studio won't print: Katha's trademark guardrail), live
+templates, the messages log of the mock sender (ADR-0013) and the audit trail. Brand words follow the naming convention in
 `docs/research/outcome-categories/implementation-plan.md`: an Avatar is always shown as "Codename · Name"
 (Saathi · Keychain & bag charm), a Duniya as "Codename · Title" (Utsav · Festive & gifting), and the content slot
 (Chhaap) types are labelled Naam (`emboss_text`), Buti (`motif`), Chhavi (`relief_image`) and Roop (`hero_mesh`) with
@@ -90,6 +91,7 @@ Copy `.env.example` to `.env.local` to change them. Fonts (Cormorant Garamond, M
 | `/environments` | **Backgrounds · Mahaul**, read-only: each backdrop's label and id, surface, viewer preset key (**Built**, or **Preset pending** when the storefront has no preset with that key yet, so it shows as the studio; built keys are the design tokens' `environments`), palette swatches with their hex values, and which Duniya, Avatars and Shop items use it (linked to their pages) | `GET /environments`, `GET /experiences`, `GET /families`, `GET /catalog/items` |
 | `/hardware` | Bought-in parts (sku, name, unit cost in ₹ stored as paise, weight, supplier link, notes, which Avatars use it, available switch) with an edit drawer and **Add hardware**. Owner-only writes; 409 `hardware_exists` shown inline | `GET/POST /hardware`, `PUT /hardware/{sku}`, `GET /families` |
 | `/reviews` | Content review queue: flagged customer uploads as cards (image preview when the upload is an image with a URL, otherwise a model-file card with format and size), owner or guest, the scanner's reason, **Approve** / **Reject** with an optional note (a "standard note" button fills the Katha guardrail copy: "We can't print copyrighted heroes, but your own hero is welcome"); the list refreshes after a decision; filter chips switch to approved (`ready`) and `rejected` uploads. Studio and owner may decide | `GET /uploads?status=`, `POST /content-reviews/{id}` |
+| `/content-rules` | **Content rules** (under Reviews in the sidebar): the names the studio won't print, Katha's trademark guardrail. A short explanation of what the rules do (an upload whose file name mentions an active term waits in Reviews with the term in the reason; a text (Naam) that mentions one is refused with the customer copy "We can't print copyrighted heroes or their names, but your own hero is welcome…", and customers never see the list; case, spaces, punctuation and accents never count; terms of six letters or fewer only match as whole words, so DC doesn't catch Adcock; switch off, never delete or rename). Kind filter chips with counts (All · Trademarks · Characters · Other) and a search by term or reason; a table of term, kind pill, how it matches (`normalised_term` and "Whole word only" / "Anywhere in a name"), reason, an **active** switch (owner; studio sees it read-only) and the last update; **Add term** and an edit drawer (term fixed once created, with a live "Matches as … · whole word only / anywhere" preview and a duplicate check against the list before sending; kind with hints; reason; active). 409 `content_term_exists`, 422 `validation_failed` and 403 shown inline | `GET/POST /content-terms`, `PUT /content-terms/{id}` |
 | `/templates` | Cards per template with a live switch, its family (linked to the Avatar), the Chhaap types it supports (Naam/Buti/Chhavi/Roop chips, code in the title), the hardware it is cut for and the catalog items using it | `GET /templates`, `PUT /templates/{id}`, `GET /catalog/items`, `GET /families`, `GET /hardware` |
 | `/messages` | Notifications log (when, channel, template, to, status, rendered text, order link), filter by `?order_id=`, with the mock-sender explanation | `GET /admin/api/notifications` |
 | `/audit` | Paginated entries (when, who, action, target link) with a before/after diff toggle per row | `GET /admin/api/audit` |
@@ -111,7 +113,8 @@ Copy `.env.example` to `.env.local` to change them. Fonts (Cormorant Garamond, M
 | `ExperiencesPage`, `ExperienceDrawer` | `src/components/experiences/` | The Duniya list and its drawer (ordered lists with drag and ↑ ↓ ✕, palette radios, motif pack chips, collection and season rows); owner-only writes |
 | `EnvironmentsPage`, `PaletteSwatches`, `EnvironmentSelect`, `EnvironmentPicker` | `src/components/environments/` | The read-only Backgrounds page, and the backdrop swatches, select (Catalog and Avatar drawers) and radio-card picker (Duniya drawer) fed by `GET /admin/api/environments` |
 | `HardwarePage`, `HardwareDrawer` | `src/components/hardware/` | Unit cost in rupees, posted as integer paise |
-| `ReviewsPage` | `src/components/reviews/` | Cards with approve / reject; exports the `REJECTION_PRESET` copy |
+| `ReviewsPage` | `src/components/reviews/` | Cards with approve / reject; exports the `REJECTION_PRESET` copy; links to the content rules |
+| `ContentRulesPage`, `ContentTermDrawer` | `src/components/content-rules/` | The content rules list (kind chips, search, active switch) with the "what the rules do" card, and the add/edit drawer; owner-only writes |
 | `TemplatesPage`, `MessagesPage`, `AuditPage` | `src/components/{templates,messages,audit}/` | |
 
 ### Libraries and state
@@ -119,9 +122,10 @@ Copy `.env.example` to `.env.local` to change them. Fonts (Cormorant Garamond, M
 | File | What |
 |---|---|
 | `src/lib/api/schema.d.ts` | Generated by `openapi-typescript` from `aakar-admin.v1.yaml` (do not edit by hand) |
-| `src/lib/api/types.ts` | Aliases over the generated types (`AdminOrder`, `PricingPolicyVersion`, `AdminMaterialInput`, `AdminFamily`, `AdminFamilyInput`, `AdminHardware`, `AdminUpload`, `AdminExperience`, `AdminExperienceInput`, `Environment`, `Motif`, `SeasonWindow`, `Shelf`, `FamilyRule`, `FeatureType`, …) plus `itemAssets()` |
-| `src/lib/api/client.ts` | `api.*` typed fetch wrapper with the bearer token (`catalog.shelves`, `families`, `experiences.list/create/update`, `environments.list`, `motifs.list`, `hardware`, `uploads`, `reviews` groups included), `ApiError`/`toProblem()`, binary `download()` + `saveBlob()`, multipart upload |
+| `src/lib/api/types.ts` | Aliases over the generated types (`AdminOrder`, `PricingPolicyVersion`, `AdminMaterialInput`, `AdminFamily`, `AdminFamilyInput`, `AdminHardware`, `AdminUpload`, `AdminExperience`, `AdminExperienceInput`, `Environment`, `Motif`, `SeasonWindow`, `Shelf`, `FamilyRule`, `FeatureType`, `ContentTerm`, `ContentTermInput`, `ContentTermKind`, …) plus `itemAssets()` |
+| `src/lib/api/client.ts` | `api.*` typed fetch wrapper with the bearer token (`catalog.shelves`, `families`, `experiences.list/create/update`, `environments.list`, `motifs.list`, `hardware`, `uploads`, `reviews`, `contentTerms.list/create/update` groups included), `ApiError`/`toProblem()`, binary `download()` + `saveBlob()`, multipart upload |
 | `src/lib/experiences.ts` | Duniya vocabulary: `STYLES`, `experienceTitle()`, `experienceInput()` (row → PUT body), the brand palette as `ACCENTS` / `TINTS` (from the design tokens), `packEntry()` (motif, pack id or pending), season windows (`windowProblem()`, `formatWindow()`, `inSeason()` in IST, month-day helpers) |
+| `src/lib/contentTerms.ts` | Content-rule vocabulary: `TERM_KINDS` (labels, plurals, hints), `KIND_TONE`, `REFUSAL_COPY` (what customers read), `WHOLE_WORD_MAX`, `normaliseTerm()` / `isWholeWord()` (a preview of the API's matcher; the API's `normalised_term` and `whole_word` win), `contentTermInput()` (row → PUT body), `sortTerms()` |
 | `src/lib/environments.ts` | Backdrops from the API: `sortEnvironments()`, `environmentLabel(list, id)`, `presetBuilt()` (the storefront's preset keys are the design tokens' `environments`) — the hard-coded `ENVIRONMENTS` list is gone |
 | `src/lib/orders.ts` | Status labels, tones, filter groups, action verbs, production statuses, timeline order |
 | `src/lib/families.ts` | Avatar / Chhaap vocabulary: `FEATURE_TYPES` (Naam · Buti · Chhavi · Roop), kinds, tiers, shape tolerances, tones, `familyTitle()`, `familyInput()` |
@@ -164,10 +168,14 @@ Node, no dependencies, CORS enabled. Implements every path of `aakar-admin.v1.ya
   artwork itself at `GET /api/motifs/{id}.svg` (no token needed). Catalog items and families are validated against the
   same backdrop list. The catalog's headphone stand uses the API seed's slug, `pillar-headphone-stand`, so Adda's
   curated items resolve.
-- Uploads and reviews: five customer uploads (a pending image with an inline SVG placeholder and reason
-  `trademark_terms: batman`, a pending STL flagged `filename_terms: marvel_ironman.stl`, one approved, one rejected,
-  one clean). `GET /uploads?status=` filters, `POST /content-reviews/{id}` approves or rejects (studio or owner; 409
+- Uploads and reviews: five customer uploads (a pending image with an inline SVG placeholder held for "Batman", a pending
+  STL held for "Iron Man", each with the API's reason wording `File name mentions "Iron Man", a protected character · …`,
+  one approved, one rejected, one clean). `GET /uploads?status=` filters, `POST /content-reviews/{id}` approves or rejects (studio or owner; 409
   `review_already_decided` on a second decision) and is audited as `review.decide`.
+- Content rules: the API's 24-term seed (`V13__content_terms.sql`: 4 trademarks, 20 characters) with the same
+  `normalised_term` and `whole_word`; `GET/POST /content-terms` and `PUT /content-terms/{id}` in memory (owner-only writes,
+  audited as `content_term.create` / `content_term.update` with the term as target; 409 `content_term_exists` for another
+  spelling of an existing term, 422 `validation_failed` for a rename, a bad kind or a term without two letters or digits, 404).
 - Six materials, seven catalog items (two available), three templates (`jharokha_phone_stand`, `keychain_tag`,
   `raw_print`, each with `features_supported` and `hardware`), a messages log and an audit log seeded with
   configuration changes.
