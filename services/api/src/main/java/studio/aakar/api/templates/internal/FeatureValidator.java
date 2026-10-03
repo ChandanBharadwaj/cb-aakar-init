@@ -7,6 +7,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -25,10 +26,17 @@ import studio.aakar.api.templates.TemplateDescriptor;
  * the geometry would refuse is answered 422 before a job starts: the feature shape of {@code design-spec.v1.json}
  * (known type, no unknown settings, required settings, types, enums and ranges), then the descriptor
  * ({@code features_supported}, the anchor's {@code accepts}, surface vs volume, what one anchor holds, flat lettering,
- * {@code max_relief_mm} with the lithophane exemption, {@code max_text_height_mm}), then the family (text length without
- * marks, and for the raw family exactly one form sized inside the envelope), the letters of a text ({@link Lettering}) and
- * the motif library ({@link Motifs}). Values are never clamped. Returns the features normalised with the contract
- * defaults, in schema order. Customer-facing {@code detail}s use labels, never code words.
+ * {@code max_relief_mm} with the lithophane exemption, {@code max_text_height_mm}, the anchor's {@code modes}), then the
+ * family (text length without marks, and for the raw family exactly one form sized inside the envelope), the letters of a
+ * text ({@link Lettering}), the motif library ({@link Motifs}) and, last, the anchors marked {@code required} (each needs
+ * content). Values are never clamped. Returns the features normalised with the contract defaults, in schema order; under the
+ * spec style {@code comic_pop} the geometry service's comic defaults replace them for texts and motifs (raised where the
+ * anchor allows it, 1.5 mm deep within the anchor's cap). Customer-facing {@code detail}s use labels, never code words.
+ *
+ * <p>Anchor modes (contract {@code cccb468}): an anchor that lists {@code modes} takes content only in those, and a feature
+ * that leaves its mode out takes its type's default (text and photo raised, motif cut in), which must then be listed. So
+ * Chaukhat's rails take cut-in names and motifs only and Roshni's plate takes its photo as the plate itself (lithophane), as
+ * the geometry templates refuse anything else at build time.
  *
  * <p>What one anchor holds: at most one photo or form, one text (Naam) and one motif (Buti). A text and a motif share a
  * spot side by side; a photo relief fills its spot, so a text or a motif beside it is refused as crowded, whichever
@@ -60,6 +68,26 @@ class FeatureValidator {
     static final double LONGEST_MIN_MM = 5;
     static final double LONGEST_MAX_MM = 250;
     static final List<String> FORMATS = List.of("png", "jpg", "webp", "heic", "stl", "glb", "3mf", "obj", "ply", "off", "gltf");
+    static final String EMBOSS = "emboss";
+    static final String DEBOSS = "deboss";
+    static final String LITHOPHANE = "lithophane";
+    static final List<String> MODES = List.of(EMBOSS, DEBOSS, LITHOPHANE);
+    /** Katha's spec style: its texts and motifs are raised unless the customer chose otherwise (the geometry service's defaults). */
+    static final String COMIC_POP = "comic_pop";
+    /** How proud a comic_pop text or motif stands when its depth is left out, before the anchor's {@code max_relief_mm}. */
+    static final double COMIC_RAISED_DEPTH_MM = 1.5;
+    /** What a mode does, in a sentence ("names are cut in"), and the choice a customer makes ("choose cut-in"). */
+    private static final Map<String, String> MODE_STATE = Map.of(EMBOSS, "raised", DEBOSS, "cut in", LITHOPHANE, "the glowing plate itself");
+    private static final Map<String, String> MODE_CHOICE = Map.of(EMBOSS, "raised", DEBOSS, "cut-in", LITHOPHANE, "the night-light photo");
+    /** What an anchor holds, as a sentence names it, in this order. */
+    private static final List<String> PLURAL_ORDER = List.of(EMBOSS_TEXT, MOTIF, RELIEF_IMAGE, HERO_MESH);
+    private static final Map<String, String> PLURALS = Map.of(EMBOSS_TEXT, "names", MOTIF, "motifs", RELIEF_IMAGE, "photos", HERO_MESH, "3D forms");
+    /** What a required anchor asks for: one kind ("Add the photo"), or several ("Add a photo, a name or a motif"), in this order. */
+    private static final List<String> NEEDS_ORDER = List.of(RELIEF_IMAGE, EMBOSS_TEXT, MOTIF, HERO_MESH);
+    private static final Map<String, String> NEEDS_ONE = Map.of(RELIEF_IMAGE, "the photo", EMBOSS_TEXT, "the name", MOTIF, "a motif",
+            HERO_MESH, "your model file");
+    private static final Map<String, String> NEEDS_ANY = Map.of(RELIEF_IMAGE, "a photo", EMBOSS_TEXT, "a name", MOTIF, "a motif",
+            HERO_MESH, "your model file");
     private static final Pattern ID = Pattern.compile("^[a-z][a-z0-9_]*$");
     private static final double EPSILON = 1e-9;
 
@@ -111,13 +139,25 @@ class FeatureValidator {
         this.motifs = motifs;
     }
 
+    /** The checks with the contract's defaults (spec style {@code none}). */
     List<Map<String, Object>> validate(TemplateDescriptor descriptor, FamilyLimits family, List<Map<String, Object>> requested) {
+        return validate(descriptor, family, requested, null);
+    }
+
+    /** @param style the design's spec style; {@code comic_pop} switches to the comic defaults for texts and motifs */
+    List<Map<String, Object>> validate(TemplateDescriptor descriptor, FamilyLimits family, List<Map<String, Object>> requested, String style) {
         FamilyLimits limits = family == null ? FamilyLimits.none(descriptor.family()) : family;
         List<Map<String, Object>> features = requested == null ? List.of() : requested;
+        boolean comic = COMIC_POP.equals(style);
 
         List<Map<String, Object>> normalised = new ArrayList<>();
         for (int i = 0; i < features.size(); i++) {
-            normalised.add(normalise(descriptor, i, features.get(i)));
+            Object raw = features.get(i);
+            Map<String, Object> feature = normalise(descriptor, i, raw);
+            if (comic) {
+                applyComicDefaults(descriptor, raw, feature);
+            }
+            normalised.add(feature);
         }
 
         List<String> supported = descriptor.featuresSupportedOrEmpty();
@@ -137,6 +177,7 @@ class FeatureValidator {
         if (limits.raw()) {
             checkRaw(descriptor, limits, normalised);
         }
+        checkRequired(descriptor, normalised);
         return normalised;
     }
 
@@ -235,6 +276,30 @@ class FeatureValidator {
         };
     }
 
+    /**
+     * Katha's comic_pop defaults, the geometry service's own (the API fills every default before a spec reaches it, so it must
+     * fill these too): a text or a motif that leaves its mode out is raised where the anchor allows it (no {@code modes}, or
+     * {@code modes} listing emboss), and a raised one that leaves its depth out stands {@value #COMIC_RAISED_DEPTH_MM} mm proud,
+     * capped at the anchor's {@code max_relief_mm}. Explicit choices, photos and forms are left alone; an unknown anchor is
+     * refused by the placement checks.
+     */
+    private static void applyComicDefaults(TemplateDescriptor descriptor, Object raw, Map<String, Object> feature) {
+        if (!(raw instanceof Map<?, ?> requested) || !MARK_TYPES.contains(feature.get("type"))) {
+            return;
+        }
+        TemplateDescriptor.Anchor anchor = descriptor.anchors().stream().filter(a -> Objects.equals(a.id(), feature.get("anchor"))).findFirst()
+                .orElse(null);
+        if (anchor == null) {
+            return;
+        }
+        if (requested.get("mode") == null && anchor.allowsMode(EMBOSS)) {
+            feature.put("mode", EMBOSS);
+        }
+        if (requested.get("depth_mm") == null && EMBOSS.equals(feature.get("mode"))) {
+            feature.put("depth_mm", anchor.maxReliefMm() == null ? COMIC_RAISED_DEPTH_MM : Math.min(COMIC_RAISED_DEPTH_MM, anchor.maxReliefMm()));
+        }
+    }
+
     /** {@code content_source}: an upload id (the API fills the url, format and origin from the upload itself). */
     private Map<String, Object> checkSource(TemplateDescriptor descriptor, int index, String type, Object value) {
         String path = path(index, "source");
@@ -305,6 +370,7 @@ class FeatureValidator {
             throw problem(ProblemCodes.UNSUPPORTED_FEATURE, "Unsupported feature", "The " + labelOf(anchor) + " holds a 3D form; " + label
                     + " needs a flat surface", descriptor, index, Map.of("anchor", anchor.id()));
         }
+        checkMode(descriptor, anchor, index, feature);
         checkCompany(descriptor, anchor, onAnchor.computeIfAbsent(anchor.id(), id -> new ArrayList<>()), index, type);
         if (MARK_TYPES.contains(type)) {
             checkFlat(descriptor, anchor, index, feature);
@@ -365,6 +431,48 @@ class FeatureValidator {
                     Map.of("anchor", anchor.id()));
         }
         seen.add(type);
+    }
+
+    /**
+     * The anchor's {@code modes}: the feature's mode (its type's default when it left the mode out) must be one of them.
+     * A form ({@code hero_mesh}) has no mode.
+     */
+    private static void checkMode(TemplateDescriptor descriptor, TemplateDescriptor.Anchor anchor, int index, Map<String, Object> feature) {
+        if (!(feature.get("mode") instanceof String mode) || anchor.allowsMode(mode)) {
+            return;
+        }
+        Map<String, Object> where = new LinkedHashMap<>();
+        where.put("field", path(index, "mode"));
+        where.put("anchor", anchor.id());
+        where.put("modes", anchor.modes());
+        throw problem(ProblemCodes.UNSUPPORTED_FEATURE, "Unsupported feature", modeDetail(descriptor, anchor, (String) feature.get("type"), mode),
+                descriptor, index, where);
+    }
+
+    /**
+     * "On the Top rail names and motifs are cut in, not raised; choose cut-in"; "On the Photo plate your photo becomes the
+     * glowing plate itself; choose the night-light photo": the place by its label, what it holds and how, and what to choose.
+     */
+    static String modeDetail(TemplateDescriptor descriptor, TemplateDescriptor.Anchor anchor, String type, String mode) {
+        String place = "On the " + labelOf(anchor) + " ";
+        List<String> allowed = MODES.stream().filter(anchor.modes()::contains).toList();
+        if (allowed.isEmpty()) {
+            allowed = anchor.modes();
+        }
+        if (RELIEF_IMAGE.equals(type) && allowed.equals(List.of(LITHOPHANE))) {
+            return place + "your photo becomes the glowing plate itself; choose the night-light photo";
+        }
+        String states = allowed.stream().map(m -> MODE_STATE.getOrDefault(m, m)).collect(Collectors.joining(" or "));
+        boolean swapped = allowed.size() == 1 && Set.of(EMBOSS, DEBOSS).containsAll(List.of(mode, allowed.get(0)));
+        String choices = allowed.stream().map(m -> MODE_CHOICE.getOrDefault(m, m)).collect(Collectors.joining(" or "));
+        return place + holds(descriptor, anchor, type) + " are " + states + (swapped ? ", not " + MODE_STATE.get(mode) : "") + "; choose " + choices;
+    }
+
+    /** What the anchor holds, as a sentence names it ("names and motifs"); the feature's own kind when the anchor names nothing. */
+    private static String holds(TemplateDescriptor descriptor, TemplateDescriptor.Anchor anchor, String type) {
+        List<String> accepts = accepts(descriptor, anchor);
+        List<String> nouns = PLURAL_ORDER.stream().filter(accepts::contains).map(PLURALS::get).toList();
+        return nouns.isEmpty() ? PLURALS.getOrDefault(type, "pieces") : joined(nouns, "and");
     }
 
     /** No anchor is curved yet, so a text or a motif is set flat: a curved projection (or a curved anchor) is not built. */
@@ -446,7 +554,45 @@ class FeatureValidator {
         }
     }
 
+    /**
+     * Anchors marked {@code required} (the night-light plate needs its photo): the piece can't be built without content on
+     * each. Runs after every other check, so a more specific refusal (the raw family's "Add your model file") comes first.
+     */
+    private static void checkRequired(TemplateDescriptor descriptor, List<Map<String, Object>> features) {
+        Set<Object> filled = features.stream().map(f -> f.get("anchor")).collect(Collectors.toSet());
+        for (TemplateDescriptor.Anchor anchor : descriptor.anchors()) {
+            if (anchor.needsContent() && !filled.contains(anchor.id())) {
+                List<String> accepts = accepts(descriptor, anchor);
+                throw problem(ProblemCodes.VALIDATION_FAILED, "Validation failed", requiredDetail(anchor, accepts), descriptor, null,
+                        Map.of("anchor", anchor.id(), "accepts", accepts));
+            }
+        }
+    }
+
+    /** "Add the photo for the Photo plate"; "Add a photo, a name or a motif for the Face" when the anchor takes several kinds. */
+    static String requiredDetail(TemplateDescriptor.Anchor anchor, List<String> accepts) {
+        String place = " for the " + labelOf(anchor);
+        if (accepts.size() == 1) {
+            return "Add " + NEEDS_ONE.getOrDefault(accepts.get(0), "something") + place;
+        }
+        List<String> any = NEEDS_ORDER.stream().filter(accepts::contains).map(NEEDS_ANY::get).toList();
+        return "Add " + (any.isEmpty() ? "something" : joined(any, "or")) + place;
+    }
+
     // ---- helpers ------------------------------------------------------------------------------------------------------
+
+    /** The kinds an anchor takes: its {@code accepts}, else the template's {@code features_supported}. */
+    private static List<String> accepts(TemplateDescriptor descriptor, TemplateDescriptor.Anchor anchor) {
+        return anchor.accepts() != null ? anchor.accepts() : descriptor.featuresSupportedOrEmpty();
+    }
+
+    /** "a", "a and b", "a, b and c" (or "or"). */
+    private static String joined(List<String> words, String conjunction) {
+        if (words.size() <= 1) {
+            return String.join("", words);
+        }
+        return String.join(", ", words.subList(0, words.size() - 1)) + " " + conjunction + " " + words.get(words.size() - 1);
+    }
 
     /**
      * Characters as a reader counts them: combining marks (Indic vowel signs and viramas, accents) and format characters

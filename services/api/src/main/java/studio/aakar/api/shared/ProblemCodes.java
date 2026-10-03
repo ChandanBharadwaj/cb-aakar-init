@@ -59,6 +59,11 @@ public final class ProblemCodes {
     // The motif library (Buti): artwork served for previews
     public static final String UNKNOWN_MOTIF = "unknown_motif";
 
+    // Content rules, the trademark guardrail behind Katha (plan §8): a text (Naam) naming a protected hero or brand, and a
+    // second portal rule with the same letters and digits
+    public static final String PROTECTED_TERM = "protected_term";
+    public static final String CONTENT_TERM_EXISTS = "content_term_exists";
+
     private ProblemCodes() {
     }
 }

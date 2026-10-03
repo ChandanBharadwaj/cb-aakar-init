@@ -92,6 +92,12 @@ export type UploadsQuery = NonNullable<paths["/admin/api/uploads"]["get"]["param
 export type ContentReviewDecision = Schemas["ContentReviewDecision"];
 export type ReviewDecision = ContentReviewDecision["decision"];
 
+// Content rules: the names the studio won't print (the Katha trademark guardrail)
+/** A rule as stored, with `normalised_term` (how the matcher compares it) and `whole_word` (short terms match only as words). */
+export type ContentTerm = Schemas["ContentTerm"];
+export type ContentTermInput = Schemas["ContentTermInput"];
+export type ContentTermKind = ContentTermInput["kind"];
+
 // Templates
 /**
  * The contract lists the columns every template row must carry. The API merges the descriptor's

@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import studio.aakar.api.catalog.AdminExperienceDto;
 import studio.aakar.api.catalog.Catalog;
 import studio.aakar.api.catalog.CatalogItemDto;
 import studio.aakar.api.catalog.FamilyDto;
@@ -26,6 +27,8 @@ import studio.aakar.api.design.DesignVersionResponse;
 import studio.aakar.api.design.Designs;
 import studio.aakar.api.design.EditParamsRequest;
 import studio.aakar.api.design.VersionStatus;
+import studio.aakar.api.media.ContentTermDto;
+import studio.aakar.api.media.ContentTerms;
 import studio.aakar.api.media.UploadDto;
 import studio.aakar.api.media.UploadKind;
 import studio.aakar.api.media.Uploads;
@@ -47,12 +50,21 @@ import studio.aakar.api.templates.Templates;
  * one {@code hero_mesh}). Every path checks the template is live, its params, the finish (descriptor list and the
  * family's material rules) and the features (templates module), then resolves each content source to the customer's
  * own ready upload and writes the geometry service's URL into the spec.
+ *
+ * <p>Katha (plan §8): a text (Naam) that mentions an active content term (a licensed hero or brand, the portal's Content
+ * rules) is refused with 422 {@code protected_term}, at create and on every params edit, kept texts included. A design
+ * started from an experience takes the experience's style as {@code spec.style} when its template offers it
+ * ({@code style_variants}), else {@code none}; params edits keep the parent's style, and the feature checks apply that
+ * style's defaults ({@code comic_pop}: texts and motifs raised).
  */
 @Service
 class DesignService implements Designs {
 
     static final String NOT_YET_AVAILABLE_DETAIL =
             "Create from a description arrives in Phase 2; start from a template or a Shop piece instead.";
+    /** What a customer reads when a text (Naam) names a licensed hero; the term and the list are never echoed. */
+    static final String PROTECTED_TERM_DETAIL =
+            "We can't print copyrighted heroes or their names, but your own hero is welcome. Try your own hero's name.";
     static final int TITLE_MAX = 80;
     private static final Logger log = LoggerFactory.getLogger(DesignService.class);
 
@@ -63,9 +75,10 @@ class DesignService implements Designs {
     private final Uploads uploads;
     private final GenerationJobs jobs;
     private final VersionMapper mapper;
+    private final ContentTerms contentTerms;
 
     DesignService(DesignRepository designs, DesignVersionRepository versions, Catalog catalog, Templates templates, Uploads uploads,
-            GenerationJobs jobs, VersionMapper mapper) {
+            GenerationJobs jobs, VersionMapper mapper, ContentTerms contentTerms) {
         this.designs = designs;
         this.versions = versions;
         this.catalog = catalog;
@@ -73,6 +86,7 @@ class DesignService implements Designs {
         this.uploads = uploads;
         this.jobs = jobs;
         this.mapper = mapper;
+        this.contentTerms = contentTerms;
     }
 
     @Transactional
@@ -84,10 +98,9 @@ class DesignService implements Designs {
             throw ApiProblemException.validation("family_id is required when source is upload (your own model file prints as family raw_print)");
         }
         String experienceId = request.hasExperience() ? request.experienceId().trim() : null;
-        if (experienceId != null && !catalog.experienceExists(experienceId)) {
-            throw ApiProblemException.unprocessable(ProblemCodes.UNKNOWN_EXPERIENCE, "Unknown experience",
-                    "experience_id '" + experienceId + "' is not an experience (see GET /api/experiences)");
-        }
+        AdminExperienceDto experience = experienceId == null ? null : catalog.adminExperience(experienceId).orElseThrow(() ->
+                ApiProblemException.unprocessable(ProblemCodes.UNKNOWN_EXPERIENCE, "Unknown experience",
+                        "experience_id '" + experienceId + "' is not an experience (see GET /api/experiences)"));
         Draft draft = request.source() == DesignSource.shop ? fromShop(request)
                 : request.hasFamily() ? fromFamily(request) : fromTemplate(request);
         requireSourceFitsFamily(request.source(), draft.family());
@@ -97,26 +110,28 @@ class DesignService implements Designs {
         }
         templates.validateParams(draft.descriptor(), draft.params());
         requireMaterial(draft.descriptor(), draft.family(), draft.material());
-        List<Map<String, Object>> features = contentFeatures(request.features(), draft.descriptor(), draft.family(), owner, Set.of());
+        String style = DesignSpecs.style(draft.descriptor(), experience == null ? null : experience.style());
+        List<Map<String, Object>> features = contentFeatures(request.features(), draft.descriptor(), draft.family(), style, owner, Set.of());
 
         Instant now = Instant.now();
         String familyId = draft.family() == null ? null : draft.family().id();
         DesignEntity design = designs.save(new DesignEntity(request.source(), draft.catalogItemSlug(), familyId, experienceId, draft.title(), owner,
                 now));
-        Map<String, Object> spec = DesignSpecs.build(draft.descriptor(), draft.params(), draft.material(), features);
+        Map<String, Object> spec = DesignSpecs.build(draft.descriptor(), draft.params(), draft.material(), features, style);
         DesignVersionEntity version = versions.save(new DesignVersionEntity(design.id(), 1, null, spec, DesignSpecs.templateRef(draft.descriptor()),
                 expectedHardware(draft.descriptor(), draft.family()), DesignVersionEntity.CREATED_BY_USER, now));
         UUID jobId = jobs.start(new GenerationRequest(design.id(), version.id(), 1, null, spec));
         version.attachJob(jobId);
-        log.info("Design {} created from {} ({}, family {}, experience {}, {} feature(s)) by {}; job {}", design.id(), request.source(),
-                draft.descriptor().ref(), familyId, experienceId, features.size(), owner, jobId);
+        log.info("Design {} created from {} ({}, family {}, experience {}, style {}, {} feature(s)) by {}; job {}", design.id(), request.source(),
+                draft.descriptor().ref(), familyId, experienceId, style, features.size(), owner, jobId);
         return new DesignAccepted(design.id(), 1, jobId, GenerationJobs.eventsPath(jobId));
     }
 
     /**
      * A new version from a parent: params merged over the parent's, an optional finish swap and, when {@code features}
      * is present, the complete new list of content features (an empty list clears them; absent keeps the parent's).
-     * Uploads already on the design stay usable by whoever edits it; a new upload must belong to the caller.
+     * Uploads already on the design stay usable by whoever edits it; a new upload must belong to the caller. The parent's
+     * style stays; its texts are checked against the content rules again, since a term may have been added since.
      */
     @Transactional
     public DesignAccepted editParams(UUID versionId, EditParamsRequest request, Identity caller) {
@@ -132,13 +147,14 @@ class DesignService implements Designs {
         templates.validateParams(descriptor, params);
         String material = blank(request.material()) ? DesignSpecs.material(parent.spec()) : request.material();
         requireMaterial(descriptor, family, material);
+        String style = DesignSpecs.style(parent.spec());
         List<Map<String, Object>> features = request.features() == null
-                ? templates.validateFeatures(descriptor, limits(descriptor, family), DesignSpecs.features(parent.spec()))
-                : contentFeatures(request.features(), descriptor, family, caller, DesignSpecs.uploadIds(parent.spec()));
+                ? requireOwnWords(templates.validateFeatures(descriptor, limits(descriptor, family), DesignSpecs.features(parent.spec()), style))
+                : contentFeatures(request.features(), descriptor, family, style, caller, DesignSpecs.uploadIds(parent.spec()));
 
         Instant now = Instant.now();
         int versionNo = versions.maxVersionNo(design.id()) + 1;
-        Map<String, Object> spec = DesignSpecs.build(descriptor, params, material, features);
+        Map<String, Object> spec = DesignSpecs.build(descriptor, params, material, features, style);
         DesignVersionEntity version = versions.save(new DesignVersionEntity(design.id(), versionNo, parent.id(), spec,
                 DesignSpecs.templateRef(descriptor), expectedHardware(descriptor, family), DesignVersionEntity.CREATED_BY_USER, now));
         UUID jobId = jobs.start(new GenerationRequest(design.id(), version.id(), versionNo, parent.id(), spec));
@@ -336,13 +352,15 @@ class DesignService implements Designs {
     }
 
     /**
-     * Validates the features (templates module) and fills each {@code content_source} from the upload: the URL the
-     * geometry service fetches, the format and the origin. {@code onDesign} are uploads the parent version already
-     * carries; any other upload must belong to {@code caller}.
+     * Validates the features (templates module, with the defaults of the spec {@code style}), checks their texts against the
+     * content rules and fills each {@code content_source} from the upload: the URL the geometry service fetches, the format
+     * and the origin. {@code onDesign} are uploads the parent version already carries; any other upload must belong to
+     * {@code caller}.
      */
     private List<Map<String, Object>> contentFeatures(List<Map<String, Object>> requested, TemplateDescriptor descriptor, FamilyDto family,
-            Identity caller, Set<UUID> onDesign) {
-        List<Map<String, Object>> normalised = templates.validateFeatures(descriptor, limits(descriptor, family), requested == null ? List.of() : requested);
+            String style, Identity caller, Set<UUID> onDesign) {
+        List<Map<String, Object>> normalised = requireOwnWords(templates.validateFeatures(descriptor, limits(descriptor, family),
+                requested == null ? List.of() : requested, style));
         List<Map<String, Object>> resolved = new ArrayList<>(normalised.size());
         for (int i = 0; i < normalised.size(); i++) {
             Map<String, Object> feature = normalised.get(i);
@@ -354,6 +372,29 @@ class DesignService implements Designs {
             resolved.add(feature);
         }
         return resolved;
+    }
+
+    /**
+     * The trademark guardrail (Katha, plan §8): a text (Naam) that mentions an active content term, a licensed hero, villain
+     * or brand, is refused with 422 {@code protected_term}. The detail invites the customer's own hero; the response points at
+     * the text ({@code field}) and never names the term or the list.
+     */
+    private List<Map<String, Object>> requireOwnWords(List<Map<String, Object>> features) {
+        for (int i = 0; i < features.size(); i++) {
+            Map<String, Object> feature = features.get(i);
+            if (!FeatureLabels.EMBOSS_TEXT.equals(feature.get("type")) || !(feature.get("text") instanceof String text)) {
+                continue;
+            }
+            Optional<ContentTermDto> term = contentTerms.mentionedIn(text);
+            if (term.isPresent()) {
+                log.info("Refused a text (Naam) on feature {}: it mentions the content term \"{}\" ({})", i, term.get().term(), term.get().kind());
+                Map<String, Object> where = new LinkedHashMap<>();
+                where.put("feature", i);
+                where.put("field", "features[" + i + "].text");
+                throw ApiProblemException.unprocessable(ProblemCodes.PROTECTED_TERM, "Protected term", PROTECTED_TERM_DETAIL, where);
+            }
+        }
+        return features;
     }
 
     private Map<String, Object> contentSource(int index, String type, String uploadIdText, Identity caller, Set<UUID> onDesign) {

@@ -105,8 +105,10 @@ aakar:
     dir: ${AAKAR_MOTIFS_DIR:}
   uploads:
     # Customer uploads (POST /api/uploads, plan §4): photos for a relief, model files for a hero form or Swaroop.
-    # `terms` flags a file whose name mentions one of flag-terms (comma-separated; case, spaces and punctuation ignored)
-    # into the review queue; `noop` flags nothing and is refused when aakar.profile=production.
+    # `terms` flags a file whose name mentions an active content term (the portal's Content rules, table content_terms) or
+    # one of flag-terms (comma-separated, on top of the portal's list; case, spaces and punctuation ignored, terms of six
+    # letters or fewer only as whole words) into the review queue; `noop` flags nothing and is refused when
+    # aakar.profile=production.
     scanner: ${AAKAR_UPLOADS_SCANNER:terms}
     flag-terms: ${AAKAR_UPLOADS_FLAG_TERMS:}
     max-image-bytes: 15MB

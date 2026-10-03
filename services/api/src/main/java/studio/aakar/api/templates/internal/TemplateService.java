@@ -86,7 +86,8 @@ class TemplateService implements Templates {
     }
 
     @Override
-    public List<Map<String, Object>> validateFeatures(TemplateDescriptor descriptor, FamilyLimits family, List<Map<String, Object>> requested) {
-        return features.validate(descriptor, family, requested);
+    public List<Map<String, Object>> validateFeatures(TemplateDescriptor descriptor, FamilyLimits family, List<Map<String, Object>> requested,
+            String style) {
+        return features.validate(descriptor, family, requested, style);
     }
 }

@@ -160,7 +160,8 @@ class UploadsIntegrationTest extends AbstractIntegrationTest {
         assertThat(row.get("owner").get("user_id").isNull()).isTrue();
         assertThat(row.get("owner").get("phone").isNull()).isTrue();
         assertThat(row.get("review").get("status").asText()).isEqualTo("pending");
-        assertThat(row.get("review").get("reason").asText()).isEqualTo("File name mentions \"marvel\", a flagged term");
+        // the portal's content terms come first, the most specific one named (Iron Man over Marvel), with its kind and why
+        assertThat(row.get("review").get("reason").asText()).isEqualTo("File name mentions \"Iron Man\", a protected character · Marvel character (Disney)");
         assertThat(row.get("review").get("decided_at").isNull()).isTrue();
         String reviewId = row.get("review").get("id").asText();
         assertThat(body(get("/admin/api/uploads?status=ready&limit=200", owner)).findValuesAsText("id")).doesNotContain(uploadId);

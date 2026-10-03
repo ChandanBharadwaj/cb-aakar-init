@@ -1270,6 +1270,134 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/api/content-terms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Content rules (the trademark guardrail), every term active or not
+         * @description The names the studio won't print (Katha, docs/research/outcome-categories/implementation-plan.md §8 and open
+         *     decision 16): publishers and brands (`trademark`), heroes and villains (`character`) and anything else (`other`).
+         *     An upload whose file name mentions an active term waits in the review queue (`pending_review`, the reason names the
+         *     term); a design whose text (Naam) mentions one is refused with 422 `protected_term`, and customers never see the
+         *     list. Matching folds accents, ignores case, spaces and punctuation (letters and digits only, `normalised_term`), so
+         *     "iron man", "Iron-Man" and "IRONMAN" are one term; a term of six letters or digits or fewer (`whole_word`) only
+         *     matches as a whole word, so "DC" never catches "Adcock" nor "Thor" "Thorat". Sorted by `normalised_term`. Any staff role.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Content terms */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ContentTerm"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Add a content rule (owner only, audited as content_term.create)
+         * @description 409 `content_term_exists` when a term with the same letters and digits exists, active or not (edit or switch on that
+         *     one instead); 422 `validation_failed` for a schema violation or a term with fewer than two letters or digits.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ContentTermInput"];
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ContentTerm"];
+                    };
+                };
+                403: components["responses"]["Problem"];
+                /** @description content_term_exists */
+                409: components["responses"]["Problem"];
+                422: components["responses"]["Problem"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/api/content-terms/{termId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change a content rule's kind, reason or active switch (owner only, audited as content_term.update)
+         * @description The term is the rule's key and can't be renamed: the body's `term` must have the same letters and digits as the stored
+         *     one (another spelling of it is accepted and the stored spelling stays), 422 `validation_failed` otherwise; add the new
+         *     spelling as its own term and switch this one off. Rules are never deleted, so the audit trail stays readable. Switching
+         *     a term off stops it holding uploads and refusing names at once. 404 for an unknown id.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    termId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ContentTermInput"];
+                };
+            };
+            responses: {
+                /** @description Updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ContentTerm"];
+                    };
+                };
+                403: components["responses"]["Problem"];
+                404: components["responses"]["Problem"];
+                422: components["responses"]["Problem"];
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/api/motifs": {
         parameters: {
             query?: never;
@@ -1717,9 +1845,19 @@ export interface components {
             /** @default 100 */
             sort_order: number;
         };
+        /** @description The row as stored. The lists and defaults the input may leave out are always returned. */
         AdminExperience: components["schemas"]["AdminExperienceInput"] & {
+            /** @enum {string} */
+            style: "none" | "jaipur_heritage" | "modern_zen" | "cyber_desi" | "warli_line" | "comic_pop";
+            /** @description Motif ids (or a pack id) in order; empty when none */
+            motif_pack: string[];
+            /** @description Shop item slugs in display order; empty when none */
+            items: string[];
+            collections: components["schemas"]["ExperienceCollection"][];
+            season: components["schemas"]["SeasonWindow"][];
+            sort_order: number;
             /** Format: date-time */
-            updated_at?: string;
+            updated_at: string;
         };
         AdminUpload: components["schemas"]["Upload"] & {
             owner?: {
@@ -1750,6 +1888,41 @@ export interface components {
             decision: "approved" | "rejected";
             note?: string;
         };
+        /** @description A content rule as staff write it. On PUT the term must be the stored one (same letters and digits). */
+        ContentTermInput: {
+            /** @description The name as staff spell it (Spider-Man); at least two letters or digits */
+            term: string;
+            /**
+             * @description A publisher or brand, a character, or anything else
+             * @enum {string}
+             */
+            kind: "trademark" | "character" | "other";
+            /** @description Why it is protected, for staff and reviewers, e.g. Marvel character (Disney) */
+            reason?: string | null;
+            /**
+             * @description Off keeps the rule but stops it holding uploads and refusing names
+             * @default true
+             */
+            active: boolean;
+        };
+        /** @description A content rule as stored, with how the matcher compares it. */
+        ContentTerm: {
+            /** Format: uuid */
+            id: string;
+            term: string;
+            /** @enum {string} */
+            kind: "trademark" | "character" | "other";
+            reason: string | null;
+            active: boolean;
+            /** @description Folded, lowercase, letters and digits only (spiderman): the rule's unique key */
+            normalised_term: string;
+            /** @description Six letters or digits or fewer: matches only as a whole word of a text (DC, Thor, Batman) */
+            whole_word: boolean;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
         NotificationRecord: {
             /** Format: uuid */
             id: string;
@@ -1777,9 +1950,9 @@ export interface components {
             /** Format: date-time */
             at: string;
             staff_email: string;
-            /** @description order.advance, pricing.publish, material.update, catalog.update, template.live, family.create, family.update, hardware.create, hardware.update, experience.create, experience.update, review.decide */
+            /** @description order.advance, pricing.publish, material.update, catalog.update, template.live, family.create, family.update, hardware.create, hardware.update, experience.create, experience.update, review.decide, content_term.create, content_term.update */
             action: string;
-            /** @description Order number, policy version, material id, slug, template id, family id, hardware sku, experience id or review id */
+            /** @description Order number, policy version, material id, slug, template id, family id, hardware sku, experience id, review id or content term */
             target: string;
             before?: {
                 [key: string]: unknown;

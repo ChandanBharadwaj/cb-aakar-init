@@ -10,10 +10,11 @@ import org.springframework.util.unit.DataUnit;
 /**
  * {@code aakar.uploads.*}: customer uploads (plan §4).
  *
- * @param scanner {@code terms} (default: flags file names that mention a {@code flag-terms} entry) or {@code noop}
- *                (passes everything; refused by the production guard)
- * @param flagTerms words that send an upload to the review queue when its file name mentions them (case-insensitive,
- *                  spaces and punctuation ignored); empty by default; the seed of the trademark guardrail (plan §8)
+ * @param scanner {@code terms} (default: flags file names that mention an active content term of the portal or a
+ *                {@code flag-terms} entry) or {@code noop} (passes everything; refused by the production guard)
+ * @param flagTerms words that send an upload to the review queue when its file name mentions them (case, spaces and
+ *                  punctuation ignored, short terms as whole words), on top of the portal's content terms
+ *                  ({@code content_terms}, the trademark guardrail of plan §8); empty by default
  * @param maxImageBytes photos, default 15 MB
  * @param maxModelBytes model files, default 50 MB ({@code spring.servlet.multipart.max-file-size} sits just above)
  */

@@ -17,6 +17,8 @@ import type {
   AuditPage,
   CatalogItem,
   CatalogItemInput,
+  ContentTerm,
+  ContentTermInput,
   Dashboard,
   Environment,
   LoginRequest,
@@ -276,6 +278,13 @@ export const api = {
   reviews: {
     decide: (reviewId: string, decision: ReviewDecision, note?: string) =>
       request<AdminUpload>(`/admin/api/content-reviews/${enc(reviewId)}`, { method: "POST", body: { decision, ...(note?.trim() ? { note: note.trim() } : {}) } }),
+  },
+  /** Content rules (the trademark guardrail): any staff role reads; owner-only writes, audited as content_term.create / content_term.update. */
+  contentTerms: {
+    list: () => request<ContentTerm[]>("/admin/api/content-terms"),
+    create: (body: ContentTermInput) => request<ContentTerm>("/admin/api/content-terms", { method: "POST", body }),
+    /** The term is the rule's key: send it as stored (any spelling with the same letters and digits is accepted). */
+    update: (id: string, body: ContentTermInput) => request<ContentTerm>(`/admin/api/content-terms/${enc(id)}`, { method: "PUT", body }),
   },
   templates: {
     list: () => request<AdminTemplate[]>("/admin/api/templates"),

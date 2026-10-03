@@ -21,21 +21,44 @@ final class DesignSpecs {
     /**
      * @param features content features already validated and normalised (contract defaults filled) with their
      *                 {@code content_source} resolved from the uploads (url, format, origin); an empty list for none
+     * @param style    the spec style ({@link #style(TemplateDescriptor, String)} for a new design, the parent's on an edit);
+     *                 null or blank for {@value #STYLE_NONE}
      */
-    static Map<String, Object> build(TemplateDescriptor descriptor, Map<String, Object> params, String material, List<Map<String, Object>> features) {
+    static Map<String, Object> build(TemplateDescriptor descriptor, Map<String, Object> params, String material, List<Map<String, Object>> features,
+            String style) {
         Map<String, Object> spec = new LinkedHashMap<>();
         spec.put("spec_version", SPEC_VERSION);
         spec.put("family", descriptor.family());
         spec.put("template", descriptor.ref());
         spec.put("params", new LinkedHashMap<>(params));
         spec.put("features", features == null ? List.of() : copy(features));
-        spec.put("style", STYLE_NONE);
+        spec.put("style", style == null || style.isBlank() ? STYLE_NONE : style);
         spec.put("material", material);
         Map<String, Object> constraints = descriptor.constraints() == null ? Map.of() : descriptor.constraints().toSpecConstraints();
         if (!constraints.isEmpty()) {
             spec.put("constraints", constraints);
         }
         return spec;
+    }
+
+    /**
+     * The style a new design takes from the experience it started from: the experience's style when the template offers it
+     * ({@code style_variants}), otherwise {@value #STYLE_NONE}, silently (a theme never asks for a look the template can't make).
+     *
+     * @param experienceStyle the experience's {@code style}, or null without an experience
+     */
+    static String style(TemplateDescriptor descriptor, String experienceStyle) {
+        if (experienceStyle == null || experienceStyle.isBlank() || STYLE_NONE.equals(experienceStyle)) {
+            return STYLE_NONE;
+        }
+        List<String> offered = descriptor.styleVariants();
+        return offered != null && offered.contains(experienceStyle) ? experienceStyle : STYLE_NONE;
+    }
+
+    /** {@code spec.style} as stored (what a params edit keeps); {@value #STYLE_NONE} for a spec without one. */
+    static String style(Map<String, Object> spec) {
+        Object style = spec == null ? null : spec.get("style");
+        return style instanceof String s && !s.isBlank() ? s : STYLE_NONE;
     }
 
     /** {@code {id, version}} from {@code id@version}. */

@@ -41,13 +41,20 @@ public interface Templates {
      * {@code max_text_height_mm}; text within the family's {@code max_text_chars} (marks and joiners do not count), on one
      * line, in one of the seven launch scripts (matching {@code script} when given) and in the bundled lettering when a
      * {@code font} is named; a motif from the {@link Motifs} library at a scale between its {@code min_scale} and 1; a raw
-     * family needs exactly one form sized by its longest side inside the family envelope. Values are rejected, never
-     * clamped: 422 {@code validation_failed}, {@code unsupported_feature} or {@code param_out_of_range} (with the offending
-     * {@code features[i].field} path in {@code params}); the {@code detail} uses customer labels ("photo relief (Chhavi)"),
-     * never code words.
+     * family needs exactly one form sized by its longest side inside the family envelope. An anchor that lists
+     * {@code modes} takes only those ({@code unsupported_feature} on {@code features[i].mode}; a feature that leaves its mode
+     * out takes its type's default), and an anchor marked {@code required} must hold content ({@code validation_failed}).
+     * Values are rejected, never clamped: 422 {@code validation_failed}, {@code unsupported_feature} or
+     * {@code param_out_of_range} (with the offending {@code features[i].field} path in {@code params}); the {@code detail}
+     * uses customer labels ("photo relief (Chhavi)"), never code words.
+     *
+     * <p>Under the spec style {@code comic_pop} (Katha) the defaults are the geometry service's comic ones: a text or a motif
+     * that leaves its mode out is raised where the anchor allows it, and a raised text or motif that leaves its depth out
+     * stands 1.5 mm proud, capped at the anchor's {@code max_relief_mm}. Explicit choices and photos are left alone.
      *
      * @param family the family's limits, or {@link FamilyLimits#none(String)}
      * @param features the requested features (may be empty); {@code content_source.url} is not required
+     * @param style the design's spec style ({@code none}, {@code comic_pop}, …); null counts as {@code none}
      */
-    List<Map<String, Object>> validateFeatures(TemplateDescriptor descriptor, FamilyLimits family, List<Map<String, Object>> features);
+    List<Map<String, Object>> validateFeatures(TemplateDescriptor descriptor, FamilyLimits family, List<Map<String, Object>> features, String style);
 }

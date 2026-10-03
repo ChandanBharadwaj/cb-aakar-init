@@ -51,6 +51,9 @@ class FeatureValidatorTest {
     static TemplateDescriptor nameplate;
     static TemplateDescriptor plaque;
     static TemplateDescriptor mug;
+    static TemplateDescriptor frame;
+    static TemplateDescriptor nightLight;
+    static TemplateDescriptor badge;
     final FeatureValidator validator = new FeatureValidator(LIBRARY);
 
     @BeforeAll
@@ -79,6 +82,34 @@ class FeatureValidatorTest {
                  "features_supported": ["emboss_text", "motif"],
                  "anchors": [{"id": "wrap", "label": "Wrap", "kind": "surface", "projection": "cylindrical", "size_mm": [200, 80],
                               "accepts": ["emboss_text", "motif"], "max_relief_mm": 1.5}]}
+                """, TemplateDescriptor.class);
+        // Anchor modes and required content (contract cccb468), as Chaukhat and Roshni will publish them: rails that print face
+        // down take cut-in names and motifs only, a night-light plate takes its photo as the plate itself and can't be left empty
+        frame = JSON.readValue("""
+                {"id": "test_frame", "version": 1, "family": "photo_frame", "name": "Test frame", "params": {}, "materials": ["basic_white"],
+                 "features_supported": ["emboss_text", "motif"],
+                 "anchors": [
+                   {"id": "border", "label": "Top rail", "kind": "surface", "projection": "planar", "accepts": ["motif", "emboss_text"], "max_relief_mm": 1.2, "modes": ["deboss"]},
+                   {"id": "base_front", "label": "Bottom rail", "kind": "surface", "projection": "planar", "accepts": ["emboss_text"], "max_relief_mm": 1.2, "modes": ["deboss"]}
+                 ]}
+                """, TemplateDescriptor.class);
+        nightLight = JSON.readValue("""
+                {"id": "test_night_light", "version": 1, "family": "lithophane", "name": "Test night light", "params": {}, "materials": ["basic_white"],
+                 "features_supported": ["relief_image", "emboss_text"],
+                 "anchors": [
+                   {"id": "plate", "label": "Photo plate", "kind": "surface", "projection": "planar", "accepts": ["relief_image"], "modes": ["lithophane"], "required": true},
+                   {"id": "base", "label": "Base", "kind": "surface", "projection": "planar", "accepts": ["emboss_text", "relief_image"], "max_relief_mm": 1.2, "modes": ["emboss", "deboss"], "required": false}
+                 ]}
+                """, TemplateDescriptor.class);
+        // Katha's comic look (spec style comic_pop): a face capped at 1.2 mm, a rim without a cap, a rail that only cuts in
+        badge = JSON.readValue("""
+                {"id": "test_badge", "version": 1, "family": "keychain", "name": "Test badge", "params": {}, "materials": ["basic_white"],
+                 "style_variants": ["comic_pop"], "features_supported": ["emboss_text", "motif", "relief_image"],
+                 "anchors": [
+                   {"id": "face", "label": "Face", "kind": "surface", "projection": "planar", "accepts": ["emboss_text", "motif", "relief_image"], "max_relief_mm": 1.2},
+                   {"id": "rim", "label": "Rim", "kind": "surface", "projection": "planar", "accepts": ["emboss_text", "motif"], "modes": ["emboss", "deboss"]},
+                   {"id": "rail", "label": "Rail", "kind": "surface", "projection": "planar", "accepts": ["emboss_text", "motif"], "max_relief_mm": 1.2, "modes": ["deboss"]}
+                 ]}
                 """, TemplateDescriptor.class);
     }
 
@@ -458,6 +489,160 @@ class FeatureValidatorTest {
                     e -> assertThat(e.getMessage()).doesNotContain("relief_image", "hero_mesh", "emboss_text", "motif_id", "_mm", "anchor", "planar",
                             "cylindrical", "min_scale"));
         }
+    }
+
+    @Test
+    void anAnchorTakesContentOnlyInTheModesItAllows() {
+        // a name left without a mode takes its type's default, raised, which the face-down rails can't take
+        String railRefusal = "On the Top rail names and motifs are cut in, not raised; choose cut-in";
+        ApiProblemException problem = rejects(frame, NAMEPLATE, List.of(text("border", "Asha")), ProblemCodes.UNSUPPORTED_FEATURE);
+        assertThat(problem.getMessage()).isEqualTo(railRefusal);
+        assertThat(problem.properties()).containsEntry("field", "features[0].mode").containsEntry("anchor", "border")
+                .containsEntry("modes", List.of("deboss")).containsEntry("feature", 0).containsEntry("template_id", "test_frame");
+        assertThat(validator.validate(frame, NAMEPLATE, List.of(withMode(text("border", "Asha"), "deboss")))).singleElement()
+                .satisfies(f -> assertThat(f).containsEntry("mode", "deboss"));
+        // a motif's default is cut in, so it fits as it is; raised it does not
+        assertThat(validator.validate(frame, NAMEPLATE, List.of(motif("border")))).singleElement().satisfies(f -> assertThat(f).containsEntry("mode", "deboss"));
+        assertThat(rejects(frame, NAMEPLATE, List.of(withMode(motif("border"), "emboss")), ProblemCodes.UNSUPPORTED_FEATURE).getMessage()).isEqualTo(railRefusal);
+        // the message names what the anchor holds, and points at the second feature when that is the one at fault
+        problem = rejects(frame, NAMEPLATE, List.of(motif("border"), text("base_front", "Asha Rao")), ProblemCodes.UNSUPPORTED_FEATURE);
+        assertThat(problem.getMessage()).isEqualTo("On the Bottom rail names are cut in, not raised; choose cut-in");
+        assertThat(problem.properties()).containsEntry("field", "features[1].mode").containsEntry("feature", 1);
+
+        // the night-light plate takes the photo as the plate itself, however else it is asked for
+        String plateRefusal = "On the Photo plate your photo becomes the glowing plate itself; choose the night-light photo";
+        for (String mode : new String[] {null, "emboss", "deboss"}) {
+            Map<String, Object> photo = mode == null ? relief("plate") : withMode(relief("plate"), mode);
+            problem = rejects(nightLight, NAMEPLATE, List.of(photo), ProblemCodes.UNSUPPORTED_FEATURE);
+            assertThat(problem.getMessage()).as("mode %s", mode).isEqualTo(plateRefusal);
+            assertThat(problem.properties()).containsEntry("field", "features[0].mode").containsEntry("modes", List.of("lithophane"));
+        }
+        Map<String, Object> lithophane = withMode(relief("plate"), "lithophane");
+        lithophane.put("relief_mm", 2.5);
+        assertThat(validator.validate(nightLight, NAMEPLATE, List.of(lithophane))).hasSize(1);
+        // an anchor with two modes words the choice as both
+        problem = rejects(nightLight, NAMEPLATE, List.of(lithophane, withMode(relief("base"), "lithophane")), ProblemCodes.UNSUPPORTED_FEATURE);
+        assertThat(problem.getMessage()).isEqualTo("On the Base names and photos are raised or cut in; choose raised or cut-in");
+        assertThat(validator.validate(nightLight, NAMEPLATE, List.of(lithophane, text("base", "Asha")))).hasSize(2);
+    }
+
+    @Test
+    void aRequiredAnchorCannotBeLeftEmpty() {
+        ApiProblemException problem = rejects(nightLight, NAMEPLATE, List.of(), ProblemCodes.VALIDATION_FAILED);
+        assertThat(problem.getMessage()).isEqualTo("Add the photo for the Photo plate");
+        assertThat(problem.properties()).containsEntry("anchor", "plate").containsEntry("accepts", List.of("relief_image")).doesNotContainKey("feature");
+        // content elsewhere does not count
+        assertThat(rejects(nightLight, NAMEPLATE, List.of(text("base", "Asha")), ProblemCodes.VALIDATION_FAILED).getMessage())
+                .isEqualTo("Add the photo for the Photo plate");
+        // a wrong mode on the plate is the more useful answer, so it comes first
+        rejects(nightLight, NAMEPLATE, List.of(relief("plate")), ProblemCodes.UNSUPPORTED_FEATURE);
+        // `required: false` asks nothing, and an anchor that takes several kinds names them all
+        TemplateDescriptor.Anchor face = new TemplateDescriptor.Anchor("face", "Face", "surface", "planar", null, null, null, null,
+                List.of("motif", "emboss_text", "relief_image"), null, null, true);
+        assertThat(FeatureValidator.requiredDetail(face, face.accepts())).isEqualTo("Add a photo, a name or a motif for the Face");
+        assertThat(FeatureValidator.requiredDetail(face, List.of("hero_mesh"))).isEqualTo("Add your model file for the Face");
+    }
+
+    @Test
+    void templatesWithoutModesOrRequiredAnchorsBehaveAsBefore() {
+        Map<String, Object> cutIn = withMode(relief("window"), "deboss");
+        assertThat(validator.validate(plaque, NAMEPLATE, List.of(cutIn))).hasSize(1);
+        assertThat(validator.validate(plaque, NAMEPLATE, List.of(withMode(relief("window"), "lithophane")))).hasSize(1);
+        assertThat(validator.validate(plaque, NAMEPLATE, List.of(withMode(text("face", "Asha"), "deboss"), withMode(motif("face"), "emboss")))).hasSize(2);
+        assertThat(validator.validate(plaque, NAMEPLATE, List.of())).isEmpty();
+        assertThat(validator.validate(keychain, KEYCHAIN, List.of())).isEmpty();
+        // the new fields stay absent when a descriptor doesn't carry them, so it round-trips as published
+        assertThat(plaque.anchors()).allSatisfy(a -> {
+            assertThat(a.modes()).isNull();
+            assertThat(a.required()).isNull();
+            assertThat(a.needsContent()).isFalse();
+            assertThat(a.allowsMode("lithophane")).isTrue();
+        });
+    }
+
+    @Test
+    void anchorModesAndRequiredRoundTripAsJson() throws IOException {
+        Map<String, Object> plate = JSON.readValue(JSON.writeValueAsString(nightLight.anchors().get(0)), new TypeReference<>() { });
+        assertThat(plate).containsEntry("modes", List.of("lithophane")).containsEntry("required", true);
+        assertThat(JSON.readValue(JSON.writeValueAsString(nightLight.anchors().get(1)), new TypeReference<Map<String, Object>>() { }))
+                .containsEntry("required", false);
+        Map<String, Object> face = JSON.readValue(JSON.writeValueAsString(plaque.anchors().get(0)), new TypeReference<>() { });
+        assertThat(face).doesNotContainKeys("modes", "required", "volume", "needs_content");
+    }
+
+    @Test
+    void comicPopRaisesNamesAndMotifsByDefault() {
+        String comic = FeatureValidator.COMIC_POP;
+        // a motif left without a mode is raised where the anchor allows it; a raised mark without a depth stands 1.5 mm proud,
+        // capped at the anchor's max_relief_mm (1.2 on the face, none on the rim)
+        List<Map<String, Object>> out = validator.validate(badge, NAMEPLATE, List.of(motif("face"), text("rim", "Asha"), motif("rim", "paisley")), comic);
+        assertThat(out.get(0)).containsEntry("mode", "emboss").containsEntry("depth_mm", 1.2);
+        assertThat(out.get(1)).containsEntry("mode", "emboss").containsEntry("depth_mm", 1.5);
+        assertThat(out.get(2)).containsEntry("mode", "emboss").containsEntry("depth_mm", 1.5);
+        assertThat(validator.validate(badge, NAMEPLATE, List.of(text("face", "Asha")), comic)).singleElement()
+                .satisfies(f -> assertThat(f).containsEntry("mode", "emboss").containsEntry("depth_mm", 1.2));
+
+        // where the anchor only cuts in, a motif keeps its cut-in default (and its contract depth) and a name still needs its mode
+        assertThat(validator.validate(badge, NAMEPLATE, List.of(motif("rail")), comic)).singleElement()
+                .satisfies(f -> assertThat(f).containsEntry("mode", "deboss").containsEntry("depth_mm", 1.0));
+        rejects(badge, NAMEPLATE, List.of(text("rail", "Asha")), ProblemCodes.UNSUPPORTED_FEATURE, comic);
+
+        // explicit choices are left alone: a cut-in motif, a chosen depth (a raised one included)
+        Map<String, Object> cutIn = withMode(motif("face"), "deboss");
+        Map<String, Object> shallow = new LinkedHashMap<>(text("rim", "Ravi"));
+        shallow.put("depth_mm", 0.8);
+        Map<String, Object> raisedDeep = withMode(motif("rim", "paisley"), "emboss");
+        raisedDeep.put("depth_mm", 2.5);
+        out = validator.validate(badge, NAMEPLATE, List.of(cutIn, shallow, raisedDeep), comic);
+        assertThat(out.get(0)).containsEntry("mode", "deboss").containsEntry("depth_mm", 1.0);
+        assertThat(out.get(1)).containsEntry("mode", "emboss").containsEntry("depth_mm", 0.8);
+        assertThat(out.get(2)).containsEntry("mode", "emboss").containsEntry("depth_mm", 2.5);
+        // and a chosen depth over the anchor's cap is still refused, never clamped
+        Map<String, Object> tooDeep = new LinkedHashMap<>(text("face", "Asha"));
+        tooDeep.put("depth_mm", 1.5);
+        rejects(badge, NAMEPLATE, List.of(tooDeep), ProblemCodes.PARAM_OUT_OF_RANGE, comic);
+
+        // photos are left alone
+        assertThat(validator.validate(badge, NAMEPLATE, List.of(relief("face")), comic)).singleElement()
+                .satisfies(f -> assertThat(f).containsEntry("mode", "emboss").containsEntry("relief_mm", 0.6));
+        // and without the comic style the contract's defaults hold: motifs cut in 1 mm, names raised 1.2 mm
+        out = validator.validate(badge, NAMEPLATE, List.of(motif("face"), text("rim", "Asha")), "none");
+        assertThat(out.get(0)).containsEntry("mode", "deboss").containsEntry("depth_mm", 1.0);
+        assertThat(out.get(1)).containsEntry("mode", "emboss").containsEntry("depth_mm", 1.2);
+        assertThat(validator.validate(badge, NAMEPLATE, List.of(motif("face")), null)).singleElement().satisfies(f -> assertThat(f).containsEntry("mode", "deboss"));
+    }
+
+    @Test
+    void modeAndRequiredDetailsUseLabelsNeverCodeWords() {
+        List<List<Map<String, Object>>> bad = List.of(
+                List.of(),
+                List.of(relief("plate")),
+                List.of(withMode(relief("plate"), "lithophane"), withMode(relief("base"), "lithophane")));
+        for (List<Map<String, Object>> features : bad) {
+            assertThatThrownBy(() -> validator.validate(nightLight, NAMEPLATE, features)).isInstanceOfSatisfying(ApiProblemException.class,
+                    e -> assertThat(e.getMessage()).doesNotContain("relief_image", "emboss_text", "lithophane", "deboss", "emboss ", "anchor", "_mm"));
+        }
+        assertThatThrownBy(() -> validator.validate(frame, NAMEPLATE, List.of(text("border", "Asha")))).isInstanceOfSatisfying(ApiProblemException.class,
+                e -> assertThat(e.getMessage()).doesNotContain("emboss", "deboss", "emboss_text", "anchor"));
+    }
+
+    private ApiProblemException rejects(TemplateDescriptor descriptor, FamilyLimits family, List<Map<String, Object>> features, String code, String style) {
+        try {
+            validator.validate(descriptor, family, features, style);
+        } catch (ApiProblemException e) {
+            assertThat(e.code()).as(e.getMessage()).isEqualTo(code);
+            assertThat(e.status()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+            assertThat(e.properties()).containsEntry("template_id", descriptor.id());
+            return e;
+        }
+        throw new AssertionError("expected " + code + " for " + features);
+    }
+
+    /** A copy of the feature with an explicit {@code mode}. */
+    private static Map<String, Object> withMode(Map<String, Object> feature, String mode) {
+        Map<String, Object> copy = new LinkedHashMap<>(feature);
+        copy.put("mode", mode);
+        return copy;
     }
 
     private ApiProblemException rejects(TemplateDescriptor descriptor, FamilyLimits family, List<Map<String, Object>> features, String code) {

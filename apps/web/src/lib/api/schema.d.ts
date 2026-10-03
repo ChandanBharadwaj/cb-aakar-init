@@ -538,7 +538,9 @@ export interface paths {
          * @description `multipart/form-data` with `file` and `kind` (`image` | `model`). Images: png, jpg, webp, heic up to
          *     15 MB. Models: stl, glb, 3mf, obj, ply, off, gltf up to 50 MB. Requires a known identity (user or
          *     guest header). Uploads the content scanner flags answer with `status: pending_review` and cannot be
-         *     placed on a design until a reviewer approves them (409 `upload_not_ready`, 422 `upload_rejected`).
+         *     placed on a design until a reviewer approves them (409 `upload_not_ready`, 422 `upload_rejected`). The scanner
+         *     holds a file whose name mentions a content rule the studio manages in its portal (licensed heroes and brands,
+         *     the Katha guardrail), case, spaces and punctuation ignored.
          */
         post: {
             parameters: {
@@ -646,7 +648,15 @@ export interface paths {
          *     Swaroop path: `source: upload`, `family_id: raw_print`, one `hero_mesh` feature.
          *     Create path: `prompt` alone → 422 until Phase 2.
          *     Any path may name the Duniya experience the customer came from (`experience_id`, 422 `unknown_experience`
-         *     otherwise); the design keeps it so the karigar's note and packaging card can name the theme.
+         *     otherwise); the design keeps it so the karigar's note and packaging card can name the theme, and takes the
+         *     experience's style as `spec.style` when the template offers it (`style_variants`), else `none`. Under
+         *     `comic_pop` a text or motif without a `mode` is raised where its anchor allows it, and a raised one without a
+         *     `depth_mm` stands 1.5 mm proud (capped at the anchor's `max_relief_mm`); explicit choices and photos are left alone.
+         *     Content is checked as the geometry service will build it: 422 `unsupported_feature` when a feature's mode (its
+         *     type's default when left out) is not in its anchor's `modes` (`params.field` = `features[i].mode`), 422
+         *     `validation_failed` when an anchor marked `required` has no content, and 422 `protected_term` when a text (Naam)
+         *     names a licensed hero or brand ("We can't print copyrighted heroes or their names, but your own hero is welcome.
+         *     Try your own hero's name."; the term is never echoed).
          *     Returns 202 with the design and the first generation job. Follow `/api/jobs/{id}/events`.
          */
         post: {
@@ -804,7 +814,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Edit parameters → new version (new job) */
+        /**
+         * Edit parameters → new version (new job)
+         * @description The new version keeps the parent's style. Its content is checked like a new design's, and every text (Naam), kept
+         *     or new, against the content rules again (422 `protected_term`), since a rule may have been added since.
+         */
         post: {
             parameters: {
                 query?: never;
@@ -2352,7 +2366,7 @@ export interface components {
             environment: string;
             surface: components["schemas"]["ExperienceSurface"];
             /**
-             * @description Default style variant the studio presets
+             * @description Style variant a design started from this experience takes (spec.style) when its template offers it (style_variants); none otherwise
              * @enum {string}
              */
             style: "none" | "jaipur_heritage" | "modern_zen" | "cyber_desi" | "warli_line" | "comic_pop";
@@ -2404,7 +2418,7 @@ export interface components {
             }[];
             prompt?: string;
             title?: string;
-            /** @description The Duniya experience the customer started from (an id from GET /api/experiences, e.g. festive); 422 unknown_experience otherwise */
+            /** @description The Duniya experience the customer started from (an id from GET /api/experiences, e.g. festive); 422 unknown_experience otherwise. Its style becomes spec.style when the template offers it (style_variants), else none */
             experience_id?: string;
         };
         DesignAccepted: {
@@ -3064,7 +3078,7 @@ export interface components {
                     status?: number;
                     detail?: string;
                     instance?: string;
-                    /** @description Stable machine code, e.g. not_found, not_yet_available, param_out_of_range, version_not_ready, unauthenticated, otp_invalid, otp_expired, otp_rate_limited, not_printable, cart_empty, not_serviceable, payment_final, unknown_family, unknown_experience */
+                    /** @description Stable machine code, e.g. not_found, validation_failed, not_yet_available, param_out_of_range, unsupported_feature, protected_term (a text naming a licensed hero or brand), version_not_ready, unauthenticated, otp_invalid, otp_expired, otp_rate_limited, not_printable, cart_empty, not_serviceable, payment_final, unknown_family, unknown_experience */
                     code?: string;
                 };
             };

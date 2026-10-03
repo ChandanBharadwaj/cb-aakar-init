@@ -6,12 +6,13 @@ info:
     Staff-only API behind the management portal (`apps/admin`, ADR-0012). Served by `services/api`
     under `/admin/api/*` with its own staff authentication (email + password, seeded account in the
     local profile; never customer tokens). Owns operational configuration (pricing policies, materials,
-    catalog, live templates, Avatars, hardware, Duniya experiences) and fulfilment operations (orders queue, stage advancement, QC, print pack,
-    messages log). Every write is recorded in the audit log.
+    catalog, live templates, Avatars, hardware, Duniya experiences, the content rules of the trademark guardrail) and
+    fulfilment operations (orders queue, stage advancement, QC, print pack, content reviews, messages log). Every write is
+    recorded in the audit log.
 
-    Roles: `owner` (everything), `studio` (fulfilment and read-only configuration).
+    Roles: `owner` (everything), `studio` (fulfilment, content reviews and read-only configuration).
     Errors are RFC 9457 Problem Details with a stable `code` (`unauthenticated`, `forbidden`,
-    `invalid_transition`, `policy_version_exists`, `not_found`, `validation_failed`).
+    `invalid_transition`, `policy_version_exists`, `not_found`, `validation_failed`, `content_term_exists`, …).
 servers:
   - url: http://localhost:8080
 security: [{ staffBearer: [] }]
@@ -391,6 +392,56 @@ paths:
         '200': { description: Decided, content: { application/json: { schema: { $ref: '#/components/schemas/AdminUpload' } } } }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { description: review_already_decided, $ref: '#/components/responses/Problem' }
+  /admin/api/content-terms:
+    get:
+      summary: Content rules (the trademark guardrail), every term active or not
+      description: |
+        The names the studio won't print (Katha, docs/research/outcome-categories/implementation-plan.md §8 and open
+        decision 16): publishers and brands (`trademark`), heroes and villains (`character`) and anything else (`other`).
+        An upload whose file name mentions an active term waits in the review queue (`pending_review`, the reason names the
+        term); a design whose text (Naam) mentions one is refused with 422 `protected_term`, and customers never see the
+        list. Matching folds accents, ignores case, spaces and punctuation (letters and digits only, `normalised_term`), so
+        "iron man", "Iron-Man" and "IRONMAN" are one term; a term of six letters or digits or fewer (`whole_word`) only
+        matches as a whole word, so "DC" never catches "Adcock" nor "Thor" "Thorat". Sorted by `normalised_term`. Any staff role.
+      tags: [content-rules]
+      responses:
+        '200': { description: Content terms, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/ContentTerm' } } } } }
+    post:
+      summary: Add a content rule (owner only, audited as content_term.create)
+      description: |
+        409 `content_term_exists` when a term with the same letters and digits exists, active or not (edit or switch on that
+        one instead); 422 `validation_failed` for a schema violation or a term with fewer than two letters or digits.
+      tags: [content-rules]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContentTermInput' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/ContentTerm' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { description: content_term_exists, $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /admin/api/content-terms/{termId}:
+    put:
+      summary: Change a content rule's kind, reason or active switch (owner only, audited as content_term.update)
+      description: |
+        The term is the rule's key and can't be renamed: the body's `term` must have the same letters and digits as the stored
+        one (another spelling of it is accepted and the stored spelling stays), 422 `validation_failed` otherwise; add the new
+        spelling as its own term and switch this one off. Rules are never deleted, so the audit trail stays readable. Switching
+        a term off stops it holding uploads and refusing names at once. 404 for an unknown id.
+      tags: [content-rules]
+      parameters: [{ name: termId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContentTermInput' }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/ContentTerm' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /admin/api/motifs:
     get:
       summary: The Buti motif library, for experience motif packs and template previews
@@ -711,11 +762,18 @@ components:
         available: { type: boolean }
         sort_order: { type: integer, default: 100 }
     AdminExperience:
+      description: The row as stored. The lists and defaults the input may leave out are always returned.
       allOf:
         - $ref: '#/components/schemas/AdminExperienceInput'
         - type: object
-          required: [style, motif_pack, items, collections, season, sort_order]
+          required: [style, motif_pack, items, collections, season, sort_order, updated_at]
           properties:
+            style: { type: string, enum: [none, jaipur_heritage, modern_zen, cyber_desi, warli_line, comic_pop] }
+            motif_pack: { type: array, items: { type: string }, description: "Motif ids (or a pack id) in order; empty when none" }
+            items: { type: array, items: { type: string }, description: Shop item slugs in display order; empty when none }
+            collections: { type: array, items: { $ref: 'aakar-api.v1.yaml#/components/schemas/ExperienceCollection' } }
+            season: { type: array, items: { $ref: 'aakar-api.v1.yaml#/components/schemas/SeasonWindow' } }
+            sort_order: { type: integer }
             updated_at: { type: string, format: date-time }
     AdminUpload:
       allOf:
@@ -733,6 +791,30 @@ components:
       properties:
         decision: { type: string, enum: [approved, rejected] }
         note: { type: string, maxLength: 200 }
+    ContentTermInput:
+      type: object
+      description: A content rule as staff write it. On PUT the term must be the stored one (same letters and digits).
+      additionalProperties: false
+      required: [term, kind]
+      properties:
+        term: { type: string, minLength: 2, maxLength: 80, description: "The name as staff spell it (Spider-Man); at least two letters or digits" }
+        kind: { type: string, enum: [trademark, character, other], description: "A publisher or brand, a character, or anything else" }
+        reason: { type: [string, 'null'], maxLength: 200, description: "Why it is protected, for staff and reviewers, e.g. Marvel character (Disney)" }
+        active: { type: boolean, default: true, description: Off keeps the rule but stops it holding uploads and refusing names }
+    ContentTerm:
+      type: object
+      description: A content rule as stored, with how the matcher compares it.
+      required: [id, term, kind, reason, active, normalised_term, whole_word, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        term: { type: string }
+        kind: { type: string, enum: [trademark, character, other] }
+        reason: { type: [string, 'null'] }
+        active: { type: boolean }
+        normalised_term: { type: string, description: "Folded, lowercase, letters and digits only (spiderman): the rule's unique key" }
+        whole_word: { type: boolean, description: "Six letters or digits or fewer: matches only as a whole word of a text (DC, Thor, Batman)" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
     NotificationRecord:
       type: object
       required: [id, channel, template, to, status, created_at]
@@ -754,7 +836,7 @@ components:
         id: { type: integer }
         at: { type: string, format: date-time }
         staff_email: { type: string }
-        action: { type: string, description: "order.advance, pricing.publish, material.update, catalog.update, template.live, family.create, family.update, hardware.create, hardware.update, experience.create, experience.update, review.decide" }
-        target: { type: string, description: "Order number, policy version, material id, slug, template id, family id, hardware sku, experience id or review id" }
+        action: { type: string, description: "order.advance, pricing.publish, material.update, catalog.update, template.live, family.create, family.update, hardware.create, hardware.update, experience.create, experience.update, review.decide, content_term.create, content_term.update" }
+        target: { type: string, description: "Order number, policy version, material id, slug, template id, family id, hardware sku, experience id, review id or content term" }
         before: { type: [object, 'null'], additionalProperties: true }
         after: { type: [object, 'null'], additionalProperties: true }

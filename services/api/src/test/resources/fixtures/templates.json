@@ -134,7 +134,9 @@
       "sandalwood_silk",
       "indigo_matte"
     ],
-    "style_variants": [],
+    "style_variants": [
+      "comic_pop"
+    ],
     "features_supported": [
       "relief_image",
       "emboss_text",
@@ -240,7 +242,9 @@
       "sandalwood_silk",
       "indigo_matte"
     ],
-    "style_variants": [],
+    "style_variants": [
+      "comic_pop"
+    ],
     "features_supported": [
       "relief_image",
       "emboss_text",
@@ -363,7 +367,9 @@
       "sandalwood_silk",
       "indigo_matte"
     ],
-    "style_variants": [],
+    "style_variants": [
+      "comic_pop"
+    ],
     "features_supported": [
       "relief_image",
       "emboss_text",
@@ -497,7 +503,9 @@
       "sandalwood_silk",
       "indigo_matte"
     ],
-    "style_variants": [],
+    "style_variants": [
+      "comic_pop"
+    ],
     "features_supported": [
       "emboss_text",
       "motif",
@@ -616,7 +624,9 @@
       "sandalwood_silk",
       "indigo_matte"
     ],
-    "style_variants": [],
+    "style_variants": [
+      "comic_pop"
+    ],
     "features_supported": [
       "relief_image",
       "emboss_text"
@@ -694,7 +704,11 @@
         "bleed_mm": 0.0,
         "accepts": [
           "relief_image"
-        ]
+        ],
+        "modes": [
+          "lithophane"
+        ],
+        "required": true
       }
     ],
     "constraints": {
@@ -817,7 +831,9 @@
       "sandalwood_silk",
       "indigo_matte"
     ],
-    "style_variants": [],
+    "style_variants": [
+      "comic_pop"
+    ],
     "features_supported": [
       "emboss_text",
       "motif",
@@ -892,7 +908,10 @@
           "motif",
           "emboss_text"
         ],
-        "max_relief_mm": 1.5
+        "max_relief_mm": 1.5,
+        "modes": [
+          "deboss"
+        ]
       },
       {
         "id": "base_front",
@@ -908,7 +927,10 @@
         "accepts": [
           "emboss_text"
         ],
-        "max_relief_mm": 1.5
+        "max_relief_mm": 1.5,
+        "modes": [
+          "deboss"
+        ]
       }
     ],
     "constraints": {
@@ -1034,7 +1056,9 @@
       "sandalwood_silk",
       "indigo_matte"
     ],
-    "style_variants": [],
+    "style_variants": [
+      "comic_pop"
+    ],
     "features_supported": [
       "hero_mesh",
       "emboss_text"
