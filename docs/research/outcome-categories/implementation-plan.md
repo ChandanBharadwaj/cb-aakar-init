@@ -111,6 +111,32 @@ Sessions hit limits, so every phase ends with a commit and push to `claude/3d-pr
 
 Each phase is independently shippable: phase 1 alone makes the catalogue data-driven, phases 1–3 make the geometry buildable from the CLI, phases 1–4 make avatars orderable through the API, phase 5 exposes them to customers and the portal, phase 7 adds the Duniya layer and Katha on top. Phase 7 depends only on phase 1 (families) and phase 5 (Shop and portal shells), so it can run in parallel with phases 2–4 if two people are available.
 
+## Status (3 Oct 2026): all seven phases done
+
+Every phase in the table above is on `claude/3d-print-categories-ypc6xw`, verified with the repo's own suites and live runs. `PROGRESS.md` holds the commit for each step.
+
+| Suite or walk | Result |
+|---|---|
+| API (`./gradlew test`) | 224 passed |
+| Geometry · inspect (pytest) | 665 · 21 passed |
+| Contracts, descriptors | valid; descriptors regenerate with no change; no pending backdrop or motif pack |
+| Storefront and portal (typecheck · lint · build) | clean |
+| `make smoke-avatars` (walks 1, 2, 4) | passed live |
+| `make smoke-katha` (walk 7 and the keepsakes) | passed live |
+| `/duniya/katha` and a comic studio in Chromium | rooftop backdrop, toon shading and ink outline; no page errors |
+
+Decided while building (beyond the sections below):
+- **Anchor rules are data.** Template descriptors carry `modes` (emboss, deboss, lithophane) and `required` per anchor (contract `cccb468`). The geometry service enforces them, the API refuses them at design time, and the composer reads them instead of special-casing products.
+- **Migrations:** `V12` keepsake ranges (Saathi from 25 mm, Pratima from 40 mm, photo-frame copy), `V13` content terms (24 seeded publishers and characters; terms of six characters or fewer match only as whole words), `V14` opens Roshni, Pratima and Katha. Each update leaves portal edits alone, and `V14` derives the new pricing policy from whichever one is active.
+- **Placeholder minimums** for the newly orderable keepsakes: Roshni ₹599, Pratima ₹699 (pricing policy `2026-10-keepsakes`), just above the research's delivered floors.
+
+Still open, for the owner:
+1. Real minimums and hardware costs in the portal (open decision 3); the seeded figures are placeholders.
+2. Fit tests on real prints before the photo frame (Chaukhat) and keycap (Kunji) are switched on; both have live templates and stay off.
+3. Licensed comic collections (open decision 16) need agreements; until then Katha's `collections` stay empty and the content terms guard the brand.
+4. Names matching a protected term are refused outright; a review path for genuine names (a customer called Thor) is a later choice, and staff can switch a term off meanwhile.
+5. Follow-ups noted by the build: quantity breaks for sets (open decision 11); marking Swaroop's `body` anchor `required`; the storefront mock does not mirror `protected_term`.
+
 ## Implementation
 
 ### 1. Domain model: carriers are template families

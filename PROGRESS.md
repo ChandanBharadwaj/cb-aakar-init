@@ -4,7 +4,7 @@ Living status of the plan in [PLAN.md](PLAN.md). Update this file with every mer
 
 | | |
 |---|---|
-| Last updated | 2026-10-03 (outcome categories: phases 1–5 done, keepsakes green in geometry and the API, Duniya live, Katha in flight) |
+| Last updated | 2026-10-03 (outcome categories: all seven phases done; Roshni, Pratima and Katha open; photo frame and keycap wait for fit tests) |
 | Current phase | **Phase 1** — the loop is complete locally (ADR-0013); now building **outcome categories (Avatars) + Swaroop** per `docs/research/outcome-categories/implementation-plan.md` |
 | Completed | Phase 0 — Foundations |
 | Roadmap position | ~2 of 28 scheduled weeks (5 phases; 1 done) |
@@ -115,7 +115,7 @@ Grouped by workstream (PLAN §15). Tick items as they merge.
 - [ ] Rate limits and per-user generation quotas
 - [ ] GST and consumer-law review with a chartered accountant (ADR-0008 follow-up)
 
-## Outcome categories (Avatars) — in progress
+## Outcome categories (Avatars) — done
 
 Plan: [`docs/research/outcome-categories/implementation-plan.md`](docs/research/outcome-categories/implementation-plan.md) (research in the same folder). Every step ends with a commit on `claude/3d-print-categories-ypc6xw`; a new session resumes from this table and the plan's "Resume state" and phase tables. Rules that survived a session-limit stop: checkpoint partial work as `wip(...)` commits first, run at most two agents at a time, commit after every green step.
 
@@ -127,8 +127,8 @@ Plan: [`docs/research/outcome-categories/implementation-plan.md`](docs/research/
 | 3 | PR 4 carriers `keychain_tag`, `fridge_magnet`, `hanging_ornament`, `desk_nameplate`, `raw_print` | ✅ Done (`debbefc` + `f7e7db5`; geometry 292) | descriptors exported to `packages/contracts/examples/template-descriptors.json` (`make descriptors`, drift-tested) |
 | 4 | PR 5 API uploads + review, content on designs, per-Avatar pricing, print pack | ✅ Done (`05599ea` + `046067f` + `2967d23`; API 175) | live smoke `make smoke-avatars` passed 27 Sep (`3a9763c`) |
 | 5 | PR 6 storefront · PR 7 portal | ✅ Done (web `e22c99e` + `e0f6e85` + `b929a04`; admin `31d9c8e` + `65ae76e`) | typecheck · lint · build clean |
-| 6 | PR 8 lithophane plate + night light, plinth, pet tag, photo frame, keycap | 🟨 geometry green (`a8f2a96` + `a8ddd09` + `9aa7ac8`; geometry 608); API fixtures carry the keepsakes (`907653e`); seed ranges and frame copy follow the templates (`V12`, `d3d6fc1`); anchors publish allowed `modes` and `required` content in the contract (`cccb468`) | next: geometry publishes `modes`/`required` and the composer reads them (with PR 12b); then `V14` switches on lithophane and figurine_base; photo_frame and keycap stay tier `next` until fit tests on real prints |
-| 7 | PRs 9–12 Duniya experiences + Katha | 🟨 PRs 9–11 and the motif endpoints done; PR 12a done (`869c9fd`: content terms `V13`, portal Content rules, Naam and upload checks, experience style, API anchor modes and comic defaults; API 224); PR 12b in flight (comic motifs, `comic_pop`, rooftop backdrop, cel shading, geometry anchor modes, composer modes) | after 12b: `V14` switches on Katha with the keepsakes, fixtures re-synced, `make smoke-avatars` live, walk (7) |
+| 6 | PR 8 lithophane plate + night light, plinth, pet tag, photo frame, keycap | ✅ Done (geometry `9aa7ac8`; fixtures `907653e`; ranges `V12` `d3d6fc1`; anchor modes `cccb468`; opened in `V14` `c926b36`) | Roshni and Pratima orderable with placeholder minimums ₹599 / ₹699; photo_frame and keycap stay switched off until fit tests on real prints |
+| 7 | PRs 9–12 Duniya experiences + Katha | ✅ Done (PRs 9–11; 12a `869c9fd`, API 224; 12b `4d7317f`, geometry 665; Katha opened in `V14`) | `make smoke-katha` passed live; `/duniya/katha` and a comic studio render in Chromium without page errors |
 
 ## Decisions
 
@@ -152,11 +152,13 @@ Plan: [`docs/research/outcome-categories/implementation-plan.md`](docs/research/
 
 | Suite | Count | Last run |
 |---|---|---|
-| `services/inspect` pytest | 21 passed | 2026-09-27 |
-| `services/geometry` pytest | 608 passed | 2026-10-03 |
+| `services/inspect` pytest | 21 passed | 2026-10-03 |
+| `services/geometry` pytest | 665 passed | 2026-10-03 |
 | `services/api` Gradle test | 224 passed | 2026-10-03 |
-| Avatar order smoke, live (`make smoke-avatars`: photo keychain + Swaroop raw print → cart → OTP → checkout → mock pay → print pack) | passed | 2026-09-27 |
-| `apps/web` typecheck · lint · build | clean | 2026-09-27 |
+| Avatar order smoke, live (`make smoke-avatars`: photo keychain + Swaroop raw print → cart → OTP → checkout → mock pay → print pack) | passed | 2026-10-03 |
+| Katha and keepsakes smoke, live (`make smoke-katha`: hero names refused, look-alikes allowed, hero-named upload held for review, comic Katha keychain, night light, plinth, photo frame still off) | passed | 2026-10-03 |
+| `/duniya/katha` and a comic design's studio in Chromium against the live API (rooftop backdrop, toon shading, ink outline) | passed, no page errors | 2026-10-03 |
+| `apps/web` typecheck · lint · build | clean | 2026-10-03 |
 | `apps/admin` typecheck · lint · build | clean | 2026-10-03 |
 | End-to-end slice (live services) | passed | 2026-09-26 |
 | Customer loop, live (guest design → cart → OTP → checkout → mock pay fail/retry/succeed → order queued → SSE) | passed, 1 finding (duplicate checkout) | 2026-09-27 |
