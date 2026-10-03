@@ -76,7 +76,7 @@ def _row(
 # rules only; brand copy lives in the seed). Keep in step with packages/design-tokens/families.json.
 BUILTIN_FAMILIES: list[dict[str, Any]] = [
     _row("keychain", "carrier", "keychain_tag", ["relief_image", "emboss_text", "motif"], ["face", "back"],
-         max_text_chars=16, hardware=[{"sku": "split_ring_25", "qty": 1}], envelope=(30, 60)),
+         max_text_chars=16, hardware=[{"sku": "split_ring_25", "qty": 1}], envelope=(25, 60)),
     _row("fridge_magnet", "carrier", "fridge_magnet", ["relief_image", "emboss_text", "motif"], ["face"],
          max_text_chars=12, hardware=[{"sku": "magnet_d10x3", "qty": 1}], envelope=(40, 70)),
     _row("ornament", "carrier", "hanging_ornament", ["relief_image", "emboss_text", "motif"], ["face_front", "face_back"],
@@ -87,7 +87,7 @@ BUILTIN_FAMILIES: list[dict[str, Any]] = [
          hardware=[{"sku": "led_base_usb", "qty": 1}], allowed=["basic_white"], shape_tolerance="strict", available=False,
          envelope=(100, 150)),
     _row("figurine_base", "carrier", "plinth_round", ["hero_mesh", "emboss_text"], ["top", "base_front"],
-         hero_volume=True, max_text_chars=16, available=False, envelope=(50, 200)),
+         hero_volume=True, max_text_chars=16, available=False, envelope=(40, 200)),
     _row("raw_print", "raw", "raw_print", ["hero_mesh"], ["body"], hero_volume=True, envelope=(20, 240)),
     # tier next, templates in PR 8 (Chaukhat, Kunji): the registry must resolve them without the seed too
     _row("photo_frame", "carrier", "photo_frame_std", ["emboss_text", "motif"], ["base_front", "border"],

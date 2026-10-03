@@ -208,6 +208,7 @@ def test_a_template_that_forgets_its_hardware_is_caught():
 
 
 def test_size_envelopes_come_from_the_seed():
-    assert families.size_envelope("keychain") == (30.0, 60.0)
+    assert families.size_envelope("keychain") == (25.0, 60.0)  # the 25 mm pet tag (seed changed in PR 8, V12)
+    assert families.size_envelope("figurine_base") == (40.0, 200.0)  # the 40 mm plinth before a form is added (V12)
     assert families.size_envelope("raw_print") == (20.0, 240.0)
     assert families.size_envelope("nameplate") == (120.0, 250.0)  # the 250 mm bed (seed changed in PR 5)

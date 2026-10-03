@@ -90,7 +90,7 @@ class CatalogFamiliesIntegrationTest extends AbstractIntegrationTest {
         assertThat(keychain.get("demand_rank").asInt()).isEqualTo(1);
         assertThat(keychain.get("default_template_id").asText()).isEqualTo("keychain_tag");
         assertThat(keychain.get("environment").asText()).isEqualTo("studio");
-        assertThat(keychain.get("size_envelope_mm").get("min_longest_mm").asDouble()).isEqualTo(30.0);
+        assertThat(keychain.get("size_envelope_mm").get("min_longest_mm").asDouble()).isEqualTo(25.0); // the pet tag (V12)
         assertThat(keychain.get("size_envelope_mm").get("max_longest_mm").asDouble()).isEqualTo(60.0);
         assertThat(keychain.get("hardware")).hasSize(1);
         assertThat(keychain.get("hardware").get(0).get("sku").asText()).isEqualTo("split_ring_25");
