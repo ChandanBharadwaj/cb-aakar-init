@@ -4,7 +4,7 @@ Living status of the plan in [PLAN.md](PLAN.md). Update this file with every mer
 
 | | |
 |---|---|
-| Last updated | 2026-09-27 (outcome categories: phases 1–5 done, keepsakes green in geometry, Duniya live, Katha in flight) |
+| Last updated | 2026-10-03 (outcome categories: phases 1–5 done, keepsakes green in geometry and the API, Duniya live, Katha in flight) |
 | Current phase | **Phase 1** — the loop is complete locally (ADR-0013); now building **outcome categories (Avatars) + Swaroop** per `docs/research/outcome-categories/implementation-plan.md` |
 | Completed | Phase 0 — Foundations |
 | Roadmap position | ~2 of 28 scheduled weeks (5 phases; 1 done) |
@@ -127,8 +127,8 @@ Plan: [`docs/research/outcome-categories/implementation-plan.md`](docs/research/
 | 3 | PR 4 carriers `keychain_tag`, `fridge_magnet`, `hanging_ornament`, `desk_nameplate`, `raw_print` | ✅ Done (`debbefc` + `f7e7db5`; geometry 292) | descriptors exported to `packages/contracts/examples/template-descriptors.json` (`make descriptors`, drift-tested) |
 | 4 | PR 5 API uploads + review, content on designs, per-Avatar pricing, print pack | ✅ Done (`05599ea` + `046067f` + `2967d23`; API 175) | live smoke `make smoke-avatars` passed 27 Sep (`3a9763c`) |
 | 5 | PR 6 storefront · PR 7 portal | ✅ Done (web `e22c99e` + `e0f6e85` + `b929a04`; admin `31d9c8e` + `65ae76e`) | typecheck · lint · build clean |
-| 6 | PR 8 lithophane plate + night light, plinth, pet tag, photo frame, keycap | 🟨 geometry green (`a8f2a96` + `a8ddd09` + `9aa7ac8`; geometry 608, inspect 21, contracts valid) | next: API fixtures re-synced to the new descriptors (with PR 12a), then the coordinator's `V13` seed: `available` for lithophane and figurine_base, keychain floor 25 mm for pet tags, figurine floor 40 mm, photo-frame copy without 5 × 7; photo_frame and keycap stay tier `next` until their fit tests on real prints |
-| 7 | PRs 9–12 Duniya experiences + Katha | 🟨 PR 9 done (`dbf69a9` + `8f34734`; API 184); PRs 10–11 done (`d070a4a` + `6b2d423`); motif endpoints done (`81ff75a` + `759b294`; API 200); PR 12 Katha in flight as 12a (content-terms guardrail: `V12`, portal list, Naam and upload checks) and 12b (comic motifs, `comic_pop`, rooftop backdrop, cel shading, keepsake composer modes) | after both: flip Katha `available` in `V13`, re-run `make smoke-avatars`, walk (7) |
+| 6 | PR 8 lithophane plate + night light, plinth, pet tag, photo frame, keycap | 🟨 geometry green (`a8f2a96` + `a8ddd09` + `9aa7ac8`; geometry 608); API fixtures carry the keepsakes (`907653e`); seed ranges and frame copy follow the templates (`V12`, `d3d6fc1`); anchors publish allowed `modes` and `required` content in the contract (`cccb468`) | next: geometry publishes `modes`/`required` and the composer reads them (with PR 12b); then `V14` switches on lithophane and figurine_base; photo_frame and keycap stay tier `next` until fit tests on real prints |
+| 7 | PRs 9–12 Duniya experiences + Katha | 🟨 PRs 9–11 and the motif endpoints done (API 200); PR 12 Katha relaunched 3 Oct as 12a (content-terms guardrail `V13__content_terms.sql`, portal Content rules, Naam and upload checks, experience style on designs, API checks of anchor modes) and 12b (comic motifs, `comic_pop`, rooftop backdrop, cel shading, geometry anchor modes, composer modes) | after both: `V14` switches on Katha with the keepsakes, fixtures re-synced, `make smoke-avatars` live, walk (7) |
 
 ## Decisions
 
@@ -153,8 +153,8 @@ Plan: [`docs/research/outcome-categories/implementation-plan.md`](docs/research/
 | Suite | Count | Last run |
 |---|---|---|
 | `services/inspect` pytest | 21 passed | 2026-09-27 |
-| `services/geometry` pytest | 608 passed | 2026-09-27 |
-| `services/api` Gradle test | 200 passed | 2026-09-27 |
+| `services/geometry` pytest | 608 passed | 2026-10-03 |
+| `services/api` Gradle test | 200 passed | 2026-10-03 |
 | Avatar order smoke, live (`make smoke-avatars`: photo keychain + Swaroop raw print → cart → OTP → checkout → mock pay → print pack) | passed | 2026-09-27 |
 | `apps/web` typecheck · lint · build | clean | 2026-09-27 |
 | `apps/admin` typecheck · lint · build | clean | 2026-09-27 |
