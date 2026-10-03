@@ -2552,6 +2552,13 @@ export interface components {
             accepts?: ("emboss_text" | "motif" | "relief_image" | "hero_mesh")[];
             /** @description At least 0.4 mm, the shallowest text depth, so every accepted feature can fit. Cap for relief_image.relief_mm (emboss and deboss) and emboss depth on this anchor. relief_image in lithophane mode is exempt: the plate itself is the relief and the template's lithophane hook owns its thickness range. */
             max_relief_mm?: number;
+            /** @description The only modes content may take on this anchor: raised (emboss), cut in (deboss) or the photo as the plate itself (lithophane), e.g. ["deboss"] on a frame that prints face down, ["lithophane"] on a night-light plate. Absent: every mode the feature type allows. A feature that leaves mode out takes its type's default (emboss_text and relief_image emboss, motif deboss), which must then be listed, so clients send the mode explicitly. */
+            modes?: ("emboss" | "deboss" | "lithophane")[];
+            /**
+             * @description The piece cannot be built without content on this anchor (the night-light plate needs its photo). Clients ask for it up front; the API and the geometry service refuse a design without it.
+             * @default false
+             */
+            required: boolean;
         };
         /**
          * Aakar Template Descriptor v1
@@ -2638,6 +2645,13 @@ export interface components {
                     accepts?: ("emboss_text" | "motif" | "relief_image" | "hero_mesh")[];
                     /** @description At least 0.4 mm, the shallowest text depth, so every accepted feature can fit. Cap for relief_image.relief_mm (emboss and deboss) and emboss depth on this anchor. relief_image in lithophane mode is exempt: the plate itself is the relief and the template's lithophane hook owns its thickness range. */
                     max_relief_mm?: number;
+                    /** @description The only modes content may take on this anchor: raised (emboss), cut in (deboss) or the photo as the plate itself (lithophane), e.g. ["deboss"] on a frame that prints face down, ["lithophane"] on a night-light plate. Absent: every mode the feature type allows. A feature that leaves mode out takes its type's default (emboss_text and relief_image emboss, motif deboss), which must then be listed, so clients send the mode explicitly. */
+                    modes?: ("emboss" | "deboss" | "lithophane")[];
+                    /**
+                     * @description The piece cannot be built without content on this anchor (the night-light plate needs its photo). Clients ask for it up front; the API and the geometry service refuse a design without it.
+                     * @default false
+                     */
+                    required: boolean;
                 };
             };
         };

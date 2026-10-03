@@ -5,7 +5,7 @@ Contract-first definitions shared by every Aakar service. Change a contract here
 | Path | What |
 |---|---|
 | `schemas/design-spec.v1.json` | The Design Spec: the only thing the agent or a viewer control may hand to the geometry service |
-| `schemas/template-descriptor.v1.json` | What a parametric template publishes (params, ranges, anchors incl. surface/volume content slots, handles, constraints, materials, hardware) |
+| `schemas/template-descriptor.v1.json` | What a parametric template publishes (params, ranges, anchors incl. surface/volume content slots, the modes each anchor allows and whether it needs content, handles, constraints, materials, hardware) |
 | `schemas/template-family.v1.json` | The outcome-category catalogue (Avatars): shelves, bought-in hardware and families with copy, tier, envelope, material rules, shape tolerance and content slot. Instance: `packages/design-tokens/families.json` |
 | `schemas/experience.v1.json` | Experiences (Duniya) and viewer environments (Mahaul): backdrops with their preset key and palette; themes with copy, slug, backdrop, page surface, style, motif pack, ordered avatars, curated items, collections and seasons. Instance: `packages/design-tokens/experiences.json` (the validator also cross-checks its backdrops, preset keys, families and motifs) |
 | `schemas/printability-report.v1.json` | Stability and wall report rendered on the checkout stability card |
