@@ -50,8 +50,9 @@ class CatalogFamiliesIntegrationTest extends AbstractIntegrationTest {
         ResponseEntity<String> response = get("/api/families");
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         JsonNode families = body(response);
-        // the four planar carriers (keychain_tag, fridge_magnet, hanging_ornament, desk_nameplate), phone_stand (jharokha_phone_stand@1)
-        // and raw_print (raw_print@1) have live templates in the stub; lithophane is switched off and may not appear.
+        // the four planar carriers (keychain_tag + pet_tag, fridge_magnet, hanging_ornament, desk_nameplate), phone_stand
+        // (jharokha_phone_stand@1) and raw_print (raw_print@1) have live templates in the stub; the keepsakes (lithophane, figurine_base,
+        // photo_frame, keycap) have one too but are switched off in the catalog, so they may not appear.
         assertThat(ids(families)).containsExactly("keychain", "fridge_magnet", "ornament", "nameplate", "phone_stand", "raw_print");
         assertThat(families).allSatisfy(f -> {
             assertThat(f.get("available").asBoolean()).as("%s available", f.get("id")).isTrue();
@@ -108,10 +109,11 @@ class CatalogFamiliesIntegrationTest extends AbstractIntegrationTest {
         assertThat(keychain.get("ready").asBoolean()).isTrue();
         // price_from_paise is the family minimum of the active policy (a floor): ₹249 for keychains, none for the phone stand
         assertThat(keychain.get("price_from_paise").asLong()).isEqualTo(24_900);
-        assertThat(keychain.get("template_ids")).extracting(JsonNode::asText).containsExactly("keychain_tag");
+        // the tag and, since the keepsake templates (PR 8), the pet tag
+        assertThat(keychain.get("template_ids")).extracting(JsonNode::asText).containsExactly("keychain_tag", "pet_tag");
 
-        // the live descriptor comes along, with the anchor and hardware fields the geometry service publishes
-        assertThat(keychain.get("templates")).hasSize(1);
+        // the live descriptors come along, with the anchor and hardware fields the geometry service publishes
+        assertThat(keychain.get("templates")).hasSize(2);
         JsonNode template = keychain.get("templates").get(0);
         assertThat(template.get("id").asText()).isEqualTo("keychain_tag");
         assertThat(template.get("family").asText()).isEqualTo("keychain");
@@ -147,17 +149,24 @@ class CatalogFamiliesIntegrationTest extends AbstractIntegrationTest {
         assertThat(body.get("accepts")).extracting(JsonNode::asText).containsExactly("hero_mesh");
         assertThat(raw.get("templates").get(0).get("features_supported")).extracting(JsonNode::asText).containsExactly("hero_mesh");
 
-        // families that are not orderable still resolve by id, flagged, so a deep link can say "coming soon"
+        // families that are not orderable still resolve by id, flagged, so a deep link can say "coming soon": the keepsakes have a
+        // live template since PR 8 (ready) but stay switched off in the catalog until the studio turns them on
         JsonNode lithophane = body(get("/api/families/lithophane"));
         assertThat(lithophane.get("available").asBoolean()).isFalse();
-        assertThat(lithophane.get("ready").asBoolean()).isFalse();
-        assertThat(lithophane.get("templates")).isEmpty();
+        assertThat(lithophane.get("ready").asBoolean()).isTrue();
+        assertThat(lithophane.get("template_ids")).extracting(JsonNode::asText).containsExactly("lithophane_plate");
         assertThat(lithophane.get("material_rules").get("allowed")).extracting(JsonNode::asText).containsExactly("basic_white");
         assertThat(lithophane.get("hardware").get(0).get("name").asText()).isEqualTo("USB LED puck base 70 mm");
         JsonNode figurine = body(get("/api/families/figurine_base"));
         assertThat(figurine.get("available").asBoolean()).isFalse();
-        assertThat(figurine.get("ready").asBoolean()).isFalse();
-        assertThat(figurine.get("template_ids")).isEmpty();
+        assertThat(figurine.get("ready").asBoolean()).isTrue();
+        assertThat(figurine.get("template_ids")).extracting(JsonNode::asText).containsExactly("plinth_round");
+        // and a family whose template the geometry service does not publish yet is neither
+        JsonNode pendant = body(get("/api/families/pendant"));
+        assertThat(pendant.get("available").asBoolean()).isFalse();
+        assertThat(pendant.get("ready").asBoolean()).isFalse();
+        assertThat(pendant.get("templates")).isEmpty();
+        assertThat(pendant.get("template_ids")).isEmpty();
         // the magnet is orderable now; its descriptor names one magnet, the geometry result names as many as the params ask for
         JsonNode magnet = body(get("/api/families/fridge_magnet"));
         assertThat(magnet.get("ready").asBoolean()).isTrue();
@@ -171,7 +180,7 @@ class CatalogFamiliesIntegrationTest extends AbstractIntegrationTest {
         // the old fixture still loads beside the new descriptors, and old anchors stay as they were
         JsonNode templates = body(get("/api/templates"));
         assertThat(ids(templates)).containsExactly("jharokha_phone_stand", "keychain_tag", "fridge_magnet", "hanging_ornament", "desk_nameplate",
-                "raw_print");
+                "raw_print", "keycap_mx", "lithophane_plate", "pet_tag", "photo_frame_std", "plinth_round");
         JsonNode jharokhaAnchor = templates.get(0).get("anchors").get(0);
         assertThat(jharokhaAnchor.get("id").asText()).isEqualTo("side_left");
         assertThat(jharokhaAnchor.has("kind")).isFalse();

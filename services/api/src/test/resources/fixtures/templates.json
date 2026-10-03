@@ -558,5 +558,488 @@
     ],
     "hardware": [],
     "min_feature_mm": 0.8
+  },
+  {
+    "id": "keycap_mx",
+    "version": 1,
+    "family": "keycap",
+    "name": "Kunji keycap",
+    "description": "One 1u keycap for Cherry MX style switches, with a slightly dished top carrying your emblem or up to three letters.",
+    "environment": "desk_oak",
+    "params": {
+      "stem_slop_mm": {
+        "type": "number",
+        "label": "Stem fit",
+        "default": 0.4,
+        "handle": false,
+        "unit": "mm",
+        "description": "Extra room in the cross slot: 0.3 for resin, 0.4 for FDM; more if it binds on the switch.",
+        "min": 0.3,
+        "max": 0.5,
+        "step": 0.05,
+        "group": "Details"
+      }
+    },
+    "anchors": [
+      {
+        "id": "top",
+        "label": "Top",
+        "kind": "surface",
+        "projection": "planar",
+        "max_text_height_mm": 10.1,
+        "size_mm": [
+          11.1,
+          11.1
+        ],
+        "bleed_mm": 0.5,
+        "accepts": [
+          "relief_image",
+          "emboss_text"
+        ],
+        "max_relief_mm": 0.6
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 0.8,
+      "max_overhang_deg": 55,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "basic_white",
+      "terracotta_matte",
+      "terracotta_silk",
+      "polished_brass",
+      "sandalwood_silk",
+      "indigo_matte"
+    ],
+    "style_variants": [],
+    "features_supported": [
+      "relief_image",
+      "emboss_text"
+    ],
+    "hardware": [],
+    "min_feature_mm": 1.0
+  },
+  {
+    "id": "lithophane_plate",
+    "version": 1,
+    "family": "lithophane",
+    "name": "Roshni photo night light",
+    "description": "Your photo as a white lithophane plate: thin where the photo is light, thick where it is dark, so the picture glows when lit from behind. It stands in a base with a warm LED light, or comes as the plate alone.",
+    "environment": "teak_table_candlelight",
+    "params": {
+      "size": {
+        "type": "enum",
+        "label": "Plate",
+        "default": "portrait",
+        "handle": false,
+        "description": "Square 100 × 100 mm or portrait 104 × 140 mm.",
+        "options": [
+          "square",
+          "portrait"
+        ],
+        "group": "Size"
+      },
+      "min_mm": {
+        "type": "number",
+        "label": "Lightest parts",
+        "default": 0.8,
+        "handle": false,
+        "unit": "mm",
+        "description": "Plate thickness where the photo is lightest: thinner glows brighter.",
+        "min": 0.8,
+        "max": 1.8,
+        "step": 0.1,
+        "group": "Light"
+      },
+      "max_mm": {
+        "type": "number",
+        "label": "Darkest parts",
+        "default": 3.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "Plate thickness where the photo is darkest; at least 1.2 mm more than the lightest parts.",
+        "min": 2.0,
+        "max": 3.0,
+        "step": 0.1,
+        "group": "Light"
+      },
+      "stand": {
+        "type": "enum",
+        "label": "Stand",
+        "default": "night_light",
+        "handle": false,
+        "description": "night_light: the plate stands in a base with the LED light; none: the plate alone.",
+        "options": [
+          "none",
+          "night_light"
+        ],
+        "group": "Stand"
+      }
+    },
+    "anchors": [
+      {
+        "id": "plate",
+        "label": "Photo plate",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          95.0,
+          131.0
+        ],
+        "bleed_mm": 0.0,
+        "accepts": [
+          "relief_image"
+        ]
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 0.8,
+      "max_overhang_deg": 55,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "basic_white"
+    ],
+    "style_variants": [],
+    "features_supported": [
+      "relief_image"
+    ],
+    "hardware": [
+      {
+        "sku": "led_base_usb",
+        "qty": 1
+      }
+    ],
+    "min_feature_mm": 0.8
+  },
+  {
+    "id": "pet_tag",
+    "version": 1,
+    "family": "keychain",
+    "name": "Saathi pet tag",
+    "description": "A bone or round name tag for your pet's collar, with a steel split ring. The name stands on the face and a second line can go on the back; a small motif or photo fits too.",
+    "environment": "studio",
+    "params": {
+      "shape": {
+        "type": "enum",
+        "label": "Shape",
+        "default": "bone",
+        "handle": false,
+        "options": [
+          "bone",
+          "disc"
+        ],
+        "group": "Shape"
+      },
+      "size_mm": {
+        "type": "number",
+        "label": "Size",
+        "default": 30.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "Longest side: end to end for a bone, across for a disc.",
+        "min": 25,
+        "max": 35,
+        "step": 1,
+        "group": "Size"
+      },
+      "thickness_mm": {
+        "type": "number",
+        "label": "Thickness",
+        "default": 3.5,
+        "handle": false,
+        "unit": "mm",
+        "min": 3.0,
+        "max": 4.0,
+        "step": 0.1,
+        "group": "Size"
+      }
+    },
+    "anchors": [
+      {
+        "id": "face",
+        "label": "Face",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          23.1,
+          10.8
+        ],
+        "bleed_mm": 0.5,
+        "accepts": [
+          "emboss_text",
+          "motif",
+          "relief_image"
+        ],
+        "max_relief_mm": 1.2
+      },
+      {
+        "id": "back",
+        "label": "Back",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          23.1,
+          10.8
+        ],
+        "bleed_mm": 0.5,
+        "accepts": [
+          "emboss_text",
+          "motif",
+          "relief_image"
+        ],
+        "max_relief_mm": 1.2
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 1.2,
+      "max_overhang_deg": 55,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "basic_white",
+      "terracotta_matte",
+      "terracotta_silk",
+      "polished_brass",
+      "sandalwood_silk",
+      "indigo_matte"
+    ],
+    "style_variants": [],
+    "features_supported": [
+      "emboss_text",
+      "motif",
+      "relief_image"
+    ],
+    "hardware": [
+      {
+        "sku": "split_ring_25",
+        "qty": 1
+      }
+    ],
+    "min_feature_mm": 0.8
+  },
+  {
+    "id": "photo_frame_std",
+    "version": 1,
+    "family": "photo_frame",
+    "name": "Chaukhat photo frame",
+    "description": "A frame for a 4 × 6 in photo behind a clear acrylic pane, standing on its own feet or hanging on a wall. A motif or a name can be cut into the top rail and a line of text into the bottom rail.",
+    "environment": "teak_table_candlelight",
+    "params": {
+      "orientation": {
+        "type": "enum",
+        "label": "Orientation",
+        "default": "portrait",
+        "handle": false,
+        "description": "For a 4 × 6 in photo.",
+        "options": [
+          "portrait",
+          "landscape"
+        ],
+        "group": "Shape"
+      },
+      "border_mm": {
+        "type": "number",
+        "label": "Border",
+        "default": 18.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "Width of the frame's face round the window.",
+        "min": 12,
+        "max": 25,
+        "step": 0.5,
+        "group": "Size"
+      },
+      "stand": {
+        "type": "enum",
+        "label": "Stand",
+        "default": "easel",
+        "handle": false,
+        "description": "easel: feet at the back so it stands on a table; hanger: a tab with a hole for a nail.",
+        "options": [
+          "easel",
+          "hanger"
+        ],
+        "group": "Stand"
+      }
+    },
+    "anchors": [
+      {
+        "id": "border",
+        "label": "Top rail",
+        "kind": "surface",
+        "projection": "planar",
+        "max_text_height_mm": 15.0,
+        "size_mm": [
+          121.9,
+          15.0
+        ],
+        "bleed_mm": 0.5,
+        "accepts": [
+          "motif",
+          "emboss_text"
+        ],
+        "max_relief_mm": 1.5
+      },
+      {
+        "id": "base_front",
+        "label": "Bottom rail",
+        "kind": "surface",
+        "projection": "planar",
+        "max_text_height_mm": 15.0,
+        "size_mm": [
+          121.9,
+          15.0
+        ],
+        "bleed_mm": 0.5,
+        "accepts": [
+          "emboss_text"
+        ],
+        "max_relief_mm": 1.5
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 1.2,
+      "max_overhang_deg": 55,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "basic_white",
+      "terracotta_matte",
+      "terracotta_silk",
+      "polished_brass",
+      "sandalwood_silk",
+      "indigo_matte"
+    ],
+    "style_variants": [],
+    "features_supported": [
+      "emboss_text",
+      "motif"
+    ],
+    "hardware": [
+      {
+        "sku": "acrylic_4x6",
+        "qty": 1
+      }
+    ],
+    "min_feature_mm": 0.8
+  },
+  {
+    "id": "plinth_round",
+    "version": 1,
+    "family": "figurine_base",
+    "name": "Pratima plinth",
+    "description": "Your own 3D form, repaired and set on a round or rounded-square plinth, with a name along its flat front.",
+    "environment": "studio",
+    "params": {
+      "shape": {
+        "type": "enum",
+        "label": "Shape",
+        "default": "round",
+        "handle": false,
+        "description": "Round with a flat front for the name, or a rounded square.",
+        "options": [
+          "round",
+          "rounded_square"
+        ],
+        "group": "Shape"
+      },
+      "diameter_mm": {
+        "type": "number",
+        "label": "Size",
+        "default": 70.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "Across the plinth.",
+        "min": 40,
+        "max": 120,
+        "step": 1,
+        "group": "Size"
+      },
+      "height_mm": {
+        "type": "number",
+        "label": "Height",
+        "default": 12.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "Of the plinth; the name on its front needs at least 7 mm.",
+        "min": 6,
+        "max": 20,
+        "step": 0.5,
+        "group": "Size"
+      }
+    },
+    "anchors": [
+      {
+        "id": "top",
+        "label": "Top of the plinth",
+        "kind": "volume",
+        "projection": "planar",
+        "bounds_mm": [
+          70.0,
+          70.0,
+          180.0
+        ],
+        "accepts": [
+          "hero_mesh"
+        ]
+      },
+      {
+        "id": "base_front",
+        "label": "Front of the plinth",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          39.0,
+          11.0
+        ],
+        "bleed_mm": 0.5,
+        "accepts": [
+          "emboss_text"
+        ],
+        "max_relief_mm": 1.5
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 1.2,
+      "max_overhang_deg": 55,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "basic_white",
+      "terracotta_matte",
+      "terracotta_silk",
+      "polished_brass",
+      "sandalwood_silk",
+      "indigo_matte"
+    ],
+    "style_variants": [],
+    "features_supported": [
+      "hero_mesh",
+      "emboss_text"
+    ],
+    "hardware": [],
+    "min_feature_mm": 0.8
   }
 ]

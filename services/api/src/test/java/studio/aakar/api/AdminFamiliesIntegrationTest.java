@@ -91,13 +91,18 @@ class AdminFamiliesIntegrationTest extends AbstractIntegrationTest {
             assertThat(all).hasSize(25);
             JsonNode keychain = find(all, "id", "keychain");
             assertThat(keychain.get("ready").asBoolean()).isTrue();
-            assertThat(keychain.get("template_ids")).extracting(JsonNode::asText).containsExactly("keychain_tag");
+            assertThat(keychain.get("template_ids")).extracting(JsonNode::asText).containsExactly("keychain_tag", "pet_tag");
             assertThat(keychain.get("templates")).as("the portal list names templates, it does not embed descriptors").isEmpty();
             assertThat(keychain.get("updated_at").asText()).endsWith("Z");
+            // a keepsake with a live template (PR 8) that the catalog keeps switched off, and a family with no template yet
             JsonNode lithophane = find(all, "id", "lithophane");
             assertThat(lithophane.get("available").asBoolean()).isFalse();
-            assertThat(lithophane.get("ready").asBoolean()).isFalse();
-            assertThat(lithophane.get("template_ids")).isEmpty();
+            assertThat(lithophane.get("ready").asBoolean()).isTrue();
+            assertThat(lithophane.get("template_ids")).extracting(JsonNode::asText).containsExactly("lithophane_plate");
+            JsonNode pendant = find(all, "id", "pendant");
+            assertThat(pendant.get("available").asBoolean()).isFalse();
+            assertThat(pendant.get("ready").asBoolean()).isFalse();
+            assertThat(pendant.get("template_ids")).isEmpty();
             assertThat(find(all, "id", "raw_print").get("ready").asBoolean()).isTrue();
 
             // the viewer backdrop must be one the storefront can render

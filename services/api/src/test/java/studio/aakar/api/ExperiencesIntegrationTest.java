@@ -24,8 +24,9 @@ import studio.aakar.api.support.Contracts;
 /**
  * Experiences (Duniya) and viewer environments (Mahaul), plan §7: the Shop lists the available experiences in order with
  * their orderable avatars expanded (the geometry stub publishes live templates for keychain, fridge_magnet, ornament,
- * nameplate, phone_stand and raw_print, so lithophane, figurine_base, keycap and the other avatars without one are left out
- * there but kept in the portal's rows), slugs resolve any experience, the portal's owner-only audited CRUD with its
+ * nameplate, phone_stand and raw_print, and for the PR 8 keepsakes lithophane, figurine_base, photo_frame and keycap, which the
+ * catalog keeps switched off; so the keepsakes and the avatars without a template are left out there but kept in the portal's
+ * rows), slugs resolve any experience, the portal's owner-only audited CRUD with its
  * referential checks, the environments table behind every {@code environment} field, and designs that remember the
  * experience they started from.
  */
@@ -77,7 +78,7 @@ class ExperiencesIntegrationTest extends AbstractIntegrationTest {
         assertThat(utsav.get("available").asBoolean()).isTrue();
         assertThat(utsav.get("sort_order").asInt()).isEqualTo(10);
 
-        // avatars: the orderable families in the experience's order (Roshni, the lithophane, has no live template yet)
+        // avatars: the orderable families in the experience's order (Roshni, the lithophane, is still switched off in the catalog)
         assertThat(ids(utsav.get("avatars"))).containsExactly("ornament", "nameplate", "keychain", "fridge_magnet");
         assertThat(ids(experiences.get(1).get("avatars"))).containsExactly("keychain", "nameplate", "phone_stand");
         assertThat(ids(experiences.get(2).get("avatars"))).containsExactly("fridge_magnet");
