@@ -44,7 +44,13 @@ The keepsakes and the second wave (PR 8, below) keep the 250³ bed; the lithopha
 minimum wall is 0.8 mm (the contract's floor: a lithophane is 0.8 mm where the photo is lightest, and an MX
 stem is thinner still at its cross's tips), and the keycap's letters keep 1 mm strokes (`min_feature_mm`).
 Descriptors publish anchor sizes at the default parameters; `anchor_frame(anchor_id, params)` gives
-the exact frame for any parameters.
+the exact frame for any parameters. An anchor publishes `modes` (the only modes its content takes) and
+`required` (the piece can't be made without content there) only when it sets them: the photo frame's two rails
+take `["deboss"]`, the lithophane's `plate` takes `["lithophane"]` and is `required`; every other anchor takes
+every mode its types allow and may be left plain. Seven carriers offer the `comic_pop` style (Katha's comic-book
+look, see [Styles](#styles-comic_pop)): `keychain_tag`, `pet_tag`, `fridge_magnet`, `hanging_ornament`,
+`desk_nameplate`, `keycap_mx` and `plinth_round`; the lithophane, the photo frame, the Jharokha and `raw_print`
+offer no style.
 
 ### `jharokha_phone_stand@1` (family `phone_stand`)
 
@@ -136,8 +142,9 @@ still completes, with `printability.passed=false`.
 ### The keepsakes and the second wave (PR 8)
 
 **`lithophane_plate@1` (family `lithophane`, Roshni).** The photo becomes the plate: a `relief_image` in
-`lithophane` mode is required (a spec without it is `invalid_spec` "Add the photo that becomes your Roshni
-night light"; a photo raised or cut in is `unsupported_feature`), and the template's `lithophane` hook
+`lithophane` mode is required (the `plate` anchor publishes `modes: ["lithophane"]` and `required`; a spec
+without it is `invalid_spec` "Add the photo that becomes your Roshni night light"; a photo raised or cut in is
+`unsupported_feature`, both worded by the template's `missing_content` / `mode_refusal`), and the template's `lithophane` hook
 turns its heightmap into the plate: the darkest pixel `max_mm`, the lightest `min_mm` (`invert` swaps them
 upstream), a photo that does not fill the plate edged dark at `max_mm`. The feature's `relief_mm` does not
 apply. The plate is one closed heightfield over a 4 mm frame (`max_mm` + 1 mm, proud of the photo on the
@@ -178,7 +185,8 @@ the rabbet is the photo + 1/16 in (1.6 mm), 3/8 in (9.5 mm) deep, behind a 3 mm 
 is the face round the window. `easel`: two feet behind the side walls, clear of the rabbet's opening, stand
 it leaning back 15° (built standing so, stability checked); `hanger`: a tab with a 5 mm nail hole on top
 (built lying on its back). Both print face down with no supports, so names and motifs are cut in, never
-raised (`unsupported_feature` "cut into the face, not raised"); `border` (the top rail: motif or name) and
+raised: both rails publish `modes: ["deboss"]` (a raised one, or a name that leaves its mode out, is
+`unsupported_feature` "cut into the face, not raised", the template's `mode_refusal`); `border` (the top rail: motif or name) and
 `base_front` (the bottom rail: a line of text) lie on the rails outside the window, and a cut of at most
 1.5 mm leaves 1.5 mm of lip over the rabbet. Hardware `acrylic_4x6` ×1.
 
@@ -226,9 +234,15 @@ motifs (Buti), photo reliefs (Chhavi) and customers' own forms (Roop). It runs i
    `relief_mm` / `depth_mm` within the anchor's `max_relief_mm` (lithophane mode excepted); names and
    motifs only with `planar` projection; text within the family's `max_text_chars`, in one launch script
    and matching `script` / `font` when given, `height_mm` within the anchor's `max_text_height_mm`;
-   `motif_id` in the library and `scale` between its `min_scale` and 1. Contract defaults (and a name's
-   detected `script`) are filled in and echoed in the completed spec. Then the template's own
-   `validate_content(params, features)` (skin under cut-ins, the raw print's model and size).
+   `motif_id` in the library and `scale` between its `min_scale` and 1. The mode, explicit or the type's
+   default (names and photos `emboss`, motifs `deboss`), must be one the anchor lists in `modes`
+   (`unsupported_feature` on `features[i].mode`), and every anchor marked `required` must hold content, even
+   when the spec has no features at all (`invalid_spec`); both are worded generically ("On the top rail the name
+   can only be cut in, not raised; choose cut in") unless the template has its own words (`mode_refusal`,
+   `missing_content`). Contract defaults (and a name's detected `script`) are filled in and echoed in the
+   completed spec; a style the template offers may put its own defaults first ([Styles](#styles-comic_pop)).
+   Then the template's own `validate_content(params, features)` (skin under cut-ins, the raw print's model and
+   size).
 2. **prepare names and motifs** (`features.prepare_marks`, no CAD): shape, fit and apply the stroke rule
    to every name and motif at the real anchor size, so every refusal comes before the first boolean.
 3. **fetch** photos and model files (`features/fetch.py`): `ContentFetcher.fetch(source) -> bytes`.
@@ -295,7 +309,10 @@ the face).
 `packages/design-tokens/motifs/` (`AAKAR_MOTIFS_DIR` in the image, else the repo-relative folder):
 `index.json` lists each motif (`id`, a plain `label`, `file`, `tags`, `min_scale`) and each SVG is
 exactly one `<path>` (closed subpaths, `fill-rule` nonzero or evenodd, no transforms), original
-artwork drawn for Aakar: `paisley`, `lotus`, `star_rangoli`, `jaali_lattice`, `warli_dancer`. Paths are
+artwork drawn for Aakar: `paisley`, `lotus`, `star_rangoli`, `jaali_lattice`, `warli_dancer`, and Katha's comic
+pack, the motifs tagged `comic_bursts` (`action_burst`, `speech_bubble`, `thought_bubble`, `lightning_bolt`,
+`domino_mask`, `hero_cape`: generic shapes only, no characters, logos, costumes, emblems or publisher
+lettering). A tag shared by motifs names a pack a Duniya experience offers first (`motif_pack`). Paths are
 parsed by fontTools' `svgLib` (every path command, arcs included) into the same pen and fill as the
 lettering, and flipped upright (SVG's y runs down).
 
@@ -314,6 +331,20 @@ lettering, and flipped upright (SVG's y runs down).
   `<id>.svg`, add its row to `index.json` with the smallest `min_scale` that keeps it printable, and run
   `uv run pytest tests/test_motifs.py`: it checks the file format, the index and printability at scale
   1 and at `min_scale` on the 30 mm reference.
+
+### Styles (`comic_pop`)
+
+A template offers a style by listing it in `style_variants`; the pipeline refuses any other with
+`unsupported_feature`. `comic_pop`, Katha's comic-book look, changes only the content defaults
+(`features/styles.py`): a name or a motif that leaves `mode` out stands raised wherever its anchor allows it, and
+a raised one that leaves `depth_mm` out stands 1.5 mm proud (`COMIC_POP_DEPTH_MM`), never more than the anchor's
+`max_relief_mm` (the keycap's 0.6, the pet tag's 1.2). Explicit values win, photos and forms are untouched, and an
+anchor that only cuts in keeps the type's default. So a piece without content builds exactly as it would without
+the style, and a raised comic motif on a fridge magnet needs no skin over the magnet pocket where the default
+cut-in one is refused. The karigar's note ends with the look: "Comic pop style: the lettering and motifs stand
+bold and raised, like inked panel art, so keep their edges crisp; they read best in a high-contrast finish such
+as Basic White or Indigo Matte" (finishes named from `materials.json`, only those the family offers). The API
+fills the same defaults before a spec reaches the service, so both agree.
 
 ### The stroke rule (`outlines.stroke_check`)
 
@@ -343,17 +374,18 @@ every template to it).
 
 | Hook | What it does |
 |---|---|
-| class attributes | `id`, `version`, `family`, `name`, `description`, `environment`, `params` (with `group`), `anchors` (`kind`, `size_mm`/`bounds_mm`, `bleed_mm`, `accepts`, `max_relief_mm` ≥ 1.2 where names go, `max_text_height_mm`), `constraints`, `features_supported` ⊆ the family's `accepts` |
+| class attributes | `id`, `version`, `family`, `name`, `description`, `environment`, `params` (with `group`), `anchors` (`kind`, `size_mm`/`bounds_mm`, `bleed_mm`, `accepts`, `max_relief_mm` ≥ 1.2 where names go, `max_text_height_mm`, `modes` when content may only take some modes, `required` when the piece needs content there), `constraints`, `features_supported` ⊆ the family's `accepts`, `style_variants` (`comic_pop` where names and motifs can stand raised) |
 | `hardware` / `hardware_for(params)` | the bought-in parts cut for (`[{sku, qty}]`); override `hardware_for` when a parameter changes quantities (magnets) |
 | `min_feature_mm` | smallest printable stroke (0.8 on a 0.4 mm nozzle) |
 | `validate_combination(params)` | coupled parameter limits (a phone slot, a printable area, tipping) |
 | `validate_content(params, features)` | limits coupling parameters and content, before any CAD (skin under a cut-in, a raw print's model) |
+| `mode_refusal(anchor, ftype, mode)` / `missing_content(anchor)` | the template's own words when content takes a mode its anchor's `modes` leave out, or a `required` anchor is empty (`photo_frame_std`, `lithophane_plate`); None keeps the generic sentence |
 | `build_body(params)` | watertight mesh in mm, Z up, on Z = 0, centred in X/Y (empty only for `raw_print`) |
 | `anchor_frame(anchor_id, params)` | a right-handed `AnchorFrame` (u = the viewer's right, v = up the picture, normal out of the body; origin on the skin, or the bottom centre of a volume) |
 | `lithophane(...)` | only for templates whose plate *is* the photo (`lithophane_plate`: the heightmap becomes the plate) |
 | `build(...)` override | a rule on the finished piece after the content is fused (`plinth_round`: stability with the customer's form) |
-| `karigar_note_for(...)` override | a note that depends on the content (`plinth_round`: a line on the form only when there is one) |
-| `karigar_note(params)` | one or two lines in the craft register (the pipeline's `karigar_note_for(params, features)` appends the names and motifs set into the piece) |
+| `karigar_note_for(...)` override | a note that depends on the content (`plinth_round`: a line on the form only when there is one); end it with `join_note(note, features, style)` |
+| `karigar_note(params)` | one or two lines in the craft register (the pipeline's `karigar_note_for(params, features, style)` appends the names and motifs set into the piece, then the style's sentence) |
 
 Then register it in `templates/__init__.py` and add `tests/test_templates_<id>.py` using the shared
 checks in `tests/carrier_checks.py` (descriptor vs family, envelope, frames on the skin, holes).

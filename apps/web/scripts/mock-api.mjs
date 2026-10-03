@@ -22,7 +22,13 @@
 //   fails its job with content_unusable; a raw print under 30 mm completes with printability.passed=false (thin walls).
 //   Swaroop (raw_print@1) has no template params: its size and orientation come from its one hero_mesh feature.
 //   A spot takes a photo or a form on its own, or a name and a motif side by side; a photo with a name or a motif on the
-//   same anchor is refused as crowded (422 validation_failed), like the geometry service does.
+//   same anchor is refused as crowded (422 validation_failed), like the geometry service does. Like the API, content
+//   must take a mode its anchor lists (`modes`: 422 unsupported_feature, `field` = features[i].mode), every anchor marked
+//   `required` needs content (422 validation_failed: the night light's photo), and a text (Naam) stays within its
+//   family's max_text_chars, counted as a reader counts letters (422 param_out_of_range). A design started from a Duniya
+//   experience takes its style as spec.style when the template offers it (style_variants); under comic_pop a text or
+//   motif without a mode is raised where its anchor allows it, and a raised one without a depth stands 1.5 mm proud
+//   (capped at the anchor's max_relief_mm). A new version keeps its parent's style.
 import http from "node:http";
 import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -205,9 +211,10 @@ function price(estimate, materialId, ctx = {}) {
 const priceCtx = (v) => ({ familyId: v.family_id ?? undefined, hardware: v.hardware ?? [] });
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "content-type, last-event-id, authorization, x-aakar-guest", "Access-Control-Allow-Methods": "GET, POST, PATCH, PUT, DELETE, OPTIONS" };
-function problem(res, status, code, detail) {
+/** Problem Details; `extra` adds the API's properties (template_id, feature, field, anchor, …) beside the code. */
+function problem(res, status, code, detail, extra = {}) {
   res.writeHead(status, { "Content-Type": "application/problem+json", ...CORS });
-  res.end(JSON.stringify({ type: "about:blank", title: code.replace(/_/g, " "), status, detail, code }));
+  res.end(JSON.stringify({ type: "about:blank", title: code.replace(/_/g, " "), status, detail, code, ...extra }));
 }
 function json(res, status, body) {
   if (status === 204) {
@@ -220,7 +227,7 @@ function json(res, status, body) {
 function sse(res) {
   res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive", ...CORS });
 }
-const fail = (status, code, message) => Object.assign(new Error(message), { status, code });
+const fail = (status, code, message, extra) => Object.assign(new Error(message), { status, code, extra });
 
 // ---- Identity -------------------------------------------------------------------------------
 /** Who is calling: a user (bearer), a guest (X-Aakar-Guest), or nobody. A stale bearer is a 401. */
@@ -453,6 +460,9 @@ function startJob(design, spec, parentVersionId) {
     // The design remembers the Duniya it started from, so the note (and the packaging card) can name the theme.
     const theme = design.experience_id ? experienceById(design.experience_id) : undefined;
     const themeNote = theme && versionNo === 1 ? ` Made for ${experienceLabel(theme)}.` : "";
+    const styleNote = spec.style === "comic_pop"
+      ? " Comic pop style: the lettering and motifs stand bold and raised, like inked panel art; they read best in a high-contrast finish such as Basic White or Indigo Matte."
+      : "";
     Object.assign(version, {
       status: "ready",
       assets: completed.assets,
@@ -463,8 +473,8 @@ function startJob(design, spec, parentVersionId) {
       karigar_note: hero && template.family === "raw_print"
         ? `Your file, repaired and set at ${longest} mm on its longest side, ${orientation === "lay_flat" ? "laid flat on its widest face" : "printed as you sent it"}.${thin ? " The thinnest wall came out under 1.2 mm; a larger size fixes that." : ""}`
         : versionNo === 1
-          ? (template.id === "keychain_tag" ? `A ${spec.params.shape ?? "rounded"} Saathi tag, ${spec.params.width_mm ?? 45} mm wide with a ${spec.params.hole_d_mm ?? 4.2} mm ring hole.` : completed.karigar_note) + contentNote + themeNote
-          : `Version ${versionNo}: I re-sculpted the ${template.name.toLowerCase()} at ${spec.params.height_mm ?? spec.params.width_mm ?? 120} mm and kept the walls at ${spec.params.wall_mm ?? spec.params.thickness_mm ?? 3.2} mm.${contentNote}`,
+          ? (template.id === "keychain_tag" ? `A ${spec.params.shape ?? "rounded"} Saathi tag, ${spec.params.width_mm ?? 45} mm wide with a ${spec.params.hole_d_mm ?? 4.2} mm ring hole.` : completed.karigar_note) + contentNote + themeNote + styleNote
+          : `Version ${versionNo}: I re-sculpted the ${template.name.toLowerCase()} at ${spec.params.height_mm ?? spec.params.width_mm ?? 120} mm and kept the walls at ${spec.params.wall_mm ?? spec.params.thickness_mm ?? 3.2} mm.${contentNote}${styleNote}`,
     });
     job.status = "succeeded"; job.finished_at = now();
     design.status = "ready";
@@ -612,11 +622,14 @@ const server = http.createServer(async (req, res) => {
       const experienceId = typeof body.experience_id === "string" && body.experience_id.trim() ? body.experience_id.trim() : null;
       if (body.experience_id !== undefined && body.experience_id !== null && typeof body.experience_id !== "string") return problem(res, 400, "bad_request", "experience_id must be a string.");
       if (experienceId && (experienceId.length > 40 || !experienceById(experienceId))) return problem(res, 422, "unknown_experience", `experience_id '${experienceId}' is not an experience (see GET /api/experiences).`);
-      const features = resolveFeatures(body.features ?? [], template, who);
+      // The design takes its Duniya's style when the template offers it (style_variants), else none.
+      const experienceStyle = experienceId ? experienceById(experienceId)?.style : undefined;
+      const style = experienceStyle && (template.style_variants ?? []).includes(experienceStyle) ? experienceStyle : "none";
+      const features = resolveFeatures(body.features ?? [], template, who, style);
       const design = { id: randomUUID(), source: body.source, catalog_item_slug: slug, family_id: family?.id ?? null, experience_id: experienceId, title, status: "generating", created_at: now(), versions_count: 0 };
       Object.defineProperty(design, "owner", { value: who?.key ?? null, writable: true, enumerable: false });
       designs.set(design.id, design);
-      const spec = { spec_version: "1.0", family: template.family, template: `${template.id}@${template.version}`, params, features, style: "none", material, constraints: template.constraints };
+      const spec = { spec_version: "1.0", family: template.family, template: `${template.id}@${template.version}`, params, features, style, material, constraints: template.constraints };
       return json(res, 202, startJob(design, spec));
     }
     if ((m = p.match(/^\/api\/designs\/([^/]+)$/))) {
@@ -637,7 +650,8 @@ const server = http.createServer(async (req, res) => {
       if (!v) return problem(res, 404, "not_found", "No such version.");
       const body = JSON.parse(await readBody(req));
       const template = templates.find((t) => t.id === v.spec.template.split("@")[0]) ?? templates[0];
-      const features = body.features === undefined || body.features === null ? (v.spec.features ?? []) : resolveFeatures(body.features, template, identity(req));
+      // The new version keeps its parent's style (and so its comic defaults for new content).
+      const features = body.features === undefined || body.features === null ? (v.spec.features ?? []) : resolveFeatures(body.features, template, identity(req), v.spec.style);
       const spec = { ...v.spec, params: { ...v.spec.params, ...body.params }, material: body.material ?? v.spec.material, features };
       return json(res, 202, startJob(designs.get(v.design_id), spec, v.id));
     }
@@ -925,7 +939,7 @@ const server = http.createServer(async (req, res) => {
   } catch (err) {
     if (err instanceof SyntaxError) return problem(res, 400, "bad_request", "Body must be JSON.");
     if (!err.status) console.error(err);
-    return problem(res, err.status ?? 500, err.code ?? "internal", err.message);
+    return problem(res, err.status ?? 500, err.code ?? "internal", err.message, err.extra ?? {});
   }
 });
 
@@ -971,12 +985,70 @@ function checkSpot(held, type, anchor) {
  * surface), what one spot may hold (`checkSpot`), a motif from the library at a printable scale and depth, upload owned
  * by the caller and ready → the url filled in. Messages are customer copy.
  */
-function resolveFeatures(list, template, who) {
+// ---- Content rules the API shares with the geometry service: anchor modes, required anchors, letters, comic_pop -----
+const MODE_ORDER = ["emboss", "deboss", "lithophane"];
+const MODE_DEFAULT = { emboss_text: "emboss", motif: "deboss", relief_image: "emboss" };
+const MODE_STATE = { emboss: "raised", deboss: "cut in", lithophane: "the glowing plate itself" };
+const MODE_CHOICE = { emboss: "raised", deboss: "cut-in", lithophane: "the night-light photo" };
+const PLURAL_ORDER = ["emboss_text", "motif", "relief_image", "hero_mesh"];
+const PLURALS = { emboss_text: "names", motif: "motifs", relief_image: "photos", hero_mesh: "3D forms" };
+const NEEDS_ORDER = ["relief_image", "emboss_text", "motif", "hero_mesh"];
+const NEEDS_ONE = { relief_image: "the photo", emboss_text: "the name", motif: "a motif", hero_mesh: "your model file" };
+const NEEDS_ANY = { relief_image: "a photo", emboss_text: "a name", motif: "a motif", hero_mesh: "your model file" };
+const COMIC_RAISED_DEPTH_MM = 1.5;
+/** "a", "a and b", "a, b and c". */
+const joined = (words, conjunction) => (words.length <= 1 ? words.join("") : `${words.slice(0, -1).join(", ")} ${conjunction} ${words[words.length - 1]}`);
+const labelOf = (anchor) => anchor.label || anchor.id;
+const acceptsOf = (template, anchor) => anchor.accepts ?? template.features_supported ?? [];
+const allowsMode = (anchor, mode) => !Array.isArray(anchor.modes) || anchor.modes.length === 0 || anchor.modes.includes(mode);
+/** Letters as a reader counts them (like the API and the geometry service): marks and joiners do not add. */
+const textLength = (text) => [...String(text)].filter((ch) => !/[\p{M}\p{Cf}]/u.test(ch)).length;
+/** "On the Top rail names and motifs are cut in, not raised; choose cut-in", as the API words it. */
+function modeDetail(template, anchor, type, mode) {
+  const place = `On the ${labelOf(anchor)} `;
+  let allowed = MODE_ORDER.filter((m) => anchor.modes.includes(m));
+  if (allowed.length === 0) allowed = anchor.modes;
+  if (type === "relief_image" && allowed.length === 1 && allowed[0] === "lithophane") return `${place}your photo becomes the glowing plate itself; choose the night-light photo`;
+  const nouns = PLURAL_ORDER.filter((t) => acceptsOf(template, anchor).includes(t)).map((t) => PLURALS[t]);
+  const holds = nouns.length ? joined(nouns, "and") : (PLURALS[type] ?? "pieces");
+  const swapped = allowed.length === 1 && ["emboss", "deboss"].includes(mode) && ["emboss", "deboss"].includes(allowed[0]);
+  const states = allowed.map((m) => MODE_STATE[m] ?? m).join(" or ");
+  return `${place}${holds} are ${states}${swapped ? `, not ${MODE_STATE[mode]}` : ""}; choose ${allowed.map((m) => MODE_CHOICE[m] ?? m).join(" or ")}`;
+}
+/** An anchor that lists `modes` takes content only in those; a feature's mode is its type's default when left out. */
+function checkMode(template, anchor, index, feature) {
+  const mode = feature.mode;
+  if (typeof mode !== "string" || allowsMode(anchor, mode)) return;
+  throw fail(422, "unsupported_feature", modeDetail(template, anchor, feature.type, mode), {
+    template_id: template.id, feature: index, field: `features[${index}].mode`, anchor: anchor.id, modes: anchor.modes,
+  });
+}
+/** Every anchor marked `required` needs content (checked after everything else, as the API does). */
+function checkRequired(template, features) {
+  const filled = new Set(features.map((f) => f.anchor));
+  for (const anchor of template.anchors ?? []) {
+    if (anchor.required !== true || filled.has(anchor.id)) continue;
+    const accepts = acceptsOf(template, anchor);
+    const place = ` for the ${labelOf(anchor)}`;
+    const any = NEEDS_ORDER.filter((t) => accepts.includes(t)).map((t) => NEEDS_ANY[t]);
+    const detail = accepts.length === 1 ? `Add ${NEEDS_ONE[accepts[0]] ?? "something"}${place}` : `Add ${joined(any, "or") || "something"}${place}`;
+    throw fail(422, "validation_failed", detail, { template_id: template.id, anchor: anchor.id, accepts });
+  }
+}
+/** comic_pop: a text or motif without a mode is raised where its anchor allows it; a raised one without a depth stands 1.5 mm proud. */
+function comicDefaults(style, anchor, f, out) {
+  if (style !== "comic_pop" || (f.type !== "emboss_text" && f.type !== "motif")) return;
+  if (f.mode == null && allowsMode(anchor, "emboss")) out.mode = "emboss";
+  if (f.depth_mm == null && out.mode === "emboss") out.depth_mm = Math.min(COMIC_RAISED_DEPTH_MM, anchor.max_relief_mm ?? COMIC_RAISED_DEPTH_MM);
+}
+
+function resolveFeatures(list, template, who, style = "none") {
   if (!Array.isArray(list)) throw fail(400, "bad_request", "Send features as a list.");
   if (list.length > 8) throw fail(422, "validation_failed", "A piece can carry at most 8 things.");
   if (template.family === "raw_print") checkRawForm(list);
   const held = new Map(); // anchor id -> feature types on it so far
-  return list.map((f) => {
+  const maxChars = familyById(template.family)?.content_slot?.max_text_chars;
+  const features = list.map((f, index) => {
     if (!f || typeof f !== "object" || !FEATURE_TYPES.includes(f.type)) throw fail(422, "validation_failed", "That isn't something a piece can carry.");
     const words = FEATURE_WORDS[f.type];
     if (!(template.features_supported ?? []).includes(f.type)) throw fail(422, "unsupported_feature", `${template.name} can't carry ${words} yet.`);
@@ -991,8 +1063,15 @@ function resolveFeatures(list, template, who) {
     checkSpot(onSpot, f.type, anchor);
     held.set(anchor.id, [...onSpot, f.type]);
     const out = { ...f };
+    comicDefaults(style, anchor, f, out);
+    if (f.type in MODE_DEFAULT) checkMode(template, anchor, index, { ...out, mode: out.mode ?? MODE_DEFAULT[f.type] });
     if (f.type === "emboss_text") {
       if (typeof f.text !== "string" || !f.text.trim() || f.text.length > 40) throw fail(422, "validation_failed", "Your text (Naam) can be 1 to 40 characters.");
+      if (maxChars && textLength(f.text) > maxChars) {
+        throw fail(422, "param_out_of_range", `Text (Naam) on the ${labelOf(anchor)} can be at most ${maxChars} characters; ${textLength(f.text)} were given`, {
+          template_id: template.id, feature: index, field: `features[${index}].text`,
+        });
+      }
       out.script ??= detectScript(f.text); out.depth_mm ??= Math.min(1.2, anchor.max_relief_mm ?? 1.2); out.projection ??= "planar"; out.mode ??= "emboss";
       if (anchor.max_relief_mm && out.depth_mm > anchor.max_relief_mm) throw fail(422, "param_out_of_range", `Letters on the ${anchor.label.toLowerCase()} can be at most ${anchor.max_relief_mm} mm deep.`);
     } else if (f.type === "motif") {
@@ -1029,6 +1108,8 @@ function resolveFeatures(list, template, who) {
     }
     return out;
   });
+  checkRequired(template, features);
+  return features;
 }
 /** Swaroop, like the geometry template: exactly one form, with an explicit size inside the family envelope. */
 function checkRawForm(list) {

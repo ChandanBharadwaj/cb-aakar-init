@@ -112,11 +112,14 @@ const QUIET_LINK = "justify-self-start text-left text-[11px] text-surface-muted 
 
 /**
  * "Chhaap · Your imprint": one card per template anchor that takes content, with a tab per accepted type — Naam
- * (text), Buti (a motif from the library), Chhavi (photo relief) and Roop (your own 3D form, volume anchors only).
+ * (text), Buti (a motif from the library), Chhavi (photo relief) and Roop (your own 3D form, volume anchors only;
+ * a spot that takes only a form reads "Your form").
  * A name and a motif may share a spot; a photo fills its spot on its own, so the tabs that would crowd a spot are
- * disabled with a hint (the API refuses a crowded spot). Controlled: the parent owns the feature list. File names and
- * review states live in the design store, so they survive remounts; a file the studio is still checking is polled
- * until it is cleared or turned down.
+ * disabled with a hint (the API refuses a crowded spot). Everything follows the descriptor: a spot offers only the
+ * modes its anchor lists (one mode: no toggle, that mode is sent), a spot marked `required` comes first, says so and
+ * can't be left plain, and letters and depths stay inside the family's `max_text_chars` and the anchor's
+ * `max_relief_mm`. Controlled: the parent owns the feature list. File names and review states live in the design
+ * store, so they survive remounts; a file the studio is still checking is polled until it is cleared or turned down.
  */
 export function ContentSlotPanel({ template, family, features, onChange, motifPack, motifPackLabel, raw, look, disabled, className }: ContentSlotPanelProps) {
   const headingId = useId();
@@ -259,7 +262,7 @@ function AnchorCard({ anchor, template, family, onSpot, onChange, lockForm, disa
       </header>
       {required && !lockForm && onSpot.length === 0 && (
         <p className="text-[11px] leading-snug text-surface-muted">
-          The piece is made from this: add {contentWords(anchor, template)} here to sculpt.
+          Needed to make this piece: add {contentWords(anchor, template)} here.
         </p>
       )}
 
