@@ -36,6 +36,34 @@ public final class ProblemCodes {
     public static final String PAYLOAD_TOO_LARGE = "payload_too_large";
     public static final String RATE_LIMITED = "rate_limited";
 
+    // Outcome families (Avatars), shelves and bought-in hardware (docs/research/outcome-categories/implementation-plan.md §1)
+    public static final String UNKNOWN_FAMILY = "unknown_family";
+    public static final String FAMILY_NOT_AVAILABLE = "family_not_available";
+    public static final String FAMILY_EXISTS = "family_exists";
+    public static final String HARDWARE_EXISTS = "hardware_exists";
+    public static final String UNKNOWN_HARDWARE = "unknown_hardware";
+
+    // Customer uploads, content on designs (the Chhaap) and raw prints (plan §2, §4; ADR-0014)
+    public static final String UNSUPPORTED_FORMAT = "unsupported_format";
+    public static final String UNSUPPORTED_FEATURE = "unsupported_feature";
+    public static final String UPLOAD_NOT_READY = "upload_not_ready";
+    public static final String UPLOAD_REJECTED = "upload_rejected";
+    /** A geometry {@code design.failed} code: the customer's file could not be repaired into a printable form. */
+    public static final String CONTENT_UNUSABLE = "content_unusable";
+    public static final String REVIEW_ALREADY_DECIDED = "review_already_decided";
+
+    // Experiences (Duniya) and viewer environments (Mahaul), plan §7
+    public static final String UNKNOWN_EXPERIENCE = "unknown_experience";
+    public static final String EXPERIENCE_EXISTS = "experience_exists";
+
+    // The motif library (Buti): artwork served for previews
+    public static final String UNKNOWN_MOTIF = "unknown_motif";
+
+    // Content rules, the trademark guardrail behind Katha (plan §8): a text (Naam) naming a protected hero or brand, and a
+    // second portal rule with the same letters and digits
+    public static final String PROTECTED_TERM = "protected_term";
+    public static final String CONTENT_TERM_EXISTS = "content_term_exists";
+
     private ProblemCodes() {
     }
 }

@@ -8,13 +8,17 @@ import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.Map;
 
-/** {@code CatalogItemInput} in the management contract. */
+/**
+ * {@code CatalogItemInput} in the management contract. {@code category} must be a shelf id, {@code environment}, when given,
+ * a backdrop id and {@code family_id}, when given, a seeded family; the catalog service checks them (422
+ * {@code validation_failed} naming the shelves or backdrops / {@code unknown_family}).
+ */
 public record CatalogItemInput(
         @NotBlank(message = "slug is required")
         @Pattern(regexp = "^[a-z0-9-]{3,60}$", message = "slug must be 3-60 lowercase letters, digits or dashes") String slug,
         @NotBlank(message = "name is required") @Size(max = 80, message = "name must be at most 80 characters") String name,
-        @NotBlank(message = "category is required")
-        @Pattern(regexp = "^(home_decor|nameplates|kitchen|desk_tech|gifting)$", message = "category must be one of the five shelves") String category,
+        @NotBlank(message = "category is required") @Size(max = 40, message = "category must be at most 40 characters") String category,
+        @Size(max = 40, message = "family_id must be at most 40 characters") String familyId,
         @Size(max = 500, message = "description must be at most 500 characters") String description,
         @NotBlank(message = "template_id is required") @Size(max = 80) String templateId,
         @NotNull(message = "default_params is required") Map<String, Object> defaultParams,

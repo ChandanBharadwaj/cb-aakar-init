@@ -6,12 +6,13 @@ info:
     Staff-only API behind the management portal (`apps/admin`, ADR-0012). Served by `services/api`
     under `/admin/api/*` with its own staff authentication (email + password, seeded account in the
     local profile; never customer tokens). Owns operational configuration (pricing policies, materials,
-    catalog, live templates) and fulfilment operations (orders queue, stage advancement, QC, print pack,
-    messages log). Every write is recorded in the audit log.
+    catalog, live templates, Avatars, hardware, Duniya experiences, the content rules of the trademark guardrail) and
+    fulfilment operations (orders queue, stage advancement, QC, print pack, content reviews, messages log). Every write is
+    recorded in the audit log.
 
-    Roles: `owner` (everything), `studio` (fulfilment and read-only configuration).
+    Roles: `owner` (everything), `studio` (fulfilment, content reviews and read-only configuration).
     Errors are RFC 9457 Problem Details with a stable `code` (`unauthenticated`, `forbidden`,
-    `invalid_transition`, `policy_version_exists`, `not_found`, `validation_failed`).
+    `invalid_transition`, `policy_version_exists`, `not_found`, `validation_failed`, `content_term_exists`, …).
 servers:
   - url: http://localhost:8080
 security: [{ staffBearer: [] }]
@@ -58,7 +59,7 @@ paths:
                   orders_today: { type: integer }
                   revenue_today_paise: { type: integer }
                   revenue_month_paise: { type: integer }
-                  awaiting_action: { type: integer, description: Orders in queued, finishing or qc that need a staff step }
+                  awaiting_action: { type: integer, description: "Orders in queued, finishing or qc that need a staff step" }
   /admin/api/orders:
     get:
       summary: Orders queue
@@ -199,6 +200,7 @@ paths:
                 material: { type: string }
                 extruded_volume_cm3: { type: number }
                 print_seconds: { type: integer }
+                family_id: { type: string, description: "Applies the family's hardware default, setup fee and minimum" }
       responses:
         '200': { description: Breakdown, content: { application/json: { schema: { $ref: '../schemas/price-breakdown.v1.json' } } } }
         '422': { $ref: '#/components/responses/Problem' }
@@ -244,6 +246,208 @@ paths:
         '200': { description: Updated, content: { application/json: { schema: { $ref: 'aakar-api.v1.yaml#/components/schemas/CatalogItem' } } } }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /admin/api/catalog/shelves:
+    get:
+      summary: Shop shelves in display order
+      tags: [catalog]
+      responses:
+        '200': { description: Shelves, content: { application/json: { schema: { type: array, items: { $ref: 'aakar-api.v1.yaml#/components/schemas/Shelf' } } } } }
+  /admin/api/families:
+    get:
+      summary: Every outcome family (Avatar), available or not, with readiness
+      tags: [families]
+      responses:
+        '200': { description: Families, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AdminFamily' } } } } }
+    post:
+      summary: Create a family (owner only, audited as family.create)
+      tags: [families]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminFamilyInput' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/AdminFamily' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { description: family_exists, $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /admin/api/families/{familyId}:
+    put:
+      summary: Update a family's copy, tier, shelf, envelope, hardware, rules, content slot or availability (owner only, audited as family.update)
+      tags: [families]
+      parameters: [{ name: familyId, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminFamilyInput' }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/AdminFamily' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { description: unknown_family, $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /admin/api/hardware:
+    get:
+      summary: Bought-in hardware items
+      tags: [hardware]
+      responses:
+        '200': { description: Hardware, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AdminHardware' } } } } }
+    post:
+      summary: Create a hardware item (owner only, audited as hardware.create)
+      tags: [hardware]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminHardwareInput' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/AdminHardware' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { description: hardware_exists, $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /admin/api/hardware/{sku}:
+    put:
+      summary: Update a hardware item (owner only, audited as hardware.update)
+      tags: [hardware]
+      parameters: [{ name: sku, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminHardwareInput' }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/AdminHardware' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /admin/api/experiences:
+    get:
+      summary: Every experience (Duniya), available or not, in display order
+      description: "Rows as stored, for the portal's Duniya page: `avatars` are family ids and `items` Shop item slugs, in order."
+      tags: [experiences]
+      responses:
+        '200': { description: Experiences, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AdminExperience' } } } } }
+    post:
+      summary: Create an experience (owner only, audited as experience.create)
+      description: |
+        409 `experience_exists` for a taken id, 409 `slug_exists` for a taken slug. 422 `validation_failed` for a schema
+        violation, an environment that is not in GET /admin/api/environments (the detail names the known ones), an unknown
+        Shop item slug, a repeated avatar, item or motif, or a season window whose ends are not both dates (in order) or both
+        month-days; 422 `unknown_family` for an avatar that is not a family.
+      tags: [experiences]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminExperienceInput' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/AdminExperience' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { description: experience_exists or slug_exists, $ref: '#/components/responses/Problem' }
+        '422': { description: validation_failed or unknown_family, $ref: '#/components/responses/Problem' }
+  /admin/api/experiences/{experienceId}:
+    put:
+      summary: Update an experience's copy, slug, backdrop, style, motif pack, avatars, items, collections, seasons or availability (owner only, audited as experience.update)
+      description: The id in the path wins over the body. 404 `unknown_experience`; 409 `slug_exists` when another experience has the slug; 422 as on create.
+      tags: [experiences]
+      parameters: [{ name: experienceId, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminExperienceInput' }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/AdminExperience' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { description: unknown_experience, $ref: '#/components/responses/Problem' }
+        '409': { description: slug_exists, $ref: '#/components/responses/Problem' }
+        '422': { description: validation_failed or unknown_family, $ref: '#/components/responses/Problem' }
+  /admin/api/environments:
+    get:
+      summary: Viewer backdrops (Mahaul) in display order, read-only reference data
+      description: The valid `environment` values for experiences, families and Shop items. New backdrops need a storefront preset first (engineering).
+      tags: [experiences]
+      responses:
+        '200': { description: Environments, content: { application/json: { schema: { type: array, items: { $ref: 'aakar-api.v1.yaml#/components/schemas/Environment' } } } } }
+  /admin/api/uploads:
+    get:
+      summary: Customer uploads, newest first (filter by status for the review queue)
+      tags: [reviews]
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [ready, pending_review, rejected] } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        '200': { description: Uploads, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AdminUpload' } } } } }
+  /admin/api/content-reviews/{reviewId}:
+    post:
+      summary: Decide a flagged upload (studio or owner, audited as review.decide)
+      tags: [reviews]
+      parameters: [{ name: reviewId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContentReviewDecision' }
+      responses:
+        '200': { description: Decided, content: { application/json: { schema: { $ref: '#/components/schemas/AdminUpload' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { description: review_already_decided, $ref: '#/components/responses/Problem' }
+  /admin/api/content-terms:
+    get:
+      summary: Content rules (the trademark guardrail), every term active or not
+      description: |
+        The names the studio won't print (Katha, docs/research/outcome-categories/implementation-plan.md §8 and open
+        decision 16): publishers and brands (`trademark`), heroes and villains (`character`) and anything else (`other`).
+        An upload whose file name mentions an active term waits in the review queue (`pending_review`, the reason names the
+        term); a design whose text (Naam) mentions one is refused with 422 `protected_term`, and customers never see the
+        list. Matching folds accents, ignores case, spaces and punctuation (letters and digits only, `normalised_term`), so
+        "iron man", "Iron-Man" and "IRONMAN" are one term; a term of six letters or digits or fewer (`whole_word`) only
+        matches as a whole word, so "DC" never catches "Adcock" nor "Thor" "Thorat". Sorted by `normalised_term`. Any staff role.
+      tags: [content-rules]
+      responses:
+        '200': { description: Content terms, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/ContentTerm' } } } } }
+    post:
+      summary: Add a content rule (owner only, audited as content_term.create)
+      description: |
+        409 `content_term_exists` when a term with the same letters and digits exists, active or not (edit or switch on that
+        one instead); 422 `validation_failed` for a schema violation or a term with fewer than two letters or digits.
+      tags: [content-rules]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContentTermInput' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/ContentTerm' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { description: content_term_exists, $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /admin/api/content-terms/{termId}:
+    put:
+      summary: Change a content rule's kind, reason or active switch (owner only, audited as content_term.update)
+      description: |
+        The term is the rule's key and can't be renamed: the body's `term` must have the same letters and digits as the stored
+        one (another spelling of it is accepted and the stored spelling stays), 422 `validation_failed` otherwise; add the new
+        spelling as its own term and switch this one off. Rules are never deleted, so the audit trail stays readable. Switching
+        a term off stops it holding uploads and refusing names at once. 404 for an unknown id.
+      tags: [content-rules]
+      parameters: [{ name: termId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContentTermInput' }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/ContentTerm' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /admin/api/motifs:
+    get:
+      summary: The Buti motif library, for experience motif packs and template previews
+      tags: [motifs]
+      responses:
+        '200': { description: Motifs, content: { application/json: { schema: { type: array, items: { $ref: 'aakar-api.v1.yaml#/components/schemas/Motif' } } } } }
   /admin/api/templates:
     get:
       summary: Templates known to the geometry service with their live flag
@@ -265,6 +469,8 @@ paths:
                     name: { type: string }
                     live: { type: boolean, description: False hides the template from Create and blocks new designs }
                     catalog_items: { type: array, items: { type: string }, description: Slugs using this template }
+                    features_supported: { type: array, items: { type: string, enum: [emboss_text, motif, relief_image, hero_mesh] }, description: Chhaap types the template accepts }
+                    hardware: { type: array, items: { $ref: 'aakar-api.v1.yaml#/components/schemas/HardwareRef' }, description: Bought-in parts the template is cut for }
   /admin/api/templates/{templateId}:
     put:
       tags: [templates]
@@ -397,6 +603,24 @@ components:
         shipping_flat_paise: { type: integer, minimum: 0 }
         free_shipping_above_paise: { type: integer, minimum: 0 }
         shipping_label: { type: string, maxLength: 60 }
+        hardware_markup_pct: { type: number, minimum: 0, maximum: 500, description: Applied to bought-in hardware unit costs; 0 when absent }
+        family_rules:
+          type: object
+          description: Per-outcome rules keyed by family id
+          additionalProperties:
+            type: object
+            additionalProperties: false
+            properties:
+              minimum_subtotal_paise: { type: integer, minimum: 0, description: Lifts the subtotal to at least this (rounded to the policy ending) }
+              setup_fee_paise: { type: integer, minimum: 0, description: "Studio setup line, e.g. repair and orientation labour for raw prints" }
+              qty_breaks:
+                type: array
+                items:
+                  type: object
+                  required: [min_qty, discount_pct]
+                  properties:
+                    min_qty: { type: integer, minimum: 2 }
+                    discount_pct: { type: number, minimum: 0, maximum: 90 }
     PricingPolicyVersion:
       type: object
       required: [version, active, policy, created_at, created_by]
@@ -435,16 +659,162 @@ components:
       properties:
         slug: { type: string, pattern: '^[a-z0-9-]{3,60}$' }
         name: { type: string, maxLength: 80 }
-        category: { type: string, enum: [home_decor, nameplates, kitchen, desk_tech, gifting] }
+        category: { type: string, description: A shelf id from GET /admin/api/catalog/shelves; 422 validation_failed otherwise }
+        family_id: { type: [string, 'null'], description: Outcome family (Avatar); 422 unknown_family when not seeded }
         description: { type: string, maxLength: 500 }
         template_id: { type: string }
         default_params: { type: object, additionalProperties: true }
         default_material: { type: string }
         base_price_paise: { type: integer, minimum: 0 }
         specs_line: { type: string, maxLength: 120 }
-        environment: { type: string }
+        environment: { type: [string, 'null'], description: An environment id from GET /admin/api/environments; 422 validation_failed otherwise }
         available: { type: boolean }
         media: { type: array, items: { type: object, properties: { kind: { type: string }, url: { type: string } } } }
+    AdminFamilyInput:
+      type: object
+      description: Same fields as schemas/template-family.v1.json#/$defs/family. On PUT the id in the path wins.
+      additionalProperties: false
+      required: [id, codename, name, kind, tier, shelf, default_template_id, shape_tolerance, content_slot, available]
+      properties:
+        id: { type: string, pattern: '^[a-z][a-z0-9_]*$', maxLength: 40 }
+        codename: { type: string, maxLength: 40 }
+        name: { type: string, maxLength: 80 }
+        tagline: { type: string, maxLength: 120 }
+        description: { type: string, maxLength: 500 }
+        kind: { type: string, enum: [carrier, object, raw] }
+        tier: { type: string, enum: [launch, next, later] }
+        shelf: { type: string }
+        demand_rank: { type: integer, minimum: 1 }
+        default_template_id: { type: string, pattern: '^[a-z][a-z0-9_]*$' }
+        environment: { type: string, description: "An environment id from GET /admin/api/environments (studio when absent); 422 validation_failed otherwise" }
+        size_envelope_mm:
+          type: object
+          required: [min_longest_mm, max_longest_mm]
+          properties:
+            min_longest_mm: { type: number, exclusiveMinimum: 0 }
+            max_longest_mm: { type: number, exclusiveMinimum: 0 }
+        hardware: { type: array, items: { type: object, required: [sku, qty], properties: { sku: { type: string }, qty: { type: integer, minimum: 1 } } } }
+        material_rules:
+          type: object
+          properties:
+            heat_safe_only: { type: boolean }
+            allowed: { type: [array, 'null'], items: { type: string } }
+            excluded_finish_classes: { type: array, items: { type: string, enum: [matte, silk] } }
+        shape_tolerance: { type: string, enum: [any, constrained, strict] }
+        content_slot:
+          type: object
+          required: [accepts]
+          properties:
+            accepts: { type: array, items: { type: string, enum: [emboss_text, motif, relief_image, hero_mesh] } }
+            anchors: { type: array, items: { type: string } }
+            hero_volume: { type: boolean }
+            max_text_chars: { type: integer, minimum: 1, maximum: 40 }
+        available: { type: boolean }
+        sort_order: { type: integer, default: 100 }
+    AdminFamily:
+      allOf:
+        - $ref: '#/components/schemas/AdminFamilyInput'
+        - type: object
+          required: [ready]
+          properties:
+            ready: { type: boolean, description: At least one live template of this family exists }
+            template_ids: { type: array, items: { type: string } }
+            updated_at: { type: string, format: date-time }
+    AdminHardwareInput:
+      type: object
+      additionalProperties: false
+      required: [sku, name, unit_cost_paise]
+      properties:
+        sku: { type: string, pattern: '^[a-z][a-z0-9_]*$', maxLength: 40 }
+        name: { type: string, maxLength: 120 }
+        unit_cost_paise: { type: integer, minimum: 0 }
+        weight_g: { type: number, minimum: 0 }
+        supplier: { type: string, maxLength: 120 }
+        url: { type: string, maxLength: 500 }
+        notes: { type: string, maxLength: 200 }
+        available: { type: boolean, default: true }
+    AdminHardware:
+      allOf:
+        - $ref: '#/components/schemas/AdminHardwareInput'
+        - type: object
+          properties:
+            updated_at: { type: string, format: date-time }
+    AdminExperienceInput:
+      type: object
+      description: Same fields as schemas/experience.v1.json#/$defs/experience. On PUT the id in the path wins.
+      additionalProperties: false
+      required: [id, codename, slug, title, environment, surface, avatars, available]
+      properties:
+        id: { type: string, pattern: '^[a-z][a-z0-9_]*$', maxLength: 40, description: "snake_case English, never renamed (festive, desk_gaming, …)" }
+        codename: { type: string, maxLength: 40, description: "Brand name, e.g. Utsav" }
+        slug: { type: string, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$', minLength: 2, maxLength: 60, description: URL slug (/duniya/<slug>), unique }
+        title: { type: string, maxLength: 80, description: "Plain descriptor, e.g. Festive & gifting" }
+        tagline: { type: string, maxLength: 120 }
+        description: { type: string, maxLength: 500 }
+        environment: { type: string, description: An environment id from GET /admin/api/environments }
+        surface: { $ref: 'aakar-api.v1.yaml#/components/schemas/ExperienceSurface' }
+        style: { type: string, enum: [none, jaipur_heritage, modern_zen, cyber_desi, warli_line, comic_pop], default: none }
+        motif_pack: { type: array, maxItems: 24, items: { type: string, pattern: '^[a-z][a-z0-9_]*$' }, description: "Motif ids (or a pack id) offered first, in order" }
+        avatars: { type: array, maxItems: 24, items: { type: string }, description: Family ids in display order }
+        items: { type: array, maxItems: 24, items: { type: string }, description: Shop item slugs in display order }
+        collections: { type: array, maxItems: 24, items: { $ref: 'aakar-api.v1.yaml#/components/schemas/ExperienceCollection' } }
+        season: { type: array, maxItems: 12, items: { $ref: 'aakar-api.v1.yaml#/components/schemas/SeasonWindow' } }
+        available: { type: boolean }
+        sort_order: { type: integer, default: 100 }
+    AdminExperience:
+      description: The row as stored. The lists and defaults the input may leave out are always returned.
+      allOf:
+        - $ref: '#/components/schemas/AdminExperienceInput'
+        - type: object
+          required: [style, motif_pack, items, collections, season, sort_order, updated_at]
+          properties:
+            style: { type: string, enum: [none, jaipur_heritage, modern_zen, cyber_desi, warli_line, comic_pop] }
+            motif_pack: { type: array, items: { type: string }, description: "Motif ids (or a pack id) in order; empty when none" }
+            items: { type: array, items: { type: string }, description: Shop item slugs in display order; empty when none }
+            collections: { type: array, items: { $ref: 'aakar-api.v1.yaml#/components/schemas/ExperienceCollection' } }
+            season: { type: array, items: { $ref: 'aakar-api.v1.yaml#/components/schemas/SeasonWindow' } }
+            sort_order: { type: integer }
+            updated_at: { type: string, format: date-time }
+    AdminUpload:
+      allOf:
+        - $ref: 'aakar-api.v1.yaml#/components/schemas/Upload'
+        - type: object
+          properties:
+            owner: { type: object, properties: { user_id: { type: [string, 'null'], format: uuid }, guest_id: { type: [string, 'null'], format: uuid }, phone: { type: [string, 'null'] } } }
+            url: { type: [string, 'null'], description: Staff get the file URL in every status so reviewers can see it }
+            origin: { type: string, enum: [upload, generated] }
+            review: { type: [object, 'null'], properties: { id: { type: string, format: uuid }, reason: { type: string }, status: { type: string, enum: [pending, approved, rejected] }, decision_note: { type: [string, 'null'] }, reviewer_email: { type: [string, 'null'] }, decided_at: { type: [string, 'null'], format: date-time } } }
+    ContentReviewDecision:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision: { type: string, enum: [approved, rejected] }
+        note: { type: string, maxLength: 200 }
+    ContentTermInput:
+      type: object
+      description: A content rule as staff write it. On PUT the term must be the stored one (same letters and digits).
+      additionalProperties: false
+      required: [term, kind]
+      properties:
+        term: { type: string, minLength: 2, maxLength: 80, description: "The name as staff spell it (Spider-Man); at least two letters or digits" }
+        kind: { type: string, enum: [trademark, character, other], description: "A publisher or brand, a character, or anything else" }
+        reason: { type: [string, 'null'], maxLength: 200, description: "Why it is protected, for staff and reviewers, e.g. Marvel character (Disney)" }
+        active: { type: boolean, default: true, description: Off keeps the rule but stops it holding uploads and refusing names }
+    ContentTerm:
+      type: object
+      description: A content rule as stored, with how the matcher compares it.
+      required: [id, term, kind, reason, active, normalised_term, whole_word, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        term: { type: string }
+        kind: { type: string, enum: [trademark, character, other] }
+        reason: { type: [string, 'null'] }
+        active: { type: boolean }
+        normalised_term: { type: string, description: "Folded, lowercase, letters and digits only (spiderman): the rule's unique key" }
+        whole_word: { type: boolean, description: "Six letters or digits or fewer: matches only as a whole word of a text (DC, Thor, Batman)" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
     NotificationRecord:
       type: object
       required: [id, channel, template, to, status, created_at]
@@ -466,7 +836,7 @@ components:
         id: { type: integer }
         at: { type: string, format: date-time }
         staff_email: { type: string }
-        action: { type: string, description: order.advance, pricing.publish, material.update, catalog.update, template.live }
-        target: { type: string, description: Order number, policy version, material id, slug or template id }
+        action: { type: string, description: "order.advance, pricing.publish, material.update, catalog.update, template.live, family.create, family.update, hardware.create, hardware.update, experience.create, experience.update, review.decide, content_term.create, content_term.update" }
+        target: { type: string, description: "Order number, policy version, material id, slug, template id, family id, hardware sku, experience id, review id or content term" }
         before: { type: [object, 'null'], additionalProperties: true }
         after: { type: [object, 'null'], additionalProperties: true }

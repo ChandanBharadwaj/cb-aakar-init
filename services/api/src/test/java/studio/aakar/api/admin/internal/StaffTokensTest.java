@@ -7,6 +7,7 @@ import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -16,7 +17,9 @@ import studio.aakar.api.admin.StaffRole;
 class StaffTokensTest {
 
     static final String SECRET = "unit-test-secret-that-is-long-enough-for-hs256-0123456789";
-    static final Instant NOW = Instant.parse("2026-09-27T10:00:00Z");
+    // The parser checks expiry against the real clock, so tokens are minted "now" (a fixed 27 Sep instant expired
+    // with its 12 h token and turned this test red, as JwtTokensTest's did before).
+    static final Instant NOW = Instant.now().truncatedTo(ChronoUnit.SECONDS);
 
     private final StaffTokens tokens = new StaffTokens(SECRET);
     private final StaffPrincipal owner = new StaffPrincipal(UUID.randomUUID(), "studio@aakar.local", "Aakar Studio", StaffRole.owner);

@@ -31,9 +31,10 @@ spring:
       enabled: false
   servlet:
     multipart:
-      # QC photos are capped at 10 MB by the admin module (413 payload_too_large); the container limit sits above it.
-      max-file-size: 12MB
-      max-request-size: 13MB
+      # The services cap every file themselves (413 payload_too_large): customer photos 15 MB and model files 50 MB
+      # (aakar.uploads.*), QC photos 10 MB (admin module). The container limit sits just above the largest.
+      max-file-size: 52MB
+      max-request-size: 52MB
 
 server:
   port: 8080
@@ -91,17 +92,39 @@ aakar:
   messaging:
     sender: ${AAKAR_MESSAGING_SENDER:log}         # log | whatsapp (later)
   media:
-    # Local asset directory for staff uploads (QC photos), served at {api.public-url}/media/{key}; S3 later.
+    # Local asset directory for staff uploads (QC photos) and customer uploads, served at {api.public-url}/media/{key}; S3 later.
     dir: ${AAKAR_MEDIA_DIR:./.aakar-media}
+    # The API origin the geometry service fetches customer uploads from (content_source.url in design specs), e.g.
+    # http://api:8080 in Compose while api.public-url is the browser's http://localhost:8080. Blank = api.public-url.
+    internal-base-url: ${AAKAR_MEDIA_INTERNAL_BASE_URL:}
+  motifs:
+    # The Buti motif library (index.json + one SVG per motif) behind GET /api/motifs and the motif checks on designs; the
+    # geometry service builds from the same folder. Blank: the first packages/design-tokens/motifs found from the working
+    # directory upwards (the monorepo's); the image sets /design-tokens/motifs. Missing or broken: a production start fails,
+    # a local one logs a warning and lists no motifs.
+    dir: ${AAKAR_MOTIFS_DIR:}
+  uploads:
+    # Customer uploads (POST /api/uploads, plan §4): photos for a relief, model files for a hero form or Swaroop.
+    # `terms` flags a file whose name mentions an active content term (the portal's Content rules, table content_terms) or
+    # one of flag-terms (comma-separated, on top of the portal's list; case, spaces and punctuation ignored, terms of six
+    # letters or fewer only as whole words) into the review queue; `noop` flags nothing and is refused when
+    # aakar.profile=production.
+    scanner: ${AAKAR_UPLOADS_SCANNER:terms}
+    flag-terms: ${AAKAR_UPLOADS_FLAG_TERMS:}
+    max-image-bytes: 15MB
+    max-model-bytes: 50MB
   admin:
     # Management API (ADR-0012). The seed owner studio@aakar.local is created on first start with this password;
     # the production guard refuses the default. Staff tokens are HS256 with the identity secret and typ=staff.
     seed-password: ${AAKAR_ADMIN_SEED_PASSWORD:aakar-studio}
     token-ttl: ${AAKAR_ADMIN_TOKEN_TTL:12h}
-  # PLAN §7.10 · the SEED pricing policy (ADR-0008): V4__pricing_policies.sql inserts the same values as the
-  # first active row; from then on the active policy lives in the pricing_policies table.
+  # PLAN §7.10 · the SEED pricing policy (ADR-0008): V4__pricing_policies.sql inserted the first active row and
+  # V9__families_hardware_uploads.sql 2026-10-carriers, and V14__keepsakes_and_katha_available.sql the current one
+  # (2026-10-keepsakes, adding the night-light and plinth minimums) with the same values as below; from then on
+  # the active policy lives in the pricing_policies table. Copied from packages/design-tokens/materials.json →
+  # pricing_policy (MaterialsSeedTest fails on drift). Family keys are bracketed so Boot keeps the underscores.
   pricing:
-    version: 2026-09-phase0
+    version: 2026-10-keepsakes
     machine-rate-paise-per-hour: 20000
     finishing-fee-paise:
       matte: 8000
@@ -112,6 +135,25 @@ aakar:
     shipping-flat-paise: 7900
     free-shipping-above-paise: 99900
     shipping-label: "Shipping · Delhivery, 4 days"
+    # Applied to bought-in hardware unit costs (split rings, magnets, LED bases); placeholder until supplier quotes land.
+    hardware-markup-pct: 30
+    # Per-outcome rules keyed by family id: minimum subtotals and the raw-print setup (repair and orientation) fee.
+    family-rules:
+      "[keychain]":
+        minimum-subtotal-paise: 24900
+      "[fridge_magnet]":
+        minimum-subtotal-paise: 29900
+      "[ornament]":
+        minimum-subtotal-paise: 34900
+      "[nameplate]":
+        minimum-subtotal-paise: 59900
+      "[lithophane]":
+        minimum-subtotal-paise: 59900
+      "[figurine_base]":
+        minimum-subtotal-paise: 69900
+      "[raw_print]":
+        minimum-subtotal-paise: 34900
+        setup-fee-paise: 9900
 
 logging:
   level:

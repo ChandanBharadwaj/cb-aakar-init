@@ -1,0 +1,316 @@
+# Plan: Outcome categories ("carriers") + one raw "just print it" category
+
+## Context
+
+The user's observation: Aakar can build a model, but the **outcome** is undefined. A model on screen is not a product; a customer wants it *as* a keychain, a desk gadget, a photo frame, a keycap: **user idea + an everyday usable object**. Today the repo has:
+
+- **One live form factor** (`phone_stand` via `jharokha_phone_stand@1`, `services/geometry/aakar_geometry/templates/jharokha_phone_stand.py`). PLAN.md §7.3 plans 12 "object" families (phone_stand, headphone_stand, planter, coaster_set, nameplate, bookend, table_lamp, diya_holder, pooja_accessory, wall_hook, desk_organizer, car_accessory). None is a keychain / keycap / photo frame / lithophane / magnet / figurine base.
+- **Three unrelated classification axes**: Shop `category` (a merchandising shelf, hard-coded in 7 places), template `family` (the real form factor, a free string), viewer `environment`.
+- **An attachment mechanism that exists only on paper**: `features[]` in `packages/contracts/schemas/design-spec.v1.json` (only `emboss_text` | `motif`), `anchors` + `features_supported` in `template-descriptor.v1.json`. The API always writes `features: []` (`services/api/.../design/internal/DesignSpecs.java:23`), the geometry pipeline rejects unsupported features (`pipeline.py:108-114`), and `features_supported` is empty on the only live template, so emboss/motif is a contract, not an implementation.
+- **No AI, no upload, no print-provider adapter.** Prompts return 422 `not_yet_available` (`DesignService.java:58-60`). Printing is a manual zip handoff (`admin/internal/PrintPack.java`). The inspect service already loads STL/GLB/3MF/OBJ/PLY (`services/inspect/aakar_inspect/loaders.py:14`) but nothing customer-facing uses it. `manifold3d` (needed for mesh booleans) is not in the geometry lockfile; `spring.servlet.multipart.max-file-size` is 12 MB.
+- **No hardware / bill-of-materials concept** (key rings, magnets, LED bases, acrylic panes) and no price line for it (`price-breakdown.v1.json:21` has only material, machine_time, finishing, packaging).
+- **Architecture stance** (ADR-0009 parametric-first, the LLM emits a Design Spec never code; ADR-0005 generative provider behind an adapter, confined to bounded regions of a parametric body) maps exactly onto "proven base (carrier) + personal top (user idea)". The raw "just print it" category is the single deliberate exception and needs its own gated path and an ADR.
+
+Intended outcome: a **data-driven catalogue of outcome categories** (carrier families with consumer copy, size envelope, hardware BOM, material rules, price rules, content slot), the **content-slot mechanism** that fuses a user's idea (text, motif, photo relief, or a generated/uploaded mesh) onto a carrier, and **one raw print family** (`raw_print`), all expressed through the repo's contracts, Flyway migrations, geometry templates, pricing engine, storefront and portal, so that "make it a keychain" is a first-class order path.
+
+Product-owner additions after the first plan review (27 Sep 2026): an **exciting naming convention** (Avatar · Chhaap · Duniya · Swaroop, see below); **everything controlled from the management portal** (names, tiers, availability, hardware, price rules, experiences, background assignment); a new **Experiences persona on the Shop page** ("Duniya") that presents avatars as themes tightly integrated with the stage backgrounds; and a **Comics & heroes experience** ("Katha"). Marvel and DC characters, names and logos are licensed IP, so Katha ships as an original comic-book aesthetic in which the customer's own hero is the content, with a trademark guardrail in content review; licensed collections are a later business decision (§8, open decision 16).
+
+## Research inputs
+
+Market research was run with the deep-research skill (5 parallel researchers: consumer demand, competitor patterns, engineering standards, raw-print fulfilment, pricing/economics). Report and notes:
+
+- Report: `docs/research/outcome-categories/report.md` (committed on `claude/3d-print-categories-ypc6xw`; BLUF, five findings sections, Deliverable A taxonomy, Deliverable B raw-category design, Deliverable C evidence note).
+- Notes: `docs/research/outcome-categories/notes/{consumer_demand,competitor_patterns,engineering_standards,raw_print_and_fulfillment,pricing_economics}.md` (every claim carries a source URL).
+- This plan: `docs/research/outcome-categories/implementation-plan.md`.
+- Evidence quality: full-page fetches were blocked by the network proxy and the shared search budget ran out, so figures are snippet-level, medium confidence; re-verify numbers before publishing them anywhere or seeding real prices from them.
+
+### Headline findings
+
+- **Only "fixed carrier + 2–3 exposed parameters + own/partner fulfilment" survived.** Open customizer marketplaces died (Shapeways Chapter 7 on 2 Jul 2024, marketplace never rebuilt; i.materialise closed 31 Oct 2025; Mixee Labs gone after its 2015 Amazon acquisition). MakerWorld's MakerLab has 10+ template tools (Image to Keychain exposes plate 1 mm + image 0.5 mm; Make My Lithophane emits fixed 104×140 mm plates) but sells no prints and moved to per-generation billing on 25 Jun 2026. Meshy Creative Lab (Jan 2026) is the only AI generator shipping objects: fixed 50 mm photo keychains from US$39, priced by colour coverage, US-only, 7–10 days. Print-on-demand (Printify/Printful/Gelato) supplies the data model: blank → variants (size/colour/provider) → placement template with print area and bleed → mockup → validation.
+- **Shape tolerance is the axis that organises the taxonomy.** *Any*: a generated plate or plinth absorbs whatever the AI produced (keychain/pet tag, magnet, nameplate/plaque, ornament, figurine-on-plinth, raw). *Constrained*: the mesh must satisfy a rule (pendant attachment region, coaster flat top, planter shell). *Strict*: functional geometry is parametric and the user mesh only decorates (keycap, stands/holders/clips, cookie cutter, stamp, lithophane, AirTag holder). Rule: never boolean the user mesh into a stem, cavity, cutting wall or contact face.
+- **Demand**: personalised keychains rank first (Etsy US$5.99–15.99, Sep 2026), then desk/tech gadgets, lithophane photo lights (Etsy US$8.40–80), photo-to-figurine keepsakes (pets from US$34.49; people US$119–690; India ₹3,999–14,999), jewellery, kitchen gadgets, décor, nameplates, pet tags, keycaps (~US$5 each), ornaments. Generic fidget/articulated toys own unit volume but are saturated. Personalisation is the differentiator in every 2025–26 seller guide.
+- **India gap**: IGP and FNP sell only printed photo goods (mugs, cushions, frames, lamps) from ₹249; no mass player does 3D-printed personalisation, which lives in small studios at ₹4,000+. The wedge is photo-driven carriers (lithophane night light, relief plaque, figurine) plus a ₹249–999 impulse tier (keychain, nameplate). Diwali, Christmas, Valentine's and Mother's Day do not overlap, so a US channel smooths an Indian farm.
+- **Economics**: plastic is ≈US$0.30 / ₹11 per keychain; per-order labour + postage is US$9.8–13.4 / ₹80–110 and 70–90% of a small item's floor. Own-farm delivered floors: keychain ≈US$10.2 / ₹115 (3-pack ≈US$4.0 each), lithophane ≈US$14.1 / ₹219, night light ≈US$24.5 / ₹570, figurine ≈US$19.1 / ₹420. So carriers must ship as sets, minimum order ≈₹249–299 with ₹499 free shipping (US$15 single, US$25–30 three-packs), base cost ≈45% of retail (POD norm). AI generation costs US$0.07–0.75 per attempt but US$2.5–10 per paid order at 4–6 tries and 20% conversion: meter generations.
+- **Materials and safety**: PLA (Tg 60 °C) fails in a 70 °C parked car, so keychains/outdoor items need PETG/ASA; PLA indoors. Cookie cutters/toppers: FDM only, food-contact filament, semi-disposable, picks are the only food contact. Wearables: PA12 or cast metal, or fully cured and coated resin, no nickel plating. Kids' items with magnets/pins are a separate compliance track.
+- **Process floors and hardware**: FDM 0.4 nozzle reject walls < 0.8 mm, warn < 1.2 mm, 1.5 mm load-bearing, holes +0.2–0.25 mm; keychain hole 4 mm with ≥2 mm rim for a 25 mm split ring; magnet pocket +0.2–0.3 mm diameter, depth = magnet thickness; MX cross 4.03+slop × 1.25 mm with slop 0.3–0.35 mm (resin strongly preferred); lithophane 0.4–0.8 → 3.0–3.5 mm at 0.1–0.12 mm layers, 100% infill, 70 mm LED puck; frame rabbet 1/4 in + 1/16 in; E27 40 mm / E14 28–29 mm collars.
+- **Toolchain**: permissive core trimesh (MIT) + manifold3d (Apache-2.0, guaranteed-manifold booleans) + build123d (Apache-2.0) + Open3D (MIT); GPL repair fallbacks (pymeshfix, Blender `bpy` voxel remesh) only as isolated processes; every slicer CLI is AGPL, so run OrcaSlicer/Bambu Studio unmodified as a subprocess (`--orient --arrange 1 --slice 0 --export-slicedata`, caps 1M triangles / 300 s); decimate to ≤500k triangles; pin trimesh + manifold3d together.
+- **Raw print**: consumer bureaus expose material tier, colour, size, quantity, speed and hide every slicer setting; price = max(partner quote × (1 + margin), floor) + shipping, floor ≈US$8–10 / ₹150–250; reprint-first with 7–14-day photo claims. API-ready partners: Slant 3D v2 (US FDM farm, 220 mm cube, PLA/PETG, API announced 8 Sep 2026), Craftcloud v5 (worldwide aggregator, public API), Treatstock (lists Objectify, India), Shapeways (OAuth2, 5% fee), JLC3DP (partner-only API, uneconomic into India). No Indian bureau has a public API (iamRapid ₹3–8/g, ₹99 minimum, 3-day; 3Ding; Zbotic; Robu). US de minimis ended 29 Aug 2025 and India Post suspended US-bound merchandise: print US orders in the US, Indian orders in India.
+
+### Recommended taxonomy (from the report; envelopes marked "P" are proposed, retail bands marked "est." are unverified)
+
+**Launch tier** (commercial priority; engineering order in §7):
+
+| Carrier (family) | Shape | Envelope | Hardware | Material | Retail USD / INR | Floor | Demand | Precedent |
+|---|---|---|---|---|---|---|---|---|
+| Keychain / bag charm / pet tag (`keychain`) | any | 30–60 mm, 3–6 mm (P); Meshy fixes 50 mm | 4 mm hole, ≥2 mm rim; 25 mm split ring; pet tag adds S-hook | PETG/ASA; PA12 premium | US$5.99–15.99 / ₹249–399 | ≈US$10.2 / ₹115; 3-pack ≈US$4 | strong | MakerLab Image to Keychain; Meshy |
+| Fridge magnet (`fridge_magnet`) | any | 40–70 mm, 4–8 mm (P) | 10×2 or 10×3 mm magnet, pocket +0.2–0.3 mm | PLA/PETG | est. US$6–15, sell as 4-sets | ≈US$10.5 / ₹120 | weak–moderate | Meshy magnets |
+| Nameplate / desk sign / relief plaque (`nameplate`) | any | 150–200 × 50–70 mm (P) | none or wedge; text strokes ≥0.8 mm | multi-colour PLA | est. US$15–40; corporate Diwali ₹500–2,000 per head | ≈US$13.5 / ₹250 | weak–moderate | Make My Sign; Relief Sculpture Maker |
+| Hanging ornament (`ornament`) | any | 50–90 mm, hole ≥3 mm (P) | ribbon/hook loop | PLA or resin | est. US$10–25, seasonal | ≈US$10.7 / ₹135 (3-packs) | weak (seasonal) | Christmas Ornament Maker |
+| Lithophane plate + puck night light (`lithophane`) | strict | plate ≈104×140 mm; light 100–150 mm on 70 mm puck | 70 mm LED puck; frame/base | white PLA, 0.1–0.12 mm layers, 100% infill | US$8.40–80 (typ. 10–30) / FNP photo lamps analogue | ≈US$14.1 / ₹219; light ≈US$24.5 / ₹570 | moderate–strong | Make My Lithophane; ItsLitho; Meshy lamps |
+| Figurine / bust on plinth (`figurine_base`) | any (repair + plane cut + plinth) | 50–200 mm (P); ≤100k triangles | plinth; optional M3 insert | resin < 100 mm; FDM > 100 mm | pet from US$34.49; human US$119–690 / ₹3,999–14,999 | ≈US$19.1 / ₹420 | moderate, rising | Hero Forge; JuJuBit; PrintMon; Meshy figurine |
+
+**Second wave**: keycap (`keycap`, strict; MX/Choc stems; resin preferred, ≈US$5 each), pendant/earring (constrained; PA12 or cured coated resin; est. US$12–35), cake topper (any; food-contact picks; est. US$10–30), cookie cutter/stamp (strict silhouette offsets 0.8–1.2 mm walls; est. US$8–20), desk gadgets (strict; the existing `object` families such as `phone_stand`, `desk_organizer`, `headphone_stand` with content on their anchors; est. US$10–25, marginal below US$20), photo frame 4×6 / 5×7 (`photo_frame`, constrained by the rabbet; est. US$15–40), pin/badge, coaster 4-set, bookmark.
+
+**Later or avoid**: planter (bulky, volumetric postage), E27/E14 lamp shade (heat liability, price competition; keep only the puck night light), generic fidget/articulated toys (saturated), rings and metal jewellery (casting partner, skin safety), full-colour sandstone busts (fragile, 3 mm walls), AirTag/controller mounts (device variants), tabletop minis (MyMiniFactory/Hero Forge incumbents, IP), kids' toys with detachable magnets or pins (compliance).
+
+**The one raw category** (`raw_print`): expose material tier (FDM plastic default; resin; nylon; metal/full colour later), colour, a longest-dimension size slider with unit toggle clamped to the routed partner's envelope, quantity, delivery speed; hide layer height, infill, orientation, supports, hollowing, vendor. Gate before quoting: format/size, unit sanity, manifold repair, floater removal, bounding box, min wall (FDM reject < 0.8 mm, warn < 1.2 mm), headless slice for time/mass; soft warnings acceptable JLC-style, hard failures block. Price = max(partner quote × (1 + margin), floor) + shipping; internal fallback = volume × density × rate + Z-height time proxy + handling. Route US → Slant 3D v2 / Craftcloud / Shapeways; India → own farm ≤150 g, then iamRapid/3Ding/Zbotic/Robu by negotiated integration; never India→US parcels. Treat the raw tier as a utility and acquisition funnel, not a margin line.
+
+## Naming convention: Avatar · Chhaap · Duniya · Swaroop
+
+Rules: (1) code identifiers stay snake_case English (`keychain`, `relief_image`, `festive`) so migrations and contracts never change when a name does; (2) brand names are **data** (`codename`, `name`, `tagline`) on the family and experience rows, edited in the portal; (3) the UI always pairs the codename with a plain descriptor ("Saathi · Keychain"), keeping ADR-0002's clarity rule; (4) words come from the craft/Hindi register the brand already uses (Karigar, Jharokha, Kantha, Warli, Bazaar, Canvas).
+
+| Concept (code) | Brand name | Meaning | Where it shows |
+|---|---|---|---|
+| outcome category / carrier (`family`, kind `carrier`) | **Avatar** | the form your idea takes | Create picker "Give your idea an Avatar"; portal "Avatars" |
+| content slot (`features[]`) | **Chhaap** | imprint | studio panel "Your Chhaap" |
+| `emboss_text` | **Naam** | name, text | Chhaap panel tab |
+| `motif` | **Buti** | textile motif | Chhaap panel tab |
+| `relief_image` | **Chhavi** | likeness (photo relief) | Chhaap panel tab |
+| `hero_mesh` | **Roop** | form (your own 3D model) | Chhaap panel tab |
+| `raw_print` family | **Swaroop** | its own form, printed as it is | Create picker last card |
+| experience (`experiences`) | **Duniya** | world | Shop persona "Duniya · Experiences" |
+| viewer environment (`environments`) | **Mahaul** | ambience, backdrop | portal "Backgrounds (Mahaul)" |
+
+Avatar codenames (seeded, editable): **Saathi** · Keychain & bag charm (pet-tag template "Saathi Pet"), **Chumbak** · Fridge magnet, **Pehchaan** · Nameplate & plaque, **Jhoomar** · Hanging ornament, **Roshni** · Photo night light (lithophane), **Pratima** · Figurine on a plinth, **Chaukhat** · Photo frame, **Kunji** · Keycap, **Swaroop** · Print as it is. Object families keep their template names (Jharokha phone stand, Kantha nameplate).
+
+Duniya (experiences) seeded: **Utsav** · Festive & gifting, **Adda** · Desk & gaming, **Yaadein** · Memories & keepsakes, **Masti** · Kids & party, **Katha** · Comics & heroes.
+
+Alternatives (open decision 15): English playful (Forms · Imprint · Worlds · As-is) or Sanskrit (Roopa · Mudra · Loka · Swaroopa). Because codenames are data the switch is a portal edit, but experience `slug`s appear in URLs (`/duniya/utsav`), so decide before the seed lands.
+
+## Guiding decisions
+
+| Decision | Choice | Why |
+|---|---|---|
+| What a "carrier" is | The template **family**, promoted from a free string to a reference entity `template_families` with `kind ∈ {carrier, object, raw}` | PLAN §9 already names `template_families`; every spec/descriptor already carries `family`; nothing new to thread through geometry → API → web |
+| Where family data lives | Seed JSON `packages/design-tokens/families.json` → Flyway `V9` → Postgres; contract `template-family.v1.json`; drift test `FamiliesSeedTest` | Same pattern as `materials.json` / `V3__seed_materials.sql` / `MaterialsSeedTest` |
+| Per-family price rules | In the pricing policy (`family_rules`, `hardware_markup_pct`), not on the family row | ADR-0008: pricing is versioned, snapshotted config |
+| Owning module | `catalog` (`studio.aakar.api.catalog`) owns families, shelves, hardware | `design`, `cart`, `admin` already depend on catalog; Modulith graph stays acyclic |
+| Contract versioning | `spec_version` stays `"1.0"`; new feature types and anchor fields are additive | No stored spec becomes invalid |
+| Content on a carrier | New `features[]` types `relief_image` and `hero_mesh`; anchors gain `kind: surface\|volume`, `size_mm`/`bounds_mm`, `bleed_mm`, `accepts`, `max_relief_mm` | The MakerLab / print-on-demand pattern: fixed carrier, bounded print area, 2–4 exposed parameters |
+| Raw print | `DesignSource.upload` + family `raw_print` (kind `raw`) whose single template `raw_print@1` wraps one `hero_mesh` feature | One explicitly gated exception to ADR-0009 (new ADR-0014); same pipeline, same printability gate, same pricing |
+| Feature edits | Extend `POST /api/versions/{v}/params` body with optional `features` (full replacement) | One "Sculpt" call covers sliders and content |
+| Brand naming | Code ids English snake_case; `codename`, `name`, `tagline` are data on family and experience rows | Portal-editable, ADR-0002 clarity, renaming never needs a migration |
+| Portal control | Every catalogue concept (avatars, hardware, price rules, experiences, background assignment, shelves) has owner-only admin CRUD with audit; adding a *new* backdrop preset, template or style variant stays engineering | Data vs code boundary; ADR-0009 |
+| Experiences | `experiences` are a curation layer (theme = backdrop + style + motif pack + avatars + curated SKUs + season), not a geometry concept | Reuses families and environments; pure data + UI |
+| Comics IP | Katha ships an original comic aesthetic; trademarked characters are caught in content review; licensed collections are data added only once a licence exists | Legal exposure |
+
+## Phased approach (session-sized, resumable from git)
+
+Sessions hit limits, so every phase ends with a commit and push to `claude/3d-print-categories-ypc6xw` plus a `PROGRESS.md` entry naming the next step. If a session ends mid-phase, commit the work-in-progress with a `wip:` prefix and write the resume pointer in `PROGRESS.md`; the next session starts by reading `docs/research/outcome-categories/implementation-plan.md` (this plan) and `PROGRESS.md`.
+
+| Phase | Scope (PRs in §9) | Done when | Resume pointer |
+|---|---|---|---|
+| 0 (this session) | Research report, notes and this plan committed under `docs/research/outcome-categories/` | Files on the branch, pushed | Read `report.md` Deliverable A/B and this plan |
+| 1 Contracts + data | PR 1 contracts, PR 2 seed (incl. avatar codenames) + `V9` migration + catalog module (families, shelves, hardware, pricing policy fields) | `make contracts` clean, generated types current, `./gradlew test` green with `FamiliesSeedTest`; `GET /api/families` serves the seed | `packages/contracts/schemas/template-family.v1.json`, `V9__families_hardware_uploads.sql` |
+| 2 Geometry features | PR 3a features framework (relief_image, hero_mesh, booleans, families.py), PR 3b text + motif | `uv run pytest -q` green incl. `test_features.py`, `test_families.py`; Jharokha output unchanged | `services/geometry/aakar_geometry/features/` |
+| 3 First carriers + raw | PR 4: `keychain_tag`, `fridge_magnet`, `hanging_ornament`, `desk_nameplate`, `raw_print` | Per-template tests green; CLI builds `examples/keychain-photo.spec.json` and `raw-print.spec.json` | `services/geometry/aakar_geometry/templates/__init__.py` registry |
+| 4 API | PR 5: uploads + content review, features on create/edit, family resolution, hardware/setup pricing, print pack, ADR-0014 | Integration tests green (`UploadsIntegrationTest`, `CarrierDesignFlowIntegrationTest`, `RawPrintIntegrationTest`, `PriceCalculatorTest`); print pack lists hardware | `DesignService.java`, `PriceCalculator.java`, `docs/adr/0014-raw-print-path.md` |
+| 5 Storefront + portal | PR 6 web (avatar picker, Chhaap composer, Swaroop composer), PR 7 admin (Avatars incl. naming, Hardware, Reviews, policy fields) | `make test-web` green; end-to-end walks (1)–(4) in Verification pass on the local stack | `apps/web/src/app/(stage)/create/`, `apps/admin/src/app/(portal)/avatars/` |
+| 6 Keepsakes + second wave | PR 8: lithophane plate + night-light base, plinth, pet tag, then photo frame, keycap; flip `available` | Recipe tests green; lithophane material rule and plinth stability tests pass | `families.json` tiers/availability |
+| 7 Duniya + Katha | PR 9 experiences data + API, PR 10 Shop persona + experience pages + studio presets, PR 11 portal Duniya + Backgrounds, PR 12 Katha (comic_pop, backdrop, motif pack, trademark guardrail) | `GET /api/experiences` serves five; Shop persona switch works; `/duniya/katha` renders the comic backdrop; a Marvel-named upload lands in review; walks (5)–(7) pass | `packages/design-tokens/experiences.json`, `apps/web/src/app/(paper)/duniya/` |
+
+Each phase is independently shippable: phase 1 alone makes the catalogue data-driven, phases 1–3 make the geometry buildable from the CLI, phases 1–4 make avatars orderable through the API, phase 5 exposes them to customers and the portal, phase 7 adds the Duniya layer and Katha on top. Phase 7 depends only on phase 1 (families) and phase 5 (Shop and portal shells), so it can run in parallel with phases 2–4 if two people are available.
+
+## Status (3 Oct 2026): all seven phases done
+
+Every phase in the table above is on `claude/3d-print-categories-ypc6xw`, verified with the repo's own suites and live runs. `PROGRESS.md` holds the commit for each step.
+
+| Suite or walk | Result |
+|---|---|
+| API (`./gradlew test`) | 224 passed |
+| Geometry · inspect (pytest) | 665 · 21 passed |
+| Contracts, descriptors | valid; descriptors regenerate with no change; no pending backdrop or motif pack |
+| Storefront and portal (typecheck · lint · build) | clean |
+| `make smoke-avatars` (walks 1, 2, 4) | passed live |
+| `make smoke-katha` (walk 7 and the keepsakes) | passed live |
+| `/duniya/katha` and a comic studio in Chromium | rooftop backdrop, toon shading and ink outline; no page errors |
+
+Decided while building (beyond the sections below):
+- **Anchor rules are data.** Template descriptors carry `modes` (emboss, deboss, lithophane) and `required` per anchor (contract `cccb468`). The geometry service enforces them, the API refuses them at design time, and the composer reads them instead of special-casing products.
+- **Migrations:** `V12` keepsake ranges (Saathi from 25 mm, Pratima from 40 mm, photo-frame copy), `V13` content terms (24 seeded publishers and characters; terms of six characters or fewer match only as whole words), `V14` opens Roshni, Pratima and Katha. Each update leaves portal edits alone, and `V14` derives the new pricing policy from whichever one is active.
+- **Placeholder minimums** for the newly orderable keepsakes: Roshni ₹599, Pratima ₹699 (pricing policy `2026-10-keepsakes`), just above the research's delivered floors.
+
+Still open, for the owner:
+1. Real minimums and hardware costs in the portal (open decision 3); the seeded figures are placeholders.
+2. Fit tests on real prints before the photo frame (Chaukhat) and keycap (Kunji) are switched on; both have live templates and stay off.
+3. Licensed comic collections (open decision 16) need agreements; until then Katha's `collections` stay empty and the content terms guard the brand.
+4. Names matching a protected term are refused outright; a review path for genuine names (a customer called Thor) is a later choice, and staff can switch a term off meanwhile.
+5. Follow-ups noted by the build: quantity breaks for sets (open decision 11); marking Swaroop's `body` anchor `required`; the storefront mock does not mirror `protected_term`.
+
+## Implementation
+
+### 1. Domain model: carriers are template families
+
+**Contract** `packages/contracts/schemas/template-family.v1.json` (new). One document `{shelves[], hardware_items[], families[]}` so `families.json` validates as a whole; add to `packages/contracts/scripts/validate.mjs`.
+
+| Family field | Type / rule |
+|---|---|
+| `id` | `^[a-z][a-z0-9_]*$`, equals `family` in specs/descriptors |
+| `codename`, `name`, `tagline`, `description` | brand codename ("Saathi"), plain descriptor ("Keychain & bag charm"), copy; craft register (never mesh/STL); all portal-editable |
+| `kind` | `carrier` \| `object` (the 12 PLAN §7.3 families) \| `raw` (only `raw_print`) |
+| `tier` | `launch` \| `next` \| `later` (roadmap); `available` is the staff switch |
+| `shelf`, `environment`, `demand_rank`, `default_template_id`, `sort_order` | shelf id, default backdrop, research rank, template used when only `family_id` is given |
+| `size_envelope_mm` | `{min_longest, max_longest}`; validates raw `longest_mm`, drives copy ("Palm-sized · 40–70 mm") |
+| `hardware` | `[{sku, qty}]` default BOM (descriptor `hardware` overrides) |
+| `material_rules` | `{heat_safe_only, allowed: [ids]\|null, excluded_finish_classes}` |
+| `shape_tolerance` | `any` \| `constrained` \| `strict` (from the engineering research) |
+| `content_slot` | `{accepts: [feature types], anchors: [ids], hero_volume: bool, max_text_chars}`; geometry test asserts each template's `features_supported ⊆ accepts` |
+
+`$defs`: `shelf {id, label, sort_order}`, `hardware_item {sku, name, unit_cost_paise, weight_g, supplier, url, available}`.
+
+**Seed** `packages/design-tokens/families.json` (tiers follow the research taxonomy; `available` follows engineering readiness): tier `launch` = `keychain` (templates `keychain_tag`, later `pet_tag` as a second template in the same family; `split_ring_25`), `fridge_magnet` (`magnet_d10x3`), `ornament` (`hanging_ornament`, `cord_200`), `nameplate` (`desk_nameplate`, `adhesive_pads`), `lithophane` (`lithophane_plate` + `night_light_base`, `led_base_usb`, `allowed: [basic_white]`, `available=false` until PR 8), `figurine_base` (`plinth_round`, first volume anchor, `available=false` until PR 8), and `raw_print` (kind raw, hidden from Shop); tier `next` = `photo_frame` (`acrylic_4x6`), `keycap`, `pendant`, `cake_topper`, `cookie_cutter`, `coaster`, `pin`, `bookmark` (rows only; templates for the first two are in this plan); the 12 PLAN §7.3 families as kind `object` (constrained; content = emboss/motif/relief on their anchors; `phone_stand` launch, rest as PLAN); tier `later` rows are not seeded. Hardware seed: `split_ring_25, magnet_d10x3, cord_200, led_base_usb, acrylic_4x6, nameplate_screws, adhesive_pads` with placeholder costs and `weight_g`.
+
+**Migration** `services/api/src/main/resources/db/migration/V9__families_hardware_uploads.sql`: `shelves` (seed the five board shelves) → `catalog_items.category` FK + `family_id`; `hardware_items`; `template_families` (CHECKs on kind/tier/shape_tolerance, JSONB for envelope/hardware/material_rules/content_slot); `designs.source` CHECK adds `upload`, `designs.family_id`; `design_versions.hardware jsonb`; `uploads` (kind image\|model, format, key/url, bytes, sha256, origin upload\|generated, provider, status ready\|pending_review\|rejected); `content_reviews`; new active `pricing_policies` row `2026-10-carriers`.
+
+**Shop `category` → shelves** (the 7 hard-coded places): `aakar-api.v1.yaml:709`, `aakar-admin.v1.yaml:438` (`category: string`, add `family_id`); `catalog/CatalogItemInput.java:17` (drop regex; service checks `shelves.existsById` → 422); `catalog/internal/CatalogController.java:28` (+ `GET /api/catalog/shelves`); `apps/web/src/lib/catalog.ts:9-16` and `apps/admin/src/lib/catalog.ts` (delete constants, fetch shelves); `apps/web/scripts/mock-api.mjs`, `apps/admin/scripts/mock-admin-api.mjs:893`; regenerated `schema.d.ts` in both apps.
+
+**Catalog module**: `TemplateFamilyEntity`, `ShelfEntity`, `HardwareItemEntity` (+ repos) beside `catalog/internal/CatalogItemEntity.java`; public `FamilyDto` (row + `ready` = ≥1 live template + `templates[]` merged from `Templates.all()`), `ShelfDto`, `HardwareItemDto`; `Catalog.families()/family(id)/shelves()/hardware()/hardwareItem(sku)` + admin create/update. New `ProblemCodes`: `UNKNOWN_FAMILY`, `FAMILY_NOT_AVAILABLE`, `HARDWARE_EXISTS`, `FAMILY_EXISTS`.
+
+### 2. Content slot / attachment mechanism
+
+**`design-spec.v1.json`**: `feature.oneOf` adds `relief_image` (`source`, `anchor`, `mode emboss\|deboss\|lithophane`, `relief_mm` 0.2–3, `fit contain\|cover`, `invert`, `cutout none\|silhouette`) and `hero_mesh` (`source`, `anchor` = a volume anchor, `fit contain\|longest`, `longest_mm` 5–250, `yaw_deg`, `orientation as_uploaded\|lay_flat`); shared `$defs/content_source {upload_id, url, format, origin upload\|generated, provider}`. `emboss_text`/`motif` unchanged. `events/design.completed.v1.json` gains optional `hardware: [{sku, qty}]`; `events/design.failed.v1.json` enum adds `content_unusable`.
+
+**`template-descriptor.v1.json`**: `anchor.kind` (surface default | volume), `size_mm [w,h]`, `bleed_mm`, `bounds_mm [w,d,h]`, `accepts[]`, `max_relief_mm`; `features_supported` enum adds `relief_image`, `hero_mesh`; optional `hardware[]`, `min_feature_mm`. Java mirror: `templates/TemplateDescriptor.java` `Anchor` record + `hardware`, `minFeatureMm` (`@JsonIgnoreProperties(ignoreUnknown = true)` keeps old fixtures loading).
+
+**Geometry features stage** (new package `services/geometry/aakar_geometry/features/`): `frames.py` (`AnchorFrame`), `validate.py` (type ∈ `features_supported`, anchor exists and `accepts`, one relief/hero per anchor, relief ≤ `max_relief_mm`, hero only on volume anchors), `fetch.py` (`ContentFetcher` protocol; `HttpFetcher` with size caps, `LocalFileFetcher` for tests/CLI; reuses `aakar_inspect.loaders`), `heightfield.py` (watertight heightfield solid), `relief_image.py` (Pillow → grayscale → fit into `size_mm − bleed` at ≈5 px/mm → gaussian smooth → heightfield → union/subtract; `lithophane` mode hands the heightmap to the template), `hero_mesh.py` (load → repair via `aakar_inspect.checks.manifold` → decimate >300k faces → scale contain/longest → yaw → seat on the anchor's bottom plane → union; unrepairable → `ContentUnusable`), `booleans.py` (trimesh `engine="manifold"`, assert watertight), `emboss_text.py`/`motif.py` (PLAN §7.5: uharfbuzz + freetype-py outlines → shapely → `cad.prism`; this is the unbuilt Phase 1 backlog item, prerequisite for nameplate text).
+
+Existing files: `templates/base.py` (`Anchor` new fields; `Template.hardware`, `anchor_frame()`, `build()` = `build_body()` + `apply_features()`; Jharokha only renames `build` → `build_body`), `pipeline.py` (`_check_spec_against_template` calls feature validation; `_build_with_timeout` passes features + fetcher; payload adds `hardware`; `HTTP_STATUS_BY_CODE` adds `content_unusable: 422`), `errors.py` (`ContentUnusable(BuildError)`), new `families.py` (loads `families.json` like `materials.py`; `register()` in `templates/__init__.py` refuses unknown families; `Template.materials()` applies `material_rules`), `pyproject.toml` (+ `manifold3d>=3.0`, `pillow`, `fast-simplification`; later `uharfbuzz`, `freetype-py`; pin trimesh + manifold3d together), `Dockerfile` (copy `families.json`, `AAKAR_FAMILIES_FILE`).
+
+**API**: `design/internal/DesignSpecs.java` `build(descriptor, params, material, features)` replaces the `List.of()` at line 23; `CreateDesignRequest` gains `familyId`, `features` (`@Size(max = 8)`); `EditParamsRequest` gains optional `features`; new `templates/internal/FeatureValidator.java` (mirrors `TemplateParamValidator`) → 422 `unsupported_feature` / `validation_failed`; `DesignService.create/editParams` resolves `family_id` → `catalog.family()` (404 `unknown_family`, 422 `family_not_available`), picks `template_id` or `default_template_id`, resolves each `content_source.upload_id` via `Uploads.findOwned` (404 / 409 `upload_not_ready` / 422 `upload_rejected`) and fills `url`; keeps the prompt-only 422 when no `family_id`. `DesignVersionEntity.markReady` stores `hardware`; `DesignVersionResponse` gains `familyId`, `hardware`. `SecurityConfig.PUBLIC` adds `/api/families/**`, `/api/uploads/**` (uploads need a known identity, like the cart).
+
+**Web**: `apps/web/src/store/design.ts` `featuresDraft` + `setFeature(anchor, feature|null)`; new `components/design/ContentSlotPanel.tsx` (one card per anchor: Text / Photo / Your model, char count vs `max_text_chars`, photo dropzone → `api.uploads.create`, size slider for hero anchors); `DesignStudio.tsx` `sculpt()` sends `{params, material, features}`.
+
+### 3. Carrier templates in the geometry service
+
+**Recipe (one PR per carrier)**: (1) family row in `families.json` + `V{n}__seed_family_<id>.sql`, `make contracts`; (2) hardware SKUs if new; (3) `templates/<template_id>.py` copied from `jharokha_phone_stand.py` (class attrs incl. `anchors` with `kind/size_mm/accepts`, `features_supported`, `hardware`; `Layout`; `validate_combination`; `build_body`; `anchor_frame`; `karigar_note`); (4) `register(...)` in `templates/__init__.py`; (5) `tests/test_templates_<id>.py` (descriptor validates and matches the family's content slot; defaults + parameter corners build watertight within bounds; anchor frames lie on the surface; a relief and a text feature on each anchor produce a watertight mesh with the expected volume delta; `inspect_mesh` passes with the hardware pocket present); (6) spec example in `packages/contracts/examples/` + `validate.mjs`, descriptor in `services/api/src/test/resources/fixtures/templates.json`; (7) catalog item; set family `available`; (8) `services/geometry/README.md`, `PROGRESS.md`.
+
+**First slice (planar anchors only)**:
+
+| Template (family) | Exposed params | Anchors | Hardware | Notes |
+|---|---|---|---|---|
+| `keychain_tag@1` (`keychain`) | `shape` rect/rounded/circle/heart, `width_mm` 30–60, `thickness_mm` 2.4–4, `hole_d_mm` 4–6 | `face`, `back` (surface) | `split_ring_25 ×1` | loop lug + 4 mm hole with ≥2 mm rim; relief 0.6 mm; base ≥2 mm keeps `min_wall` 1.2 under a deboss |
+| `fridge_magnet@1` (`fridge_magnet`) | `shape`, `size_mm` 40–70, `thickness_mm` 4.5–6, `magnet_count` 1–2 | `face` | `magnet_d10x3 ×n` | rear pocket 10.2×3.2 mm leaves ≥1.2 mm skin; `validate_combination` enforces thickness ≥ pocket + 1.2 + relief |
+| `hanging_ornament@1` (`ornament`) | `silhouette` disc/star/bauble, `diameter_mm` 50–90, `thickness_mm` 3–5, `border_mm` | `face_front`, `face_back` | `cord_200 ×1` | 3 mm top hole; both faces accept relief/text |
+| `desk_nameplate@1` (`nameplate`) | `width_mm` 120–300, `height_mm` 40–100, `tilt_deg` 60–80, `base_depth_mm` | `face` (text primary), `base_front` | `adhesive_pads ×1` | leaning plate + wedge base (Jharokha back-rest construction); ship with `relief_image, motif` first, add `emboss_text` when the text PR lands |
+
+**Second slice (PR 8), in this order**: `lithophane_plate@1` + `night_light_base@1` (launch-tier commercially; plate = heightmap 0.8–3.0 mm at fixed 100×100 / 104×140 mm, 0.1–0.12 mm layers, 100% infill; `allowed: [basic_white]`; base has a 70 mm puck cradle / `led_base_usb` slot), `plinth_round@1` (`figurine_base`, launch-tier; first volume anchor `top` e.g. 60×60×80 mm; `hero_mesh` union; stability check on the fused body), `pet_tag@1` (keychain family variant: text both faces, PETG), then second wave `photo_frame_std@1` (4×6 / 5×7 inserts, rabbet 6.35 + 1.6 mm, easel or hanger; insert-slot tolerance) and `keycap_mx@1` (MX cross 4.03+slop × 1.25 mm, slop 0.3–0.35; strict `min_feature_mm`; resin preferred, so FDM needs a calibrated stem variant and fit tests). Desk gadgets stay `object` families with content slots on their anchors.
+
+### 4. Raw print: "Print my own model"
+
+1. `POST /api/uploads` (multipart `file`, `kind=model`) → `Upload {id, kind, format, bytes, status, url}`. Formats from `aakar_inspect.loaders.SUPPORTED_FORMATS` (`stl glb 3mf obj ply off gltf`) and images `png jpg webp heic`. Limits model 50 MB, image 15 MB (`aakar.uploads.max-*-bytes`); raise `spring.servlet.multipart.max-file-size` to 52 MB in `services/api/src/main/resources/application.yml`.
+2. `POST /api/designs {source: "upload", family_id: "raw_print", features: [{type: "hero_mesh", anchor: "body", source: {upload_id}, fit: "longest", longest_mm, orientation}], params: {}, material}`. Decided 27 Sep 2026: Swaroop has no template params, so the form carries the only size control.
+3. Geometry `raw_print@1` (`features_supported = ("hero_mesh",)`, one volume anchor `body` with `bounds_mm = bed`, no params; the form's `longest_mm` must be 20–240 and is rejected outside it, never clamped): `build_body` returns nothing; `hero_mesh.py` loads → repairs → decimates → scales → optional `lay_flat` (`trimesh.poses.compute_stable_poses`) → centres on Z=0; then the normal export → inspect (full gate) → estimate. `printability.passed=false` completes but is not purchasable (today's cart rule); copy nudges "make it a little bigger".
+4. Consumer options: size, finish, quantity. Infill/layer height stay server defaults (`DEFAULT_SLICING`), never shown.
+
+**Media module** (`studio.aakar.api.media`): public `Uploads` (`store`, `find`, `findOwned`, `attachGuest`), `UploadDto`, `UploadKind`, `ContentScanner` + `ScanResult(clean|flagged|malware)`; internal `UploadEntity/Repository`, `UploadsController`, `UploadService` (extension + magic-byte sniffing, 413 `payload_too_large`, 422 `unsupported_format`, sha256, `MediaStore.store("uploads/<identity>", …)`), `NoopContentScanner` (`@ConditionalOnProperty(... havingValue="noop", matchIfMissing=true)`), `ContentReviewEntity/Repository` (flagged → `pending_review`). `ProductionGuard.FORBIDDEN_IN_PRODUCTION` adds `aakar.uploads.scanner=noop`. `AuthService` calls `Uploads.attachGuest` beside `Designs.attachGuest`. New `ProblemCodes`: `UNSUPPORTED_FORMAT`, `UPLOAD_NOT_READY`, `UPLOAD_REJECTED`, `CONTENT_UNUSABLE`.
+
+**Pricing/copy**: same formula + `family_rules.raw_print = {minimum_subtotal_paise, setup_fee_paise}` (setup = repair/orientation labour). UI: "Your own 3D model", "Upload the file from your 3D program (.stl, .obj, .3mf)"; the noun is "model file", never mesh.
+
+**ADR-0014** `docs/adr/0014-raw-print-path.md` (Proposed): exactly one family `raw_print` may carry customer geometry as the body; still a Design Spec, still repaired, still gated, still priced from the slicer estimate; only size, orientation, finish and quantity are editable; uploads pass a `ContentScanner` and a review queue when flagged; no "edit the back 18 mm" promise; generated meshes (ADR-0005, Phase 3) enter via `content_source.origin = generated` into `raw_print@1` or a carrier's volume anchor. Add the row to `docs/adr/README.md`.
+
+### 5. Pricing and hardware
+
+- `price-breakdown.v1.json`: `lines[].code` enum adds `hardware`, `setup`; optional top-level `family_id`, `minimum_subtotal_paise`.
+- `PricingPolicy` (+ `PricingPolicyProperties`, `PricingPolicyInput`, admin `PricingPolicy` schema, `materials.json → pricing_policy`, `application.yml aakar.pricing`): `family_rules: map family_id → {minimum_subtotal_paise, setup_fee_paise, qty_breaks?}`, `hardware_markup_pct`; secondary constructor keeps today's nine-arg tests compiling; version `2026-10-carriers`; extend `MaterialsSeedTest.assertMatches`.
+- `pricing/PriceCalculator.java:42-65`: lines = material + machine_time + finishing + [packaging] + [hardware: Σ qty × unit_cost × (1 + markup)] + [setup]; subtotal = round_up_to_9(Σ × (1 + margin)); subtotal = max(subtotal, round_up_to_9(family minimum)). `PriceInputs.Context(familyId, hardware[])`; existing overloads pass an empty context so current numbers stay identical.
+- Context assembly: new `Designs.priceContext(version)` resolves `spec.family` + version `hardware` (fallback descriptor, then family default) against `Catalog.hardwareItem(sku)`; used by `VersionMapper.price`, `CartService.price`, `AdminPricingController.preview` (`PreviewRequest.family_id`). Cart/order snapshots store the whole `PriceBreakdown`, so they pick the lines up unchanged. Quantity breaks deferred (needs `CartItem.discount_paise`).
+- `admin/internal/PrintSheet.java`: `Hardware` and `Content` rows (feature summary, never the source URL); `PrintPack.java`: `packing-list.txt` aggregating hardware × qty per order.
+- Admin: `aakar-admin.v1.yaml` `GET/POST/PUT /admin/api/families`, `/admin/api/hardware`, `GET /admin/api/catalog/shelves`, `GET /admin/api/uploads?status=pending_review`, `POST /admin/api/content-reviews/{id}`; controllers `AdminFamiliesController`, `AdminHardwareController`, `AdminReviewsController`; audit actions `family.*`, `hardware.*`, `review.decide`; `apps/admin/src/components/pricing/PublishPolicyForm.tsx` gains per-outcome rules + hardware markup.
+
+### 6. API + UI surface
+
+Storefront contract (`aakar-api.v1.yaml`): `GET /api/families`, `/api/families/{id}` (+ `ready`, `templates[]`, `price_from_paise`); `GET /api/catalog/shelves`; `POST /api/uploads`, `GET /api/uploads/{id}`; `POST /api/designs` (`source` + `upload`, body + `family_id`, `features`); `POST /api/versions/{v}/params` (+ `features`); `CatalogItem.category` string + `family_id`; `DesignVersion` + `family_id`, `hardware`.
+
+Storefront (`apps/web`): `src/app/(stage)/create/page.tsx` replaces "arrives in Phase 2" with a "What should it become?" `FamilyPicker` (cards from `api.families.list()`: name, tagline, "from ₹…", "Comes with a steel ring", tier badge) plus "Your own 3D model"; `create/[family]/page.tsx` + `components/design/ContentComposer.tsx` (template pick, content slot fill, finish, Sculpt → `api.designs.create`); `components/design/RawPrintComposer.tsx` (model dropzone → size slider → finish → "Check and price"); `DesignStudio.tsx` gets `ContentSlotPanel` and a `minimum_subtotal_paise` footnote; Shop card/item page adds "Make it yours: add a photo or your name" when `features_supported` is non-empty; `ShopGrid` shelves from the API, `raw_print` never listed; `src/lib/api/client.ts` + `types.ts` (`families`, `uploads` via `FormData`, `catalog.shelves`); `scripts/mock-api.mjs`.
+
+Portal (`apps/admin`): nav Avatars (`/avatars`), Duniya (`/experiences`, §7), Backgrounds (`/environments`, §7), Hardware (`/hardware`), Reviews (`/reviews`); `AvatarsPage`/`AvatarDrawer` (codename, name, tagline, kind/tier badges, shelf, default background, envelope, hardware BOM, material rules, content slot, `available` switch, sort order; `ready` badge from live templates), `HardwarePage`/`HardwareDrawer`, `ReviewsPage`; `CatalogDrawer` shelf + avatar selects from the API; `TemplatesPage` shows family, `features_supported`, hardware chips; `scripts/mock-admin-api.mjs`. Every write is owner-only and audited (`AdminCatalogController` pattern).
+
+### 7. Experiences (Duniya) on the Shop page
+
+An experience is a **theme bundle** that curates existing concepts and adds no geometry. It ties a page surface and a stage backdrop to a set of avatars, so the Shop can be browsed by mood as well as by shelf.
+
+| Field | Type / rule |
+|---|---|
+| `id` | snake_case English (`festive`, `desk_gaming`, `memories`, `kids_party`, `comics`) |
+| `codename`, `slug` | brand name ("Utsav") and URL slug (`utsav`), editable, unique |
+| `title`, `tagline`, `description` | plain descriptor ("Festive & gifting") and copy |
+| `environment` | backdrop id from the `environments` reference; rendered on the experience page and preset in the studio |
+| `surface` | `{accent, paper_tint, hero_media}` page-theming tokens (cream paper stays; accent and hero change) |
+| `style` | default style variant (`jaipur_heritage`, `modern_zen`, `cyber_desi`, `warli_line`, `comic_pop`) |
+| `motif_pack` | motif ids offered first in the Chhaap panel |
+| `avatars` | ordered `[family_id]` shown in the theme (carrier and object kinds) |
+| `items` | curated catalog item slugs |
+| `collections` | optional sub-collections `[{id, title, licence_ref}]` (empty for Katha until licensed) |
+| `season` | optional windows `[{starts_on, ends_on, label}]` (Utsav: Diwali, Christmas, Rakhi, Valentine's) |
+| `available`, `sort_order` | |
+
+**Data**: contract `packages/contracts/schemas/experience.v1.json` (with `$defs/environment {id, label, surface stage|paper, preset_key, palette}`); seed `packages/design-tokens/experiences.json` (`{environments[], experiences[]}`; the six environment ids move here from `tokens.json`); migration `V11__experiences_environments.sql`: `environments` (seed the six existing), `experiences`, `experience_avatars (experience_id, family_id, sort_order)`, `experience_items`; `designs.experience_id` nullable. Catalog module owns them (`ExperienceEntity`, `EnvironmentEntity`, `ExperienceDto`, `Catalog.experiences()`, `experience(slug)`, `environments()`). Drift test `ExperiencesSeedTest`. `template-descriptor.v1.json` `environment` and `catalog_items.environment` become strings validated against the reference (same move as Shop categories); the four hard-coded environment lists (`template-descriptor.v1.json:15-19`, `packages/design-tokens/tokens.json`, `apps/web/src/lib/viewer/environments.ts:17-24`, `apps/admin/src/lib/catalog.ts:16`) collapse to one seed plus the web preset map.
+
+**API** (`aakar-api.v1.yaml`): `GET /api/experiences`, `GET /api/experiences/{slug}` (avatars expanded with `price_from_paise`, items expanded), `GET /api/environments`. Admin (`aakar-admin.v1.yaml`): `GET/POST/PUT /admin/api/experiences`, `GET /admin/api/environments`; `AdminExperiencesController`, audit `experience.create|update`.
+
+**Web**: the Shop page gets a persona switch, **Shelves** (today's categories) | **Duniya · Experiences**, in `apps/web/src/app/(paper)/shop/page.tsx` (`ShopPersonaSwitch`, `ExperienceCard`: hero media, codename · title, season badge). New `src/app/(paper)/duniya/[slug]/page.tsx`: page surface takes the experience's accent and hero, a stage strip renders the experience `environment` through the existing presets in `src/lib/viewer/environments.ts` with the avatars' hero renders, then avatar cards → `/create/[family]?duniya=<slug>` and curated SKUs → item pages. The Create composer and `DesignStudio` read `duniya` and preset `environment`, `style` and the motif pack; the design stores `experience_id` so the karigar's note and packaging card can name the theme. `environments.ts` remains the one place a backdrop preset is *implemented* (lighting, HDRI, floor, fog); which backdrop an experience, avatar or item uses is data.
+
+**Portal**: `Duniya` page (`/experiences`): list with availability and season chips; drawer edits codename, slug, title, tagline, description, background picker (thumbnails from `/admin/api/environments`), style, motif pack, avatar multi-select with drag ordering, curated items, collections, season windows, `available`, sort order. `Backgrounds` page (`/environments`): read-only reference (thumbnail, palette, which experiences and items use it) until presets become uploadable data.
+
+**Seed (five)**: Utsav (festive & gifting; `teak_table_candlelight`, `jaipur_heritage`; Roshni, Jhoomar, Pehchaan, Saathi, Chumbak; Diwali/Christmas/Rakhi/Valentine's windows), Adda (desk & gaming; `desk_oak`, `cyber_desi`; Kunji, Saathi, Pehchaan + `phone_stand`, `desk_organizer`, `headphone_stand`), Yaadein (memories & keepsakes; `studio`, `modern_zen`; Roshni, Pratima, Chaukhat, Chumbak), Masti (kids & party; `balcony_daylight`, `warli_line`; Saathi, Chumbak, Jhoomar, cake topper later), Katha (§8).
+
+### 8. Katha: the comics & heroes experience
+
+Marvel and DC characters, names and logos are trademarks and copyrighted works (Disney/Marvel; Warner Bros. Discovery/DC). Printing and selling them without a licence is infringement; marketplaces take such listings down and the research flags the same exposure for tabletop minis. Katha therefore ships as an **original comic-book aesthetic in which the customer's own hero is the content**; licensed universes are a data-only addition once agreements exist.
+
+- **Style variant `comic_pop`**: new enum value in `design-spec.v1.json` `style` and `template-descriptor.v1.json` `style_variants`; viewer toon/cel shading with ink outlines (material preset in `apps/web/src/lib/viewer/`); geometry defaults for the variant: relief depth 1.0–1.5 mm, optional halftone-dot deboss on `face` anchors (`features/motif.py` pattern fill), bold display font for Naam.
+- **Backdrop `comic_rooftop_night`**: new preset in `environments.ts` (indigo halftone sky, skyline silhouette, spotlight cone) plus a row in the `environments` seed; one-time engineering.
+- **Motif pack `comic_bursts`**: original artwork only: speech bubbles, action bursts ("DHISHOOM!", "POW!"), halftone panels, cape and mask silhouettes; first real use of the `motifs` library (PLAN §9), seeded from `packages/design-tokens/motifs/`.
+- **Avatars in Katha**: Saathi (hero keychain), Kunji (keycap with your hero's emblem), Pratima (your hero on a plinth via Roop), Pehchaan (hero nameplate), Chumbak, Roshni (your hero as a night light).
+- **IP guardrail**: `ContentScanner` gains a `trademark_terms` rule (portal-editable list: Marvel, DC, character and logo names) that routes matching uploads and Naam text to `pending_review`; reviewer copy: "We can't print copyrighted heroes, but your own hero is welcome"; terms clause that the customer holds rights to uploaded content; `experiences.collections[]` stays empty for Katha until a `licence_ref` exists.
+- **Later (business decision)**: licensed collections (Marvel, DC, Indian comics such as Amar Chitra Katha or Raj Comics) as data with `licence_ref`, each with its own motif pack and content allow-list.
+
+### 9. Phasing (PR-sized steps)
+
+| # | PR | Key files | Tests | Commands |
+|---|---|---|---|---|
+| 1 | Contracts | `template-family.v1.json` (new), `design-spec.v1.json`, `template-descriptor.v1.json`, `price-breakdown.v1.json`, `events/design.{completed,failed}.v1.json`, both OpenAPI files, `examples/keychain-photo.spec.json`, `examples/raw-print.spec.json`, `scripts/validate.mjs`, regenerated `schema.d.ts` ×2 | `validate.mjs` validates the new examples and `families.json`; both apps typecheck | `make contracts`; `pnpm --filter @aakar/web gen:api && pnpm --filter @aakar/admin gen:api`; `make test-web` |
+| 2 | Seed + migration + catalog API | `families.json`, `materials.json` (policy), `V9__…sql`, catalog entities/DTOs/`Catalog`, `CatalogController`, `CatalogItemInput`, `PricingPolicy` + properties + `application.yml`, `TemplateDescriptor`, `fixtures/templates.json` | `FamiliesSeedTest`, `MaterialsSeedTest`, `CatalogFamiliesIntegrationTest`, `DesignFlowIntegrationTest.templatesComeFromTheGeometryService` (no longer `singleElement`), `ModularityTests` | `cd services/api && ./gradlew test` |
+| 3a | Geometry features framework | `features/*.py`, `templates/base.py`, `pipeline.py`, `errors.py`, `families.py`, `pyproject.toml`, `Dockerfile` | `tests/test_features.py` (heightfield watertight/volume, relief volume delta, hero scaling, `content_unusable`, validation codes), `tests/test_families.py` | `cd services/geometry && uv sync && uv run pytest -q` |
+| 3b | Text + motif features | `features/emboss_text.py`, `features/motif.py`, fonts | `tests/test_emboss_text.py` goldens (Latin + Devanagari first) | same |
+| 4 | Carrier templates + raw print | `templates/{keychain_tag,fridge_magnet,hanging_ornament,desk_nameplate,raw_print}.py`, `templates/__init__.py`, README | per-template tests (recipe step 5); `test_pipeline.py` additions; `test_cli.py` builds `keychain-photo.spec.json` | `uv run pytest -q`; `uv run aakar-geometry build ../../packages/contracts/examples/keychain-photo.spec.json --out ../../out/keychain` |
+| 5 | API: uploads, features, pricing, print pack, ADR | media module, `ProductionGuard`, `DesignSource.upload`, requests, `DesignSpecs`, `DesignService`, `FeatureValidator`, `Designs.priceContext`, `VersionMapper`, `CartService`, `PriceCalculator`, `PriceInputs`, `PrintSheet`, `PrintPack`, admin controllers, `AuditLog`, `ProblemCodes`, `SecurityConfig`, `docs/adr/0014-raw-print-path.md` | `UploadsIntegrationTest`, `CarrierDesignFlowIntegrationTest` (WireMock stub keyed on `$.spec.template == 'keychain_tag@1'` returns `hardware`; price has `hardware` + `setup` + minimum; cart/checkout snapshot; print pack lists hardware), `RawPrintIntegrationTest` (stub URL containing `broken` → 422 `content_unusable`), `PriceCalculatorTest` (board example unchanged), `FeatureValidatorTest`, `ProductionGuardTest`, `PrintSheetTest`, `PrintPackTest`, `AdminLoopIntegrationTest`, `ModularityTests` | `./gradlew test` |
+| 6 | Storefront | §6 web files | `make test-web` (typecheck, lint, build; `gen:api` diff clean) | `make test-web` |
+| 7 | Portal | §6 admin files | same | same |
+| 8 | Launch keepsakes + second wave | `lithophane_plate` + `night_light_base`, `plinth_round`, `pet_tag`, then `photo_frame_std`, `keycap_mx`; flip `lithophane` / `figurine_base` to `available=true` | recipe tests; lithophane material-rule test (`allowed: [basic_white]` enforced); plinth stability test with a hero mesh; keycap stem fit test | per PR 4 |
+| 9 | Duniya data + API | `experience.v1.json`, `experiences.json` (+ environments), `V11__experiences_environments.sql`, catalog entities/DTOs, `GET /api/experiences`, `/api/environments`, admin CRUD, `designs.experience_id`; environment enums → reference strings | `ExperiencesSeedTest`, `ExperiencesIntegrationTest` (list, slug, expanded avatars/items, admin CRUD + audit, 422 unknown environment), `ModularityTests` | `make contracts`; `./gradlew test` |
+| 10 | Duniya storefront | Shop persona switch, `ExperienceCard`, `duniya/[slug]/page.tsx`, stage strip, `?duniya=` presets in Create composer and `DesignStudio`, karigar's note mentions theme | `make test-web`; E2E walk (5) | `make test-web` |
+| 11 | Duniya portal | `ExperiencesPage`/`ExperienceDrawer` (background picker, avatar ordering, season windows, collections), `EnvironmentsPage`, `AvatarsPage` naming edits, mock admin API | `make test-web`; E2E walk (6) | `make test-web` |
+| 12 | Katha | `comic_pop` style enum + viewer material preset + geometry defaults, `comic_rooftop_night` preset + seed row, `comic_bursts` motif pack, `trademark_terms` scanner rule + portal list, Katha seed row flipped to `available=true` | geometry test for halftone deboss watertightness; `ContentScannerTest` (trademark term → pending_review); E2E walk (7) | `uv run pytest -q`; `./gradlew test`; `make test-web` |
+| — | Docs each PR | `PLAN.md` §7.3/§9/§10, `PROGRESS.md`, `CHANGELOG.md`, service READMEs, `docs/runbook-local.md` | | |
+
+`GeometryStub` (`services/api/src/test/java/studio/aakar/api/support/GeometryStub.java`) keeps its request-templating approach; new stubs match on `$.spec.template` and `$.spec.features[0].type`.
+
+## Verification
+
+Full suite, in order: `make contracts` → `pnpm --filter @aakar/web gen:api && pnpm --filter @aakar/admin gen:api` → `cd services/inspect && uv run pytest -q` → `cd services/geometry && uv sync && uv run pytest -q` → `cd services/api && ./gradlew test` (needs `make infra` Postgres) → `make test-web`.
+
+End-to-end on the local stack (`make infra geometry api web admin`): (1) Create → pick "Keychain" → upload a photo → Sculpt → studio shows the relief, hardware line "Steel split ring · 1" and the family minimum → add to cart → checkout (mock pay) → portal shows the order → print pack zip contains `print-sheet.txt` with Hardware/Content rows and `packing-list.txt`. (2) Create → "Your own 3D model" → upload an STL → size slider → "Check and price" → a thin-walled file completes with `passed=false` and is not purchasable; a sound file prices with the `setup` line. (3) Portal → Outcomes: toggle `available` off and confirm the family disappears from the picker; Hardware: change a unit cost and confirm the preview price moves. (4) CLI smoke: `uv run aakar-geometry build packages/contracts/examples/keychain-photo.spec.json`. (5) Shop → "Duniya · Experiences" → Utsav: page takes the festive accent, the stage strip shows the candlelight backdrop, avatar cards show "Roshni · Photo night light" → Create opens with environment and style preset → order. (6) Portal → Duniya: rename a codename, reorder avatars, set Masti `available=false` and confirm it disappears from the Shop; Avatars: rename Saathi and confirm the picker updates. (7) Katha: `/duniya/katha` renders the comic backdrop and `comic_pop` shading; uploading a file named `marvel_ironman.stl` or typing "Batman" as Naam lands in Reviews as pending with the reviewer copy shown.
+
+## Open decisions and risks
+
+| # | Item | Recommendation |
+|---|---|---|
+| 1 | Shelf list: keep the five board shelves or add "Keychains & charms" now that keychains rank first | Add `keychains_charms` in the seed; put `keychain`, `pet_tag` there |
+| 2 | Launch order: the research puts lithophane and figurine-on-plinth in the launch tier, but the four planar carriers (keychain, magnet, ornament, nameplate) reuse one relief/text machinery and ship first; existing `kantha-nameplate` SKU keeps pointing at the unbuilt `kantha_nameplate` | Seed all six as `launch`, gate lithophane/figurine with `available=false` until PR 8; ship `desk_nameplate@1` first; Kantha wall plate in tier `next` |
+| 3 | Seed price rules are placeholders (keychain min ₹249, magnet ₹299, ornament ₹349, nameplate ₹599, raw ₹349 + ₹99 setup; hardware markup 30%) | Owner sets real values in the portal (ADR-0008) |
+| 4 | Raw-print gate: failed thin-wall check completes with `passed=false` (not purchasable) rather than a hard failure | Keep consistent with today; copy nudges a larger size |
+| 5 | Text scripts: ADR-0003 wants all seven at launch; the shaping pipeline is script-agnostic but goldens need native-speaker review | Land Latin + Devanagari goldens; add the other five before nameplate `available=true` |
+| 6 | Content policy: who reviews flagged uploads, what the scanner flags, terms for customer-owned models | `studio` role may approve; real scanner is an adapter swap |
+| 7 | Mesh booleans (`manifold3d`) can fail on self-intersecting hero meshes; thickening to `min_wall_mm` (PLAN §7.8) is not in the first slice | Fail with `content_unusable`; rely on the thin-wall gate; thickening later |
+| 8 | Silhouette keychains (holes from transparent pixels) need contour tracing | `cutout: none` first; `silhouette` in tier `next` |
+| 9 | Upload URLs: `LocalMediaStore` URLs use `aakar.api.public-url` (`http://api:8080` in Compose), reachable by geometry but not the browser | Return a browser URL to the client and an internal URL in the spec; presign on S3 later |
+| 10 | `category` becomes a plain string in the contract | Accepted; shelves come from the API |
+| 11 | Quantity breaks for bulk keychains need a cart contract change (`discount_paise`) | After the first slice (economics say keychains sell as sets) |
+| 12 | Hardware `weight_g` recorded but `ShipmentRequest` has no weight | Add when the real carrier adapter lands |
+| 13 | Keycaps on FDM: research says resin is strongly preferred for the MX stem; Aakar has six PLA finishes | Keep keycap in tier `later` until a resin material/partner exists or a calibrated FDM stem passes fit tests |
+| 14 | Fulfilment partners for the raw category (Slant 3D v2 API for US, Craftcloud v5 worldwide, Indian bureaus have no APIs) | Out of scope here; a `PrintProvider` adapter behind the mock pattern is the natural follow-up once the manual print pack carries hardware and content |
+| 15 | Naming register: Hindi craft set (Avatar · Chhaap · Duniya · Swaroop; Saathi, Chumbak, Pehchaan, Jhoomar, Roshni, Pratima, Chaukhat, Kunji; Utsav, Adda, Yaadein, Masti, Katha) vs English playful vs Sanskrit | Recommend the Hindi set; codenames are portal data, but experience slugs are URLs, so confirm before the phase 7 seed |
+| 16 | Marvel/DC: unlicensed printing is infringement; Katha ships an original aesthetic plus the trademark guardrail; licensed collections need agreements (Disney Consumer Products; Warner Bros. Discovery Global Consumer Products) or an Indian comics partner (Amar Chitra Katha, Raj Comics) | Owner decision outside this plan; the `collections[]` field and content allow-list are ready for it |
+| 17 | Backdrop presets are code (`environments.ts`); a new Mahaul such as `comic_rooftop_night` is a one-time engineering task, then assignable from the portal; fully data-driven backdrops (HDRI upload) are later | Accept |
+| 18 | Experience page theming scope: accent and hero only (cream paper stays per ADR-0001) vs full palette swap per Duniya | Accent + hero + stage backdrop; revisit after Utsav ships |

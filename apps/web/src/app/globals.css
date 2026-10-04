@@ -174,7 +174,8 @@
 
   .ak-chip[aria-checked="true"],
   .ak-chip[aria-pressed="true"],
-  .ak-chip[aria-current="true"] {
+  .ak-chip[aria-current="true"],
+  .ak-chip[aria-current="page"] {
     border-color: var(--ak-accent);
     background-color: var(--ak-well);
     color: var(--ak-text);

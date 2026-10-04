@@ -45,6 +45,21 @@ class ParamOutOfRange(BuildError):
         super().__init__(message or f"Parameters out of range: {', '.join(self.keys)}", detail)
 
 
+class ContentUnusable(BuildError):
+    """The customer's photo or 3D model could not be turned into printable geometry (Chhaap content).
+
+    The default message is customer-safe; ``detail`` carries the developer reason (decoder error,
+    open edges, boolean failure). Never mention meshes or STL in the message: say photo, model, form.
+    """
+
+    code = "content_unusable"
+    http_status = 422
+    default_message = "We couldn't make this content printable; try a different photo/model or a larger size"
+
+    def __init__(self, message: str | None = None, detail: dict[str, Any] | None = None):
+        super().__init__(message or self.default_message, detail)
+
+
 class NotPrintable(BuildError):
     code = "not_printable"
     http_status = 422

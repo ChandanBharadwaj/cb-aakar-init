@@ -1,16 +1,19 @@
-import type { CatalogCategory } from "@/lib/api/types";
+import type { Shelf } from "@/lib/api/types";
+import { humanize } from "@/lib/format";
 
-export const CATEGORIES: readonly { id: CatalogCategory; label: string }[] = [
-  { id: "home_decor", label: "Home & decor" },
-  { id: "nameplates", label: "Nameplates" },
-  { id: "kitchen", label: "Kitchen" },
-  { id: "desk_tech", label: "Desk & tech" },
-  { id: "gifting", label: "Gifting" },
-];
-
-export function categoryLabel(id: string): string {
-  return CATEGORIES.find((c) => c.id === id)?.label ?? id.replace(/_/g, " ");
+/**
+ * Shop shelves (catalog categories) come from GET /admin/api/catalog/shelves; nothing is hard-coded here any more.
+ * `shelfLabel` looks an id up in the fetched list and falls back to a humanised id while the list loads or for a
+ * value the API no longer knows.
+ */
+export function shelfLabel(shelves: readonly Shelf[] | undefined, id: string | null | undefined): string {
+  if (!id) return "—";
+  return shelves?.find((s) => s.id === id)?.label ?? humanize(id);
 }
 
-/** Environments known to the storefront viewer (design-tokens `environments`). */
-export const ENVIRONMENTS = ["studio", "teak_table_candlelight", "desk_oak", "dashboard", "kitchen_marble", "balcony_daylight"] as const;
+/** Shelves in display order (`sort_order`, then label). */
+export function sortShelves(shelves: readonly Shelf[]): Shelf[] {
+  return [...shelves].sort((a, b) => a.sort_order - b.sort_order || a.label.localeCompare(b.label));
+}
+
+// Viewer backdrops (environments) come from GET /admin/api/environments: see src/lib/environments.ts.

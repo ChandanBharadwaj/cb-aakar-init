@@ -14,6 +14,13 @@ export function policyRows(policy: PricingPolicy): { label: string; value: strin
     { label: "Shipping flat rate", value: formatPaise(policy.shipping_flat_paise) },
     { label: "Free shipping from", value: formatPaise(policy.free_shipping_above_paise) },
     { label: "Shipping label", value: policy.shipping_label },
+    // Policies published before the carriers work lack these; they read as 0 / no rules.
+    ...(policy.hardware_markup_pct !== undefined ? [{ label: "Hardware markup", value: `${policy.hardware_markup_pct}%` }] : []),
+    ...Object.entries(policy.family_rules ?? {}).flatMap(([familyId, rule]) => [
+      ...(rule.minimum_subtotal_paise !== undefined ? [{ label: `Avatar · ${familyId} · minimum`, value: formatPaise(rule.minimum_subtotal_paise) }] : []),
+      ...(rule.setup_fee_paise !== undefined ? [{ label: `Avatar · ${familyId} · setup`, value: formatPaise(rule.setup_fee_paise) }] : []),
+      ...(rule.qty_breaks?.length ? [{ label: `Avatar · ${familyId} · qty breaks`, value: rule.qty_breaks.map((b) => `${b.min_qty}+ → −${b.discount_pct}%`).join(", ") }] : []),
+    ]),
   ];
 }
 

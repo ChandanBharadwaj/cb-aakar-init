@@ -119,7 +119,10 @@ services:
       AAKAR_DB_PASSWORD: aakar
       AAKAR_AMQP_URL: amqp://aakar:aakar@rabbitmq:5672/
       AAKAR_GEOMETRY_URL: http://geometry:8081
-      AAKAR_API_PUBLIC_URL: http://api:8080
+      # The browser loads media (uploads, QC photos) from the public URL; the geometry service fetches customer
+      # uploads over the Compose network. The rabbit profile never uses the job callback URL (the worker drops it).
+      AAKAR_API_PUBLIC_URL: http://localhost:8080
+      AAKAR_MEDIA_INTERNAL_BASE_URL: http://api:8080
       AAKAR_WEB_URL: http://localhost:3000
       AAKAR_PROFILE: local
     ports: ["8080:8080"]

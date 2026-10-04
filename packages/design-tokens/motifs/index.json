@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "description": "Buti motif library: original single-path artwork drawn for Aakar (no third-party artwork). The geometry service (services/geometry, features/motif.py) reads this file and the SVGs beside it; see README.md. A tag shared by several motifs names a pack a Duniya experience offers first (comic_bursts: Katha's comic artwork).",
+  "reference_mm": 30,
+  "min_stroke_mm": 0.8,
+  "motifs": [
+    {
+      "id": "paisley",
+      "label": "Paisley",
+      "file": "paisley.svg",
+      "tags": ["textile", "kalka", "classic", "festive"],
+      "min_scale": 0.3
+    },
+    {
+      "id": "lotus",
+      "label": "Lotus",
+      "file": "lotus.svg",
+      "tags": ["flower", "pooja", "festive"],
+      "min_scale": 0.25
+    },
+    {
+      "id": "star_rangoli",
+      "label": "Rangoli star",
+      "file": "star_rangoli.svg",
+      "tags": ["rangoli", "geometric", "festive", "diwali"],
+      "min_scale": 0.3
+    },
+    {
+      "id": "jaali_lattice",
+      "label": "Jaali lattice",
+      "file": "jaali_lattice.svg",
+      "tags": ["architecture", "geometric", "mughal", "screen"],
+      "min_scale": 0.3
+    },
+    {
+      "id": "warli_dancer",
+      "label": "Warli dancer",
+      "file": "warli_dancer.svg",
+      "tags": ["folk", "warli", "figure", "dance"],
+      "min_scale": 0.35
+    },
+    {
+      "id": "action_burst",
+      "label": "Action burst",
+      "file": "action_burst.svg",
+      "tags": ["comic", "comic_bursts", "burst", "action"],
+      "min_scale": 0.35
+    },
+    {
+      "id": "speech_bubble",
+      "label": "Speech bubble",
+      "file": "speech_bubble.svg",
+      "tags": ["comic", "comic_bursts", "speech", "bubble"],
+      "min_scale": 0.3
+    },
+    {
+      "id": "thought_bubble",
+      "label": "Thought bubble",
+      "file": "thought_bubble.svg",
+      "tags": ["comic", "comic_bursts", "thought", "bubble"],
+      "min_scale": 0.3
+    },
+    {
+      "id": "lightning_bolt",
+      "label": "Lightning bolt",
+      "file": "lightning_bolt.svg",
+      "tags": ["comic", "comic_bursts", "bolt", "power"],
+      "min_scale": 0.25
+    },
+    {
+      "id": "domino_mask",
+      "label": "Domino mask",
+      "file": "domino_mask.svg",
+      "tags": ["comic", "comic_bursts", "mask", "hero"],
+      "min_scale": 0.25
+    },
+    {
+      "id": "hero_cape",
+      "label": "Hero cape",
+      "file": "hero_cape.svg",
+      "tags": ["comic", "comic_bursts", "cape", "hero"],
+      "min_scale": 0.25
+    }
+  ]
+}

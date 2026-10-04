@@ -58,6 +58,21 @@ class ProductionGuardTest {
     }
 
     @Test
+    void productionRefusesTheNoopUploadScannerButTakesTheDefaultTermsScanner() {
+        String[] real = {"aakar.profile=production", "aakar.identity.otp.sender=msg91", "aakar.identity.otp.expose-dev-code=false",
+            "aakar.payments.gateway=razorpay", "aakar.shipping.carrier=delhivery", "aakar.messaging.sender=whatsapp",
+            "aakar.identity.jwt-secret=" + "s".repeat(48), "aakar.admin.seed-password=a-real-staff-password"};
+        runner.withPropertyValues(real).withPropertyValues("aakar.uploads.scanner=noop").run(context -> {
+            assertThat(context).hasFailed();
+            assertThat(rootMessage(context.getStartupFailure())).contains("aakar.uploads.scanner=noop");
+        });
+        runner.withPropertyValues(real).withPropertyValues("aakar.uploads.scanner=terms").run(context -> assertThat(context).hasNotFailed());
+        runner.withPropertyValues("aakar.uploads.scanner=noop").run(context -> assertThat(context).hasNotFailed()); // local may skip the scan
+        assertThat(ProductionGuard.violations(new MockEnvironment().withProperty("aakar.profile", "production")))
+                .noneMatch(v -> v.startsWith("aakar.uploads.")); // absent means the terms scanner
+    }
+
+    @Test
     void violationsArePureOverAnEnvironment() {
         MockEnvironment env = new MockEnvironment().withProperty("aakar.profile", "production")
                 .withProperty("aakar.payments.gateway", "razorpay");

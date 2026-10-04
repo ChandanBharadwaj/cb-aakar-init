@@ -45,6 +45,8 @@ export type PricingPolicyVersion = Schemas["PricingPolicyVersion"];
 export type PublishPolicyRequest = Body<"/admin/api/pricing/policies", "post">;
 export type PricingPreviewRequest = Body<"/admin/api/pricing/preview", "post">;
 export type PriceBreakdown = Schemas["price-breakdown.v1"];
+/** One entry of `PricingPolicy.family_rules`: the per-Avatar minimum, setup fee and (deferred) quantity breaks. */
+export type FamilyRule = NonNullable<PricingPolicy["family_rules"]>[string];
 
 // Materials
 export type AdminMaterial = Schemas["AdminMaterial"];
@@ -55,10 +57,54 @@ export type FinishClass = AdminMaterialInput["finish_class"];
 // Catalog
 export type CatalogItem = Schemas["CatalogItem"];
 export type CatalogItemInput = Schemas["CatalogItemInput"];
-export type CatalogCategory = CatalogItemInput["category"];
+export type Shelf = Schemas["Shelf"];
+
+// Families (Avatars)
+export type AdminFamily = Schemas["AdminFamily"];
+export type AdminFamilyInput = Schemas["AdminFamilyInput"];
+export type FamilyKind = AdminFamilyInput["kind"];
+export type FamilyTier = AdminFamilyInput["tier"];
+export type ShapeTolerance = AdminFamilyInput["shape_tolerance"];
+/** Content-slot (Chhaap) feature types: emboss_text · motif · relief_image · hero_mesh. */
+export type FeatureType = AdminFamilyInput["content_slot"]["accepts"][number];
+export type HardwareRef = NonNullable<AdminFamilyInput["hardware"]>[number];
+
+// Hardware
+export type AdminHardware = Schemas["AdminHardware"];
+export type AdminHardwareInput = Schemas["AdminHardwareInput"];
+
+// Duniya (experiences), Mahaul (viewer backdrops) and the Buti motif library
+/** An experience row as stored: `avatars` are family ids and `items` Shop item slugs, in display order. */
+export type AdminExperience = Schemas["AdminExperience"];
+export type AdminExperienceInput = Schemas["AdminExperienceInput"];
+export type ExperienceStyle = AdminExperienceInput["style"];
+export type ExperienceSurface = Schemas["ExperienceSurface"];
+export type ExperienceCollection = Schemas["ExperienceCollection"];
+export type SeasonWindow = Schemas["SeasonWindow"];
+/** A viewer backdrop: `preset_key` names the storefront viewer preset that renders it. */
+export type Environment = Schemas["Environment"];
+export type Motif = Schemas["Motif"];
+
+// Uploads and content reviews
+export type AdminUpload = Schemas["AdminUpload"];
+export type UploadStatus = AdminUpload["status"];
+export type UploadsQuery = NonNullable<paths["/admin/api/uploads"]["get"]["parameters"]["query"]>;
+export type ContentReviewDecision = Schemas["ContentReviewDecision"];
+export type ReviewDecision = ContentReviewDecision["decision"];
+
+// Content rules: the names the studio won't print (the Katha trademark guardrail)
+/** A rule as stored, with `normalised_term` (how the matcher compares it) and `whole_word` (short terms match only as words). */
+export type ContentTerm = Schemas["ContentTerm"];
+export type ContentTermInput = Schemas["ContentTermInput"];
+export type ContentTermKind = ContentTermInput["kind"];
 
 // Templates
-export type AdminTemplate = Ok<"/admin/api/templates", "get">[number];
+/**
+ * The contract lists the columns every template row must carry. The API merges the descriptor's
+ * `features_supported` and `hardware` into the same row (they are open properties in the contract), so the
+ * portal reads them as optional extras and shows chips when present.
+ */
+export type AdminTemplate = Ok<"/admin/api/templates", "get">[number] & { features_supported?: FeatureType[]; hardware?: HardwareRef[] };
 export type TemplateLiveRequest = Body<"/admin/api/templates/{templateId}", "put">;
 
 // Messages and audit

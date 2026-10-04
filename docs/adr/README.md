@@ -17,5 +17,6 @@ One file per decision, numbered, never edited after acceptance (supersede instea
 | [0011](0011-contract-first-schemas.md) | Contract-first: JSON Schemas and OpenAPI in `packages/contracts` lead every change | Accepted |
 | [0012](0012-management-portal.md) | A separate management portal (`apps/admin`) owns operational configuration and fulfilment ops | Accepted |
 | [0013](0013-mock-external-providers.md) | Complete the customer loop with external providers mocked behind adapters and placeholder pages | Accepted |
+| [0014](0014-raw-print-path.md) | One raw print family (Swaroop) may carry customer geometry as the body; same spec, same gate, same pricing | Proposed |
 
 Template: [0000-template.md](0000-template.md).

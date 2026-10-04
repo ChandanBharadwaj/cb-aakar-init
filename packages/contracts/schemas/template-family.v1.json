@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aakar.studio/schemas/template-family.v1.json",
+  "title": "Aakar Template Families v1 (Avatars)",
+  "description": "The catalogue of outcome categories. A family is the form a customer's idea takes: a carrier (Avatar) that fuses the idea with an everyday object, one of the parametric object families, or the single raw print family. Seeded from packages/design-tokens/families.json, stored in template_families / shelves / hardware_items, edited in the management portal. Code ids stay snake_case English; brand names (codename, name, tagline) are data.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["shelves", "hardware_items", "families"],
+  "properties": {
+    "$comment": { "type": "string" },
+    "shelves": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/shelf" } },
+    "hardware_items": { "type": "array", "items": { "$ref": "#/$defs/hardware_item" } },
+    "families": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/family" } }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "maxLength": 40 },
+    "shelf": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "label": { "type": "string", "maxLength": 60 },
+        "sort_order": { "type": "integer", "default": 100 }
+      }
+    },
+    "hardware_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sku", "name", "unit_cost_paise"],
+      "properties": {
+        "sku": { "$ref": "#/$defs/id" },
+        "name": { "type": "string", "maxLength": 120, "description": "Customer-facing, e.g. 'Steel split ring 25 mm'." },
+        "unit_cost_paise": { "type": "integer", "minimum": 0 },
+        "weight_g": { "type": "number", "minimum": 0 },
+        "supplier": { "type": "string", "maxLength": 120 },
+        "url": { "type": "string", "maxLength": 500 },
+        "notes": { "type": "string", "maxLength": 200 },
+        "available": { "type": "boolean", "default": true }
+      }
+    },
+    "hardware_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sku", "qty"],
+      "properties": {
+        "sku": { "$ref": "#/$defs/id" },
+        "qty": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "size_envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min_longest_mm", "max_longest_mm"],
+      "properties": {
+        "min_longest_mm": { "type": "number", "exclusiveMinimum": 0 },
+        "max_longest_mm": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "material_rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "heat_safe_only": { "type": "boolean", "default": false },
+        "allowed": {
+          "type": ["array", "null"],
+          "items": { "$ref": "#/$defs/id" },
+          "description": "Digital material ids allowed for this family; null means every available material."
+        },
+        "excluded_finish_classes": { "type": "array", "items": { "type": "string", "enum": ["matte", "silk"] }, "default": [] }
+      }
+    },
+    "content_slot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["accepts"],
+      "description": "The Chhaap: what personal content a family accepts and where. A template's features_supported must be a subset of accepts.",
+      "properties": {
+        "accepts": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["emboss_text", "motif", "relief_image", "hero_mesh"] },
+          "uniqueItems": true
+        },
+        "anchors": { "type": "array", "items": { "type": "string" }, "description": "Anchor ids the consumer UI offers first." },
+        "hero_volume": { "type": "boolean", "default": false, "description": "True when the family carries a customer's own 3D form (hero_mesh) in a volume anchor." },
+        "max_text_chars": { "type": "integer", "minimum": 1, "maximum": 40 }
+      }
+    },
+    "family": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "codename", "name", "kind", "tier", "shelf", "default_template_id", "shape_tolerance", "content_slot", "available"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id", "description": "Equals `family` in design specs and template descriptors." },
+        "codename": { "type": "string", "maxLength": 40, "description": "Brand name shown to customers, e.g. 'Saathi'. Portal-editable." },
+        "name": { "type": "string", "maxLength": 80, "description": "Plain descriptor always shown with the codename, e.g. 'Keychain & bag charm'." },
+        "tagline": { "type": "string", "maxLength": 120 },
+        "description": { "type": "string", "maxLength": 500 },
+        "kind": { "type": "string", "enum": ["carrier", "object", "raw"], "description": "carrier = an Avatar that carries the customer's idea; object = a parametric object family (PLAN §7.3); raw = the single 'print as it is' family." },
+        "tier": { "type": "string", "enum": ["launch", "next", "later"], "description": "Roadmap slot from the market research; `available` is the staff switch." },
+        "shelf": { "$ref": "#/$defs/id", "description": "Shop shelf (catalog category) this family sits on." },
+        "demand_rank": { "type": "integer", "minimum": 1 },
+        "default_template_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "Template used when a request names only the family." },
+        "environment": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "maxLength": 40,
+          "default": "studio",
+          "description": "Default viewer backdrop before a template is chosen: an environment id from the reference data (experience.v1.json environments; the API checks it against the environments table)."
+        },
+        "size_envelope_mm": { "$ref": "#/$defs/size_envelope" },
+        "hardware": { "type": "array", "items": { "$ref": "#/$defs/hardware_ref" }, "default": [], "description": "Bought-in parts packed with every piece; a template descriptor's hardware overrides this default." },
+        "material_rules": { "$ref": "#/$defs/material_rules" },
+        "shape_tolerance": {
+          "type": "string",
+          "enum": ["any", "constrained", "strict"],
+          "description": "any: a plate or plinth absorbs whatever shape the content has; constrained: content must satisfy a rule (attachment region, flat top, shell); strict: the functional body is parametric and content only decorates it."
+        },
+        "content_slot": { "$ref": "#/$defs/content_slot" },
+        "available": { "type": "boolean" },
+        "sort_order": { "type": "integer", "default": 100 }
+      }
+    }
+  }
+}

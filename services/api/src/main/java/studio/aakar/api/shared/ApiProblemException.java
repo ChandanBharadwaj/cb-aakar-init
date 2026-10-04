@@ -31,6 +31,11 @@ public class ApiProblemException extends RuntimeException {
         return new ApiProblemException(HttpStatus.NOT_FOUND, ProblemCodes.NOT_FOUND, "Not found", what + " " + id + " was not found");
     }
 
+    /** 404 with a domain code, e.g. {@code unknown_family}. */
+    public static ApiProblemException notFound(String code, String title, String detail) {
+        return new ApiProblemException(HttpStatus.NOT_FOUND, code, title, detail);
+    }
+
     public static ApiProblemException validation(String detail) {
         return new ApiProblemException(HttpStatus.BAD_REQUEST, ProblemCodes.VALIDATION_FAILED, "Validation failed", detail);
     }

@@ -11,6 +11,10 @@ FROM eclipse-temurin:21-jre
 WORKDIR /app
 RUN useradd --system --uid 10001 aakar
 COPY --from=build /workspace/build/libs/*.jar /app/app.jar
+# The Buti motif library behind GET /api/motifs and the motif checks on designs, at the same path the geometry image
+# uses; aakar.profile=production refuses to start without it.
+COPY packages/design-tokens/motifs /design-tokens/motifs
+ENV AAKAR_MOTIFS_DIR=/design-tokens/motifs
 USER aakar
 EXPOSE 8080
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75"

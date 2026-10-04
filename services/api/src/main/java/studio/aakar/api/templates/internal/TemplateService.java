@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import studio.aakar.api.shared.ApiProblemException;
+import studio.aakar.api.templates.FamilyLimits;
 import studio.aakar.api.templates.TemplateDescriptor;
 import studio.aakar.api.templates.Templates;
 
@@ -22,12 +23,14 @@ class TemplateService implements Templates {
 
     private final TemplateClient client;
     private final TemplateParamValidator validator;
+    private final FeatureValidator features;
     private final TemplateFlagRepository flags;
     private final Clock clock;
 
-    TemplateService(TemplateClient client, TemplateParamValidator validator, TemplateFlagRepository flags, Clock clock) {
+    TemplateService(TemplateClient client, TemplateParamValidator validator, FeatureValidator features, TemplateFlagRepository flags, Clock clock) {
         this.client = client;
         this.validator = validator;
+        this.features = features;
         this.flags = flags;
         this.clock = clock;
     }
@@ -80,5 +83,11 @@ class TemplateService implements Templates {
     @Override
     public void validateParams(TemplateDescriptor descriptor, Map<String, Object> params) {
         validator.validate(descriptor, params);
+    }
+
+    @Override
+    public List<Map<String, Object>> validateFeatures(TemplateDescriptor descriptor, FamilyLimits family, List<Map<String, Object>> requested,
+            String style) {
+        return features.validate(descriptor, family, requested, style);
     }
 }

@@ -8,7 +8,11 @@ export interface PriceBreakdownProps {
   className?: string;
 }
 
-/** Transparent price lines + shipping + total (Checkout board). */
+/**
+ * Transparent price lines + shipping + total (Checkout board). Lines render generically from the API
+ * (material, print time, finishing, packaging, and for Avatars `hardware` and `setup`), so a new line
+ * code needs no UI change. A family minimum that lifted the subtotal gets a footnote.
+ */
 export function PriceBreakdown({ price, loading, error, className }: PriceBreakdownProps) {
   return (
     <section className={["ak-card grid gap-2.5 p-4 text-[13px]", loading ? "opacity-70" : "", className].filter(Boolean).join(" ")} aria-label="Price" aria-busy={loading}>
@@ -22,6 +26,11 @@ export function PriceBreakdown({ price, loading, error, className }: PriceBreakd
               <span>{formatPaise(line.amount_paise)}</span>
             </div>
           ))}
+          {typeof price.minimum_subtotal_paise === "number" && (
+            <p className="text-[11px] leading-snug text-surface-muted">
+              Studio minimum for this piece applies · {formatPaise(price.minimum_subtotal_paise)}
+            </p>
+          )}
           <div className="flex justify-between gap-3">
             <span className="text-surface-muted">{price.shipping_label ?? "Shipping"}</span>
             <span className={price.shipping_paise === 0 ? "font-semibold text-success" : ""}>{price.shipping_paise === 0 ? "Free" : formatPaise(price.shipping_paise)}</span>

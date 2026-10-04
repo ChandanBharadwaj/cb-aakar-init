@@ -22,13 +22,23 @@ dependencies = [
   "pika>=1.3",
   "networkx>=3.2",
   "lxml>=5.0",
+  "manifold3d>=3.0,<4",
+  "pillow>=10",
+  "fast-simplification>=0.1.9",
+  "pi-heif>=1.0",
+  # Naam (text) and Buti (motifs): HarfBuzz shapes and draws the glyph outlines (uharfbuzz, Apache-2.0;
+  # HarfBuzz itself Old MIT), fontTools pens flatten them and parse the motif SVG paths (MIT)
+  "uharfbuzz>=0.50,<1",
+  "fonttools>=4.50",
 ]
 
 [project.scripts]
 aakar-geometry = "aakar_geometry.cli:main"
 
 [dependency-groups]
-dev = ["pytest>=8.0", "pytest-cov>=5.0"]
+# pillow-heif only encodes the HEIC test fixture: its wheels are GPLv2 (bundled x265), so the image
+# decodes with pi-heif (decode-only, LGPL libheif/libde265) and never ships it (`uv sync --no-dev`)
+dev = ["pytest>=8.0", "pytest-cov>=5.0", "pillow-heif>=0.18"]
 
 [tool.uv.sources]
 aakar-inspect = { path = "../inspect", editable = true }
@@ -38,6 +48,8 @@ requires = ["hatchling>=1.24"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
+# everything under aakar_geometry ships, including the lettering fonts (aakar_geometry/fonts: seven Noto
+# Sans Bold files, OFL 1.1, with OFL.txt and README.md) read through importlib.resources
 packages = ["aakar_geometry"]
 
 [tool.pytest.ini_options]

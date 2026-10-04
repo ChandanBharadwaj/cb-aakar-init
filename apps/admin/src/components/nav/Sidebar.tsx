@@ -10,7 +10,13 @@ export const NAV = [
   { href: "/pricing", label: "Pricing", glyph: "₹" },
   { href: "/materials", label: "Materials", glyph: "◍" },
   { href: "/catalog", label: "Catalog", glyph: "▦" },
+  { href: "/avatars", label: "Avatars", glyph: "❖" },
+  { href: "/experiences", label: "Duniya", glyph: "✦" },
+  { href: "/environments", label: "Backgrounds", glyph: "◐" },
+  { href: "/hardware", label: "Hardware", glyph: "⚙" },
   { href: "/templates", label: "Templates", glyph: "◈" },
+  { href: "/reviews", label: "Reviews", glyph: "◎" },
+  { href: "/content-rules", label: "Content rules", glyph: "⊘" },
   { href: "/messages", label: "Messages", glyph: "✉" },
   { href: "/audit", label: "Audit", glyph: "≡" },
 ] as const;

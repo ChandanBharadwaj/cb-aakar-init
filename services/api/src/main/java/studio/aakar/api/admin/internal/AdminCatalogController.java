@@ -17,10 +17,11 @@ import org.springframework.web.bind.annotation.RestController;
 import studio.aakar.api.catalog.Catalog;
 import studio.aakar.api.catalog.CatalogItemDto;
 import studio.aakar.api.catalog.CatalogItemInput;
+import studio.aakar.api.catalog.ShelfDto;
 import studio.aakar.api.shared.ApiProblemException;
 
 @RestController
-@RequestMapping("/admin/api/catalog/items")
+@RequestMapping("/admin/api/catalog")
 @Tag(name = "admin · catalog")
 @SecurityRequirement(name = "staffBearer")
 class AdminCatalogController {
@@ -33,14 +34,15 @@ class AdminCatalogController {
         this.audit = audit;
     }
 
-    @GetMapping
+    @GetMapping("/items")
     @Operation(summary = "Every Shop item, including unavailable ones")
     List<CatalogItemDto> all(StaffPrincipal staff) {
         return catalog.items(null, null);
     }
 
-    @PostMapping
-    @Operation(summary = "Add a Shop item", description = "Owner only. 409 `slug_exists` for a taken slug; 422 `unknown_material` for an unknown default material.")
+    @PostMapping("/items")
+    @Operation(summary = "Add a Shop item", description = "Owner only. 409 `slug_exists` for a taken slug; 422 `validation_failed` for a category that "
+            + "is not a shelf; 422 `unknown_family` / `unknown_material` for an unknown family or default material.")
     ResponseEntity<CatalogItemDto> create(@Valid @RequestBody CatalogItemInput input, StaffPrincipal staff) {
         staff.requireOwner();
         CatalogItemDto created = catalog.createItem(input);
@@ -48,7 +50,7 @@ class AdminCatalogController {
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
-    @PutMapping("/{slug}")
+    @PutMapping("/items/{slug}")
     @Operation(summary = "Replace a Shop item", description = "Owner only. 404 for an unknown slug.")
     CatalogItemDto update(@PathVariable String slug, @Valid @RequestBody CatalogItemInput input, StaffPrincipal staff) {
         staff.requireOwner();
@@ -56,5 +58,11 @@ class AdminCatalogController {
         CatalogItemDto after = catalog.updateItem(slug, input);
         audit.record(staff.email(), AuditLog.CATALOG_UPDATE, slug, before, after);
         return after;
+    }
+
+    @GetMapping("/shelves")
+    @Operation(summary = "Shop shelves in display order", description = "The valid `category` values for Shop items and `shelf` values for families.")
+    List<ShelfDto> shelves(StaffPrincipal staff) {
+        return catalog.shelves();
     }
 }

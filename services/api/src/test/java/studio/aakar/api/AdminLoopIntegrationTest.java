@@ -151,7 +151,9 @@ class AdminLoopIntegrationTest extends AbstractIntegrationTest {
         assertThat(pack.getHeaders().getContentType()).hasToString("application/zip");
         assertThat(pack.getHeaders().getFirst("Content-Disposition")).contains("attachment").contains(paid.orderNumber() + "-print-pack.zip");
         Map<String, byte[]> files = unzip(pack.getBody());
-        assertThat(files).containsOnlyKeys("item-1/model.3mf", "item-1/model.stl", "item-1/print-sheet.txt");
+        assertThat(files).containsOnlyKeys("item-1/model.3mf", "item-1/model.stl", "item-1/print-sheet.txt", "packing-list.txt");
+        assertThat(new String(files.get("packing-list.txt"), StandardCharsets.UTF_8)).contains(paid.orderNumber()).contains("Jharokha Phone Stand")
+                .endsWith("Hardware: none\n"); // the stand packs no bought-in parts
         assertThat(new String(files.get("item-1/model.3mf"), StandardCharsets.UTF_8)).isEqualTo(GeometryStub.STUB_3MF);
         assertThat(new String(files.get("item-1/model.stl"), StandardCharsets.UTF_8)).isEqualTo(GeometryStub.STUB_STL);
         String sheet = new String(files.get("item-1/print-sheet.txt"), StandardCharsets.UTF_8);
@@ -378,23 +380,32 @@ class AdminLoopIntegrationTest extends AbstractIntegrationTest {
 
             // templates: live by default; switched off it leaves the storefront and blocks new designs
             JsonNode templates = body(get("/admin/api/templates", owner));
-            assertThat(templates).hasSize(1);
-            assertThat(templates.get(0).get("id").asText()).isEqualTo("jharokha_phone_stand");
-            assertThat(templates.get(0).get("version").asInt()).isEqualTo(1);
-            assertThat(templates.get(0).get("family").asText()).isEqualTo("phone_stand");
-            assertThat(templates.get(0).get("live").asBoolean()).isTrue();
-            assertThat(templates.get(0).get("catalog_items")).extracting(JsonNode::asText).containsExactly("jharokha-phone-stand");
+            // jharokha_phone_stand, the four planar carriers, raw_print and the five PR 8 keepsakes (fixtures/templates.json)
+            assertThat(templates).hasSize(11);
+            JsonNode jharokhaRow = templates.findParents("id").stream().filter(t -> t.get("id").asText().equals("jharokha_phone_stand")).findFirst().orElseThrow();
+            assertThat(jharokhaRow.get("version").asInt()).isEqualTo(1);
+            assertThat(jharokhaRow.get("family").asText()).isEqualTo("phone_stand");
+            assertThat(jharokhaRow.get("live").asBoolean()).isTrue();
+            assertThat(jharokhaRow.get("catalog_items")).extracting(JsonNode::asText).containsExactly("jharokha-phone-stand");
+            JsonNode keychainRow = templates.findParents("id").stream().filter(t -> t.get("id").asText().equals("keychain_tag")).findFirst().orElseThrow();
+            assertThat(keychainRow.get("catalog_items")).isEmpty();
+            // the portal shows each template's Chhaap types and bought-in hardware
+            assertThat(keychainRow.get("features_supported")).extracting(JsonNode::asText).contains("relief_image");
+            assertThat(keychainRow.get("hardware").get(0).get("sku").asText()).isEqualTo("split_ring_25");
+            assertThat(keychainRow.get("hardware").get(0).get("qty").asInt()).isEqualTo(1);
             JsonNode hidden = body(put("/admin/api/templates/jharokha_phone_stand", "{\"live\": false}", owner));
             assertThat(hidden.get("live").asBoolean()).isFalse();
-            assertThat(body(get("/api/templates"))).isEmpty();
+            assertThat(body(get("/api/templates"))).extracting(d -> d.get("id").asText()).containsExactly("keychain_tag", "fridge_magnet",
+                    "hanging_ornament", "desk_nameplate", "raw_print", "keycap_mx", "lithophane_plate", "pet_tag", "photo_frame_std", "plinth_round");
             assertThat(get("/api/templates/jharokha_phone_stand").getStatusCode()).isEqualTo(HttpStatus.OK); // existing designs keep resolving
             assertProblem(post("/api/designs", "{\"source\": \"shop\", \"catalog_item_slug\": \"jharokha-phone-stand\"}", guest(UUID.randomUUID())),
                     HttpStatus.UNPROCESSABLE_ENTITY, "template_not_available");
             assertProblem(post("/api/designs", "{\"source\": \"remix\", \"template_id\": \"jharokha_phone_stand\"}", guest(UUID.randomUUID())),
                     HttpStatus.UNPROCESSABLE_ENTITY, "template_not_available");
-            assertThat(body(get("/admin/api/templates", owner)).get(0).get("live").asBoolean()).isFalse();
+            assertThat(body(get("/admin/api/templates", owner)).findParents("id").stream()
+                    .filter(t -> t.get("id").asText().equals("jharokha_phone_stand")).findFirst().orElseThrow().get("live").asBoolean()).isFalse();
             assertThat(body(put("/admin/api/templates/jharokha_phone_stand", "{\"live\": true}", owner)).get("live").asBoolean()).isTrue();
-            assertThat(body(get("/api/templates"))).hasSize(1);
+            assertThat(body(get("/api/templates"))).hasSize(11);
             assertProblem(put("/admin/api/templates/nope_template", "{\"live\": false}", owner), HttpStatus.NOT_FOUND, "not_found");
             assertProblem(put("/admin/api/templates/jharokha_phone_stand", "{}", owner), HttpStatus.UNPROCESSABLE_ENTITY, "validation_failed");
 
@@ -442,7 +453,7 @@ class AdminLoopIntegrationTest extends AbstractIntegrationTest {
             assertProblem(put("/admin/api/catalog/items/elephant-bookends", elephant.toString(), karigar), HttpStatus.FORBIDDEN, "forbidden");
             assertProblem(post("/admin/api/catalog/items", body(createdItem).toString(), karigar), HttpStatus.FORBIDDEN, "forbidden");
             assertProblem(put("/admin/api/templates/jharokha_phone_stand", "{\"live\": false}", karigar), HttpStatus.FORBIDDEN, "forbidden");
-            assertThat(body(get("/api/templates"))).hasSize(1); // nothing changed
+            assertThat(body(get("/api/templates"))).hasSize(11); // nothing changed
             assertThat(body(post("/admin/api/pricing/preview",
                     "{\"policy\": " + policy + ", \"material\": \"terracotta_silk\", \"extruded_volume_cm3\": 51.6, \"print_seconds\": 13200}", karigar))
                     .get("total_paise").asLong()).isEqualTo(133_900); // a preview changes nothing, so the studio may run it

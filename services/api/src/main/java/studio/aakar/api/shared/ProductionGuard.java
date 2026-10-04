@@ -10,8 +10,8 @@ import org.springframework.stereotype.Component;
 /**
  * ADR-0013: mock adapters and the OTP dev code must never run in production. When {@code aakar.profile}
  * is {@code production} and any external provider is still the mock (or messaging only logs, or the OTP
- * code is exposed, or the JWT secret or the staff seed password is the dev default), the context fails to
- * start with a message naming every offending property.
+ * code is exposed, or the JWT secret or the staff seed password is the dev default, or customer uploads skip the
+ * content scanner), the context fails to start with a message naming every offending property.
  */
 @Component
 public class ProductionGuard implements SmartInitializingSingleton {
@@ -28,7 +28,8 @@ public class ProductionGuard implements SmartInitializingSingleton {
             "aakar.shipping.carrier", "mock",
             "aakar.messaging.sender", "log",
             "aakar.identity.jwt-secret", DEV_JWT_SECRET,
-            "aakar.admin.seed-password", DEFAULT_ADMIN_SEED_PASSWORD);
+            "aakar.admin.seed-password", DEFAULT_ADMIN_SEED_PASSWORD,
+            "aakar.uploads.scanner", "noop");
 
     private final Environment environment;
 
@@ -63,11 +64,12 @@ public class ProductionGuard implements SmartInitializingSingleton {
         return violations;
     }
 
-    /** What the application uses when the property is absent; the defaults are the mocks by design. */
+    /** What the application uses when the property is absent; the defaults are the mocks by design (except the upload scanner). */
     private static String defaultOf(String property) {
         return switch (property) {
             case "aakar.identity.jwt-secret" -> DEV_JWT_SECRET;
             case "aakar.admin.seed-password" -> DEFAULT_ADMIN_SEED_PASSWORD;
+            case "aakar.uploads.scanner" -> "terms"; // the file-name terms scanner is the default, not a mock
             default -> FORBIDDEN_IN_PRODUCTION.get(property);
         };
     }

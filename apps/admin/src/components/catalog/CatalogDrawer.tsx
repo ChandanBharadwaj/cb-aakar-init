@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { formatPaise } from "@aakar/design-tokens";
 import { api, toProblem } from "@/lib/api/client";
-import type { AdminMaterial, AdminTemplate, CatalogItem, CatalogItemInput, Problem } from "@/lib/api/types";
-import { CATEGORIES, ENVIRONMENTS } from "@/lib/catalog";
+import type { AdminFamily, AdminMaterial, AdminTemplate, CatalogItem, CatalogItemInput, Environment, Problem, Shelf } from "@/lib/api/types";
+import { shelfLabel, sortShelves } from "@/lib/catalog";
+import { familyTitle, sortFamilies } from "@/lib/families";
 import { paiseToRupees, rupeesToPaise } from "@/lib/format";
 import { useCanWrite } from "@/store/session";
+import { EnvironmentSelect } from "@/components/environments/Backdrops";
 import { Drawer } from "@/components/ui/Drawer";
 import { Field } from "@/components/ui/Field";
 import { OwnerOnlyHint } from "@/components/ui/OwnerOnly";
@@ -19,6 +21,7 @@ export function toInput(item: CatalogItem): CatalogItemInput {
     slug: item.slug,
     name: item.name,
     category: item.category,
+    family_id: item.family_id ?? null,
     description: item.description,
     template_id: item.template_id,
     default_params: item.default_params,
@@ -31,29 +34,42 @@ export function toInput(item: CatalogItem): CatalogItemInput {
   };
 }
 
-const BLANK: CatalogItemInput = { slug: "", name: "", category: "home_decor", description: "", template_id: "", default_params: {}, default_material: "", base_price_paise: 0, specs_line: "", environment: "studio", available: false, media: [] };
+const BLANK: CatalogItemInput = { slug: "", name: "", category: "", family_id: null, description: "", template_id: "", default_params: {}, default_material: "", base_price_paise: 0, specs_line: "", environment: "studio", available: false, media: [] };
+
+const PROBLEM_TITLES: Record<string, string> = {
+  slug_exists: "That slug is taken",
+  unknown_family: "Unknown Avatar",
+  validation_failed: "The API rejected a field",
+  forbidden: "Owner only",
+};
 
 export interface CatalogDrawerProps {
   item: CatalogItem | null | undefined;
   materials: AdminMaterial[];
   templates: AdminTemplate[];
+  shelves: Shelf[];
+  families: AdminFamily[];
+  /** Backdrops from GET /admin/api/environments: the valid `environment` values. */
+  environments: Environment[];
   onClose(): void;
   onSaved(item: CatalogItem): void;
 }
 
-export function CatalogDrawer({ item, materials, templates, onClose, onSaved }: CatalogDrawerProps) {
+export function CatalogDrawer({ item, materials, templates, shelves, families, environments, onClose, onSaved }: CatalogDrawerProps) {
   const open = item !== undefined;
   return (
     <Drawer open={open} onClose={onClose} title={item ? item.name : "Add item"} eyebrow={item ? `Catalog · ${item.slug}` : "New catalog item"}>
-      {open && <CatalogForm key={item?.slug ?? "new"} item={item} materials={materials} templates={templates} onClose={onClose} onSaved={onSaved} />}
+      {open && <CatalogForm key={item?.slug ?? "new"} item={item} materials={materials} templates={templates} shelves={shelves} families={families} environments={environments} onClose={onClose} onSaved={onSaved} />}
     </Drawer>
   );
 }
 
-function CatalogForm({ item, materials, templates, onClose, onSaved }: { item: CatalogItem | null; materials: AdminMaterial[]; templates: AdminTemplate[]; onClose(): void; onSaved(i: CatalogItem): void }) {
+function CatalogForm({ item, materials, templates, shelves, families, environments, onClose, onSaved }: { item: CatalogItem | null } & Omit<CatalogDrawerProps, "item">) {
   const canWrite = useCanWrite();
   const editing = item !== null;
-  const [draft, setDraft] = useState<CatalogItemInput>(() => (item ? toInput(item) : { ...BLANK, default_material: materials[0]?.id ?? "" }));
+  const orderedShelves = sortShelves(shelves);
+  const orderedFamilies = sortFamilies(families);
+  const [draft, setDraft] = useState<CatalogItemInput>(() => (item ? toInput(item) : { ...BLANK, category: orderedShelves[0]?.id ?? "", default_material: materials[0]?.id ?? "" }));
   const [price, setPrice] = useState(() => paiseToRupees(item?.base_price_paise ?? 0));
   const [paramsText, setParamsText] = useState(() => JSON.stringify(item?.default_params ?? {}, null, 2));
   const [mediaText, setMediaText] = useState(() => (item?.media ?? []).map((m) => `${m.kind ?? "image"} ${m.url ?? ""}`.trim()).join("\n"));
@@ -88,7 +104,7 @@ function CatalogForm({ item, materials, templates, onClose, onSaved }: { item: C
         const [kind, ...rest] = l.split(/\s+/);
         return rest.length ? { kind, url: rest.join(" ") } : { kind: "image", url: kind };
       });
-    const body: CatalogItemInput = { ...draft, slug: draft.slug.trim(), name: draft.name.trim(), template_id: draft.template_id.trim(), default_params: params, base_price_paise: rupeesToPaise(price), media };
+    const body: CatalogItemInput = { ...draft, slug: draft.slug.trim(), name: draft.name.trim(), template_id: draft.template_id.trim(), family_id: draft.family_id || null, default_params: params, base_price_paise: rupeesToPaise(price), media };
     if (!body.description) delete body.description;
     try {
       const saved = editing ? await api.catalog.update(item.slug, body) : await api.catalog.create(body);
@@ -101,6 +117,15 @@ function CatalogForm({ item, materials, templates, onClose, onSaved }: { item: C
   }
 
   const templateKnown = templates.some((t) => t.id === draft.template_id);
+  const shelfKnown = !draft.category || orderedShelves.some((s) => s.id === draft.category);
+  const family = orderedFamilies.find((f) => f.id === draft.family_id);
+  const familyHint = !draft.family_id
+    ? "Optional: the outcome family (Avatar) this item belongs to"
+    : !family
+      ? "Not in the Avatars list; the API answers 422 unknown_family for ids it hasn't seeded"
+      : family.default_template_id !== draft.template_id
+        ? `${family.codename}'s default template is ${family.default_template_id}`
+        : `${family.kind} · ${family.tier}${family.available ? "" : " · hidden from the picker"}`;
 
   return (
     <form onSubmit={submit} className="grid gap-5" aria-busy={busy}>
@@ -112,12 +137,27 @@ function CatalogForm({ item, materials, templates, onClose, onSaved }: { item: C
         <Field label="Name" hint="Up to 80 characters">
           {(id) => <input id={id} className="ak-input ak-input-sm" maxLength={80} value={draft.name} onChange={(e) => set("name", e.target.value)} disabled={dis} required />}
         </Field>
-        <Field label="Category">
+        <Field label="Shelf" hint={shelfKnown ? "Shop shelf (catalog category)" : "This shelf is no longer served by the API; pick another before saving"}>
           {(id) => (
-            <select id={id} className="ak-input ak-input-sm" value={draft.category} onChange={(e) => set("category", e.target.value as CatalogItemInput["category"])} disabled={dis}>
-              {CATEGORIES.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.label}
+            <select id={id} className="ak-input ak-input-sm" value={draft.category} onChange={(e) => set("category", e.target.value)} disabled={dis} required>
+              {orderedShelves.length === 0 && <option value="">Loading shelves…</option>}
+              {!shelfKnown && <option value={draft.category}>{shelfLabel(undefined, draft.category)} (unknown shelf)</option>}
+              {orderedShelves.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          )}
+        </Field>
+        <Field label="Avatar (family)" hint={familyHint}>
+          {(id) => (
+            <select id={id} className="ak-input ak-input-sm" value={draft.family_id ?? ""} onChange={(e) => set("family_id", e.target.value || null)} disabled={dis}>
+              <option value="">No Avatar</option>
+              {draft.family_id && !family && <option value={draft.family_id}>{draft.family_id} (unknown)</option>}
+              {orderedFamilies.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {familyTitle(f)} · {f.id}
                 </option>
               ))}
             </select>
@@ -151,16 +191,8 @@ function CatalogForm({ item, materials, templates, onClose, onSaved }: { item: C
         <Field label="Base price (₹)" hint={`Shown on the Shop card · ${formatPaise(rupeesToPaise(price))}`}>
           {(id) => <input id={id} type="number" min="0" step="1" className="ak-input ak-input-sm" value={price} onChange={(e) => setPrice(e.target.value)} disabled={dis} required />}
         </Field>
-        <Field label="Environment" hint="Viewer backdrop">
-          {(id) => (
-            <select id={id} className="ak-input ak-input-sm" value={draft.environment ?? "studio"} onChange={(e) => set("environment", e.target.value)} disabled={dis}>
-              {ENVIRONMENTS.map((env) => (
-                <option key={env} value={env}>
-                  {env.replace(/_/g, " ")}
-                </option>
-              ))}
-            </select>
-          )}
+        <Field label="Environment" hint="Viewer backdrop (Backgrounds page)">
+          {(id) => <EnvironmentSelect id={id} value={draft.environment ?? "studio"} onChange={(v) => set("environment", v)} environments={environments} disabled={dis} />}
         </Field>
         <Field label="Available" hint="Off shows 'Coming soon' in the Shop" inline>
           {(id) => <Switch id={id} label="Available" checked={draft.available} onChange={(v) => set("available", v)} disabled={dis} />}
@@ -178,9 +210,9 @@ function CatalogForm({ item, materials, templates, onClose, onSaved }: { item: C
           {(id) => <textarea id={id} className="ak-input font-mono text-[12.5px]" rows={3} value={mediaText} onChange={(e) => setMediaText(e.target.value)} disabled={dis} spellCheck={false} />}
         </Field>
       </div>
-      {problem && <ProblemCard compact problem={problem} title={problem.code === "slug_exists" ? "That slug is taken" : problem.code === "forbidden" ? "Owner only" : undefined} />}
+      {problem && <ProblemCard compact problem={problem} title={PROBLEM_TITLES[problem.code ?? ""]} />}
       <div className="flex flex-wrap gap-2">
-        <button type="submit" className="ak-btn ak-btn-primary" disabled={dis || Boolean(paramsError)} title={canWrite ? undefined : "Owner only"}>
+        <button type="submit" className="ak-btn ak-btn-primary" disabled={dis || Boolean(paramsError) || !draft.category} title={canWrite ? undefined : "Owner only"}>
           {busy ? "Saving…" : editing ? "Save item" : "Add item"}
         </button>
         <button type="button" className="ak-btn ak-btn-secondary" onClick={onClose} disabled={busy}>

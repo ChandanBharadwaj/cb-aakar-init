@@ -6,15 +6,21 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatPaise } from "@aakar/design-tokens";
 import { api, toProblem } from "@/lib/api/client";
-import { boundsMm, glbUrl, type DesignVersion, type Problem, type TemplateDescriptor } from "@/lib/api/types";
+import { boundsMm, glbUrl, type DesignVersion, type Environment, type Experience, type Family, type PrintabilityReport, type Problem, type TemplateDescriptor } from "@/lib/api/types";
+import { duniyaPreset, presetStyle, STYLE_LABELS, type DuniyaPreset } from "@/lib/experiences";
+import { allowedMaterialIds, hardwareNames, isRawFamily, namedHardware, RAW_FAMILY_ID } from "@/lib/families";
+import { familyLabel, featuresForSubmit, featuresFromSpec, hasContentSlot, missingContent, missingContentLine, sameFeatures } from "@/lib/features";
 import { formatGrams, formatMm, formatPrintTime } from "@/lib/format";
+import { REJECTED_COPY } from "@/lib/uploads";
 import { environmentLabel } from "@/lib/viewer/environments";
 import { useCartStore } from "@/store/cart";
-import { selectActiveVersion, selectMaterial, useDesignStore } from "@/store/design";
+import { selectActiveVersion, selectMaterial, uploadHold, useDesignStore } from "@/store/design";
 import { toast } from "@/store/toast";
 import { BloomLoader } from "@/components/brand/BloomLoader";
 import { MandalaSpinner } from "@/components/brand/MandalaSpinner";
 import { StageNav } from "@/components/nav/StageNav";
+import { ContentSlotPanel } from "@/components/design/ContentSlotPanel";
+import { DuniyaChip } from "@/components/duniya/DuniyaChip";
 import { FinishChips } from "@/components/ui/FinishChips";
 import { ParamSliders } from "@/components/ui/ParamSliders";
 import { PriceBreakdown } from "@/components/ui/PriceBreakdown";
@@ -38,9 +44,36 @@ export interface DesignStudioProps {
   designId: string;
   /** `?job=` from the URL: the generation job to follow. */
   jobId?: string;
+  /**
+   * `?duniya=` from the URL: the slug of the Duniya experience the piece is made for. Without it the studio falls back
+   * to the design's own `experience_id`.
+   */
+  duniya?: string;
 }
 
 type LoadStatus = "loading" | "ready" | "error";
+
+/** `/design/{id}` with the job to follow and the Duniya slug kept, so a reload lands on the same themed studio. */
+function studioHref(designId: string, query: { job?: string; duniya?: string }): string {
+  const params = new URLSearchParams();
+  if (query.job) params.set("job", query.job);
+  if (query.duniya) params.set("duniya", query.duniya);
+  const qs = params.toString();
+  return `/design/${designId}${qs ? `?${qs}` : ""}`;
+}
+
+/**
+ * The Duniya a studio shows: the slug from the URL, else the experience the design was started from (looked up among
+ * the open experiences by id). Anything unknown, closed or unreachable presets nothing.
+ */
+async function resolveDuniya(slug: string | undefined, experienceId: string | null | undefined): Promise<DuniyaPreset | undefined> {
+  let experience: Experience | undefined;
+  if (slug) experience = await api.experiences.get(slug).catch(() => undefined);
+  if (!experience && experienceId) experience = (await api.experiences.list().catch(() => [] as Experience[])).find((x) => x.id === experienceId);
+  if (!experience) return undefined;
+  const environments = await api.environments.list().catch(() => undefined as Environment[] | undefined);
+  return duniyaPreset(experience, environments);
+}
 
 function sameParams(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
@@ -48,17 +81,29 @@ function sameParams(a: Record<string, unknown>, b: Record<string, unknown>): boo
   return true;
 }
 
-export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
+/**
+ * What a raw print that failed the check needs, pointed at the one control that fixes it: the size slider on the
+ * "Your form" card (Swaroop has no template sliders).
+ */
+function rawNudge(report: PrintabilityReport | undefined, minWallMm: number): string | undefined {
+  if (report?.passed !== false) return undefined;
+  if (report.checks.fits_bed?.status === "fail") return "It's too big for the printer; make it smaller with the size slider on Your form.";
+  return `Walls under ${formatMm(minWallMm, 1)} won't print; make it larger with the size slider on Your form.`;
+}
+
+export function DesignStudio({ designId, jobId: urlJobId, duniya: duniyaSlug }: DesignStudioProps) {
   const router = useRouter();
   const store = useDesignStore();
   const [status, setStatus] = useState<LoadStatus>("loading");
   const [problem, setProblem] = useState<Problem>();
   const [template, setTemplate] = useState<TemplateDescriptor>();
+  const [family, setFamily] = useState<Family>();
   const [modelNotice, setModelNotice] = useState<string>();
   const [sculptProblem, setSculptProblem] = useState<Problem>();
   const [sculpting, setSculpting] = useState(false);
   const [adding, setAdding] = useState(false);
   const [addProblem, setAddProblem] = useState<Problem>();
+  const [duniya, setDuniya] = useState<DuniyaPreset>();
   const cartCount = useCartStore((s) => s.count);
 
   const reload = useCallback(async () => {
@@ -81,6 +126,7 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
     setStatus("loading");
     setProblem(undefined);
     setTemplate(undefined);
+    setFamily(undefined);
     setModelNotice(undefined);
 
     api.catalog.materials().then((m) => !cancelled && m.length > 0 && s.setMaterials(m)).catch(() => undefined);
@@ -111,6 +157,34 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
   const material = selectMaterial(store);
   const job = store.job;
 
+  // The Avatar this piece belongs to (design, version, or the spec's family id), fetched lazily for its codename and rules.
+  const familyId = design?.family_id ?? activeVersion?.family_id ?? activeVersion?.spec.family;
+  useEffect(() => {
+    if (!familyId) return;
+    let cancelled = false;
+    api.families
+      .get(familyId)
+      .then((f) => !cancelled && setFamily(f))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [familyId]);
+
+  // The Duniya this piece is made for: its backdrop on the stage, its motif pack first in Buti, its chip in the panel.
+  const experienceId = design?.experience_id;
+  useEffect(() => {
+    if (!duniyaSlug && !experienceId) {
+      setDuniya(undefined);
+      return;
+    }
+    let cancelled = false;
+    resolveDuniya(duniyaSlug, experienceId).then((d) => !cancelled && setDuniya(d));
+    return () => {
+      cancelled = true;
+    };
+  }, [duniyaSlug, experienceId]);
+
   // Follow the job from the URL, or the one the design says is still generating.
   const effectiveJobId = urlJobId ?? (design?.status === "generating" ? design.latest_version?.job_id : undefined);
 
@@ -131,7 +205,7 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
       } catch (err) {
         setProblem(toProblem(err));
       }
-      router.replace(`/design/${designId}`);
+      router.replace(studioHref(designId, { duniya: duniyaSlug }));
     },
   });
 
@@ -171,22 +245,48 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
   const prevVersion = versionIndex > 0 ? versionsAsc[versionIndex - 1] : undefined;
   const nextVersion = versionIndex >= 0 ? versionsAsc[versionIndex + 1] : undefined;
 
-  const dirty = activeVersion ? !sameParams(store.paramsDraft, activeVersion.spec.params) : false;
+  // Swaroop: no template params; its size and orientation live on the one hero form, which can't be removed.
+  const raw = familyId === RAW_FAMILY_ID || (family ? isRawFamily(family) : false);
+
+  // Dirty when the sliders or the Chhaap (as it would be sent) differ from the version on stage; one Sculpt sends both.
+  const sending = useMemo(() => featuresForSubmit(store.featuresDraft), [store.featuresDraft]);
+  const paramsDirty = activeVersion && !raw ? !sameParams(store.paramsDraft, activeVersion.spec.params) : false;
+  const featuresDirty = activeVersion ? !sameFeatures(sending, featuresFromSpec(activeVersion.spec)) : false;
+  const dirty = paramsDirty || featuresDirty;
   const busy = Boolean(job && job.stage !== "failed");
+  const hold = uploadHold(store.featuresDraft, store.uploads);
+  const needsForm = raw && !store.featuresDraft.some((f) => f.type === "hero_mesh");
+  // A spot the piece can't be made without (an anchor's `required`: Roshni's photo) must keep its content.
+  const need = template && !raw ? missingContentLine(missingContent(template, sending), template) : undefined;
+
+  // Finishes: the family's material_rules and the template's list, the same rule the composers apply.
+  const allowedFinishes = useMemo(() => allowedMaterialIds(store.materials, family, template), [store.materials, family, template]);
+  useEffect(() => {
+    if (!material || allowedFinishes.length === 0 || allowedFinishes.includes(material.id)) return;
+    const first = allowedFinishes[0];
+    if (first) useDesignStore.getState().selectMaterial(first);
+  }, [material, allowedFinishes]);
 
   async function sculpt() {
-    if (!activeVersion || !material) return;
+    if (!activeVersion || !material || hold || needsForm || need) return;
     setSculpting(true);
     setSculptProblem(undefined);
     try {
-      const accepted = await api.versions.editParams(activeVersion.id, { params: store.paramsDraft, material: material.id });
+      const accepted = await api.versions.editParams(activeVersion.id, { params: raw ? {} : store.paramsDraft, material: material.id, features: sending });
       useDesignStore.getState().startJob(accepted.job_id);
-      router.replace(`/design/${designId}?job=${encodeURIComponent(accepted.job_id)}`);
+      router.replace(studioHref(designId, { job: accepted.job_id, duniya: duniyaSlug }));
     } catch (err) {
       setSculptProblem(toProblem(err));
     } finally {
       setSculpting(false);
     }
+  }
+
+  function undo() {
+    if (!activeVersion) return;
+    const s = useDesignStore.getState();
+    s.resetParams(activeVersion.spec.params);
+    s.resetFeatures(activeVersion.spec);
   }
 
   const price = store.price.status === "ready" ? store.price.price : store.price.status === "loading" || store.price.status === "error" ? store.price.previous : undefined;
@@ -218,14 +318,39 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
 
   const bounds = boundsMm(activeVersion);
   const model = glbUrl(activeVersion);
-  const environment = template?.environment;
+  // A Duniya's backdrop wins when the viewer has its preset; otherwise the piece keeps its own.
+  const environment = duniya?.environment ?? template?.environment ?? family?.environment;
+  // The look on stage and in the Chhaap: the design's own style, else (while it carries none) the Duniya's preset when
+  // the template offers it. comic_pop draws the piece cel-shaded with ink outlines.
+  const specLook = activeVersion?.spec.style;
+  const look = specLook && specLook !== "none" ? specLook : presetStyle(duniya?.style, template);
+  const hardware = hardwareNames(namedHardware(activeVersion?.hardware, family));
+  const minWall = template?.constraints.min_wall_mm ?? activeVersion?.spec.constraints?.min_wall_mm ?? 1.2;
+  const nudge = raw && !busy ? rawNudge(activeVersion?.printability, minWall) : undefined;
+
+  const eyebrow = family
+    ? familyLabel(family)
+    : design?.source === "shop"
+      ? "From the Shop"
+      : design?.source === "remix"
+        ? "Remix"
+        : design?.source === "upload"
+          ? "Print as it is"
+          : "Create";
+
+  const fromCreate = design?.source === "create" || design?.source === "upload";
+  const composerHref = familyId ? `/create/${encodeURIComponent(familyId)}${duniya ? `?duniya=${encodeURIComponent(duniya.slug)}` : ""}` : undefined;
+  const backHref = design?.catalog_item_slug ? `/shop/${design.catalog_item_slug}` : fromCreate && composerHref ? composerHref : "/shop";
+  const backLabel = design?.catalog_item_slug ? "Back to the Shop" : fromCreate && familyId ? "Back to Create" : "Back to the Shop";
 
   const tryAgainHref =
     design?.source === "shop" && design.catalog_item_slug
       ? `/design/new?item=${encodeURIComponent(design.catalog_item_slug)}`
-      : template
-        ? `/design/new?template=${encodeURIComponent(template.id)}`
-        : "/shop";
+      : fromCreate && composerHref
+        ? composerHref
+        : template
+          ? `/design/new?template=${encodeURIComponent(template.id)}`
+          : "/shop";
 
   if (status === "loading") {
     return (
@@ -250,7 +375,7 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
   return (
     <StageShell
       nav={
-        <StageNav section="Create" backHref={design.catalog_item_slug ? `/shop/${design.catalog_item_slug}` : "/shop"} backLabel="Back to the Shop">
+        <StageNav section="Create" backHref={backHref} backLabel={backLabel}>
           <div className="flex items-center gap-1 text-xs text-surface-muted" aria-label="Versions">
             <button
               type="button"
@@ -278,14 +403,16 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
       }
     >
       <div className="grid flex-1 grid-cols-1 lg:flex-none lg:h-[calc(100dvh-64px)] lg:min-h-0 lg:grid-cols-[280px_minmax(0,1fr)_312px] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden">
-        {/* Left: title, karigar's note, params */}
+        {/* Left: title, karigar's note, params, the Chhaap */}
         <aside className="ak-panel order-3 grid content-start gap-5 border-t border-surface-border p-5 lg:order-1 lg:min-h-0 lg:overflow-y-auto lg:border-r lg:border-t-0">
           <div className="grid gap-1.5">
-            <div className="ak-eyebrow">{design.source === "shop" ? "From the Shop" : design.source === "remix" ? "Remix" : "Create"}</div>
+            {duniya && <DuniyaChip duniya={duniya} />}
+            <div className="ak-eyebrow">{eyebrow}</div>
             <h1 className="font-display text-3xl font-semibold leading-tight">{design.title}</h1>
             {template && (
               <p className="text-xs text-surface-muted">
-                {template.name} · {environmentLabel(environment)}
+                {template.name} · {duniya?.environment ? duniya.environmentLabel : environmentLabel(environment)}
+                {look ? ` · ${STYLE_LABELS[look]}` : ""}
               </p>
             )}
           </div>
@@ -299,24 +426,61 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
 
           {template ? (
             <>
-              <ParamSliders
-                params={template.params}
-                values={store.paramsDraft}
-                onChange={(k, v) => useDesignStore.getState().setParam(k, v)}
-                disabled={busy || sculpting}
-              />
+              {/* Swaroop's size and orientation sit on the "Your form" card; its template has no sliders of its own. */}
+              {!raw && (
+                <ParamSliders
+                  params={template.params}
+                  values={store.paramsDraft}
+                  onChange={(k, v) => useDesignStore.getState().setParam(k, v)}
+                  disabled={busy || sculpting}
+                />
+              )}
+              {hasContentSlot(template) && (
+                <ContentSlotPanel
+                  template={template}
+                  family={family}
+                  features={store.featuresDraft}
+                  onChange={(edit) => useDesignStore.getState().updateFeatures(edit)}
+                  motifPack={duniya?.motifPack}
+                  motifPackLabel={duniya?.codename}
+                  raw={raw}
+                  look={look}
+                  disabled={busy || sculpting}
+                />
+              )}
               <div className="grid gap-2">
-                <button type="button" className="ak-btn ak-btn-primary" onClick={sculpt} disabled={!dirty || busy || sculpting || !activeVersion} aria-busy={sculpting}>
+                <button
+                  type="button"
+                  className="ak-btn ak-btn-primary"
+                  onClick={sculpt}
+                  disabled={!dirty || busy || sculpting || !activeVersion || Boolean(hold) || needsForm || Boolean(need)}
+                  aria-busy={sculpting}
+                >
                   {sculpting ? "Sending to the studio…" : "Sculpt"}
                 </button>
+                {(hold || needsForm || need) && (
+                  <p role="status" className="text-[11px] leading-snug text-warning">
+                    {hold === "checking"
+                      ? "The studio is checking a file you added. Sculpt opens as soon as it's cleared."
+                      : hold === "rejected"
+                        ? "A file you added can't be printed. Choose a different one to sculpt."
+                        : needsForm
+                          ? "Add your model file to sculpt."
+                          : need}
+                  </p>
+                )}
                 {dirty && activeVersion && (
-                  <button type="button" className="ak-btn ak-btn-secondary min-h-9 text-xs" onClick={() => useDesignStore.getState().resetParams(activeVersion.spec.params)} disabled={busy}>
+                  <button type="button" className="ak-btn ak-btn-secondary min-h-9 text-xs" onClick={undo} disabled={busy}>
                     Undo changes
                   </button>
                 )}
                 {sculptProblem && (
                   <p role="alert" className="text-xs text-danger">
-                    {sculptProblem.detail ?? sculptProblem.title}
+                    {sculptProblem.code === "upload_not_ready"
+                      ? "The studio is still checking a file you added. You can sculpt as soon as it's cleared."
+                      : sculptProblem.code === "upload_rejected"
+                        ? REJECTED_COPY
+                        : (sculptProblem.detail ?? sculptProblem.title)}
                   </p>
                 )}
               </div>
@@ -333,6 +497,7 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
               glbUrl={model}
               pbr={(material ?? store.materials[0])?.pbr ?? { color: "#C4785A", roughness: 0.3, metalness: 0.1 }}
               environment={environment}
+              look={look}
               dimmed={busy}
               onModelError={() => setModelNotice("The preview couldn't be loaded, so you're looking at a stand-in form.")}
             />
@@ -369,7 +534,9 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
               {job.stage === "failed" ? (
                 <div className="ak-card grid max-w-sm gap-4 p-6 text-center">
                   <div className="font-display text-2xl font-semibold">Something went wrong</div>
-                  <p className="text-sm text-surface-muted">{job.message || "The studio couldn't finish this version."}</p>
+                  <p className="text-sm text-surface-muted">
+                    {job.errorCode === "content_unusable" ? "We couldn't repair this file. Try another export from your 3D program." : job.message || "The studio couldn't finish this version."}
+                  </p>
                   {job.errorCode && <span className="font-mono text-[11px] text-surface-muted">{job.errorCode}</span>}
                   <div className="flex justify-center gap-2">
                     <Link href={tryAgainHref} className="ak-btn ak-btn-primary ak-btn-pill">
@@ -380,7 +547,7 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
                       className="ak-btn ak-btn-secondary ak-btn-pill"
                       onClick={() => {
                         useDesignStore.getState().clearJob();
-                        router.replace(`/design/${designId}`);
+                        router.replace(studioHref(designId, { duniya: duniyaSlug }));
                       }}
                     >
                       Keep looking
@@ -399,15 +566,21 @@ export function DesignStudio({ designId, jobId: urlJobId }: DesignStudioProps) {
 
         {/* Right: finishes, stats, stability, price */}
         <aside className="ak-panel order-2 grid content-start gap-4 border-t border-surface-border p-5 lg:order-3 lg:min-h-0 lg:overflow-y-auto lg:border-l lg:border-t-0">
-          <FinishChips materials={store.materials} value={material?.id} onChange={(id) => useDesignStore.getState().selectMaterial(id)} allowed={template?.materials} disabled={sculpting} />
+          <FinishChips materials={store.materials} value={material?.id} onChange={(id) => useDesignStore.getState().selectMaterial(id)} allowed={allowedFinishes} disabled={sculpting} />
 
           <div className="ak-well grid gap-1.5 p-3.5">
             <Stat label="Height" value={bounds ? formatMm(bounds[2]) : undefined} hint={bounds ? `${formatMm(bounds[0])} × ${formatMm(bounds[1])} × ${formatMm(bounds[2])}` : undefined} />
             <Stat label="Weight" value={price ? formatGrams(price.mass_g) : undefined} />
             <Stat label="Print time" value={activeVersion?.print_estimate ? formatPrintTime(activeVersion.print_estimate.print_seconds) : undefined} />
+            {hardware && <Stat label="Comes with" value={hardware} />}
           </div>
 
           <StabilityCard report={activeVersion?.printability} pending={busy || activeVersion?.status === "generating"} />
+          {nudge && (
+            <p role="status" className="text-xs leading-snug text-warning">
+              {nudge}
+            </p>
+          )}
 
           <PriceBreakdown price={price} loading={store.price.status === "loading"} error={store.price.status === "error" ? store.price.detail : undefined} />
 

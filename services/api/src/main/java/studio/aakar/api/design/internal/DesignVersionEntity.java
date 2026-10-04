@@ -9,6 +9,9 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -16,7 +19,11 @@ import org.hibernate.type.SqlTypes;
 import studio.aakar.api.design.VersionStatus;
 import studio.aakar.api.studio.DesignCompletedPayload;
 
-/** Immutable once ready: only the generation outcome is written after creation. */
+/**
+ * Immutable once ready: only the generation outcome is written after creation. {@code hardware} ({@code [{sku, qty}]},
+ * per piece) starts as what the template descriptor (else the family default) says and is replaced by the geometry
+ * result's {@code hardware} when that reports any.
+ */
 @Entity
 @Table(name = "design_versions")
 class DesignVersionEntity {
@@ -53,6 +60,9 @@ class DesignVersionEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "print_estimate", columnDefinition = "jsonb")
     private Map<String, Object> printEstimate;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb", nullable = false)
+    private List<Map<String, Object>> hardware = new ArrayList<>();
     @Column(name = "karigar_note")
     private String karigarNote;
     @Column(name = "job_id")
@@ -66,13 +76,14 @@ class DesignVersionEntity {
     }
 
     DesignVersionEntity(UUID designId, int versionNo, UUID parentVersionId, Map<String, Object> spec,
-            Map<String, Object> template, String createdBy, Instant now) {
+            Map<String, Object> template, List<Map<String, Object>> hardware, String createdBy, Instant now) {
         this.designId = designId;
         this.versionNo = versionNo;
         this.parentVersionId = parentVersionId;
         this.status = VersionStatus.generating;
         this.spec = spec;
         this.template = template;
+        this.hardware = hardware == null ? new ArrayList<>() : new ArrayList<>(hardware);
         this.createdBy = createdBy;
         this.createdAt = now;
     }
@@ -121,6 +132,11 @@ class DesignVersionEntity {
         return printEstimate;
     }
 
+    /** {@code [{sku, qty}]} per piece; never null. */
+    List<Map<String, Object>> hardware() {
+        return hardware == null ? List.of() : hardware;
+    }
+
     String karigarNote() {
         return karigarNote;
     }
@@ -154,6 +170,20 @@ class DesignVersionEntity {
         this.printability = result.printability();
         this.printEstimate = result.printEstimate();
         this.karigarNote = result.karigarNote();
+        if (result.hardware() != null && !result.hardware().isEmpty()) {
+            List<Map<String, Object>> reported = new ArrayList<>();
+            for (DesignCompletedPayload.Hardware part : result.hardware()) {
+                if (part != null && part.sku() != null && !part.sku().isBlank() && part.qty() > 0) {
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("sku", part.sku());
+                    row.put("qty", part.qty());
+                    reported.add(row);
+                }
+            }
+            if (!reported.isEmpty()) {
+                this.hardware = reported;
+            }
+        }
     }
 
     void markFailed() {

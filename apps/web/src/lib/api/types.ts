@@ -9,7 +9,7 @@ type Schemas = components["schemas"];
 export type Problem = components["responses"]["Problem"]["content"]["application/problem+json"];
 
 export type CatalogItem = Schemas["CatalogItem"];
-export type CatalogCategory = CatalogItem["category"];
+export type Shelf = Schemas["Shelf"];
 export type Material = Schemas["Material"];
 export type MaterialPbr = Material["pbr"];
 export type CreateDesignRequest = Schemas["CreateDesignRequest"];
@@ -22,12 +22,34 @@ export type Stage = JobStageEvent["stage"];
 
 export type TemplateDescriptor = Omit<Schemas["template-descriptor.v1"], "$defs">;
 export type TemplateParam = Schemas["param"];
+export type TemplateAnchor = Schemas["anchor"];
 export type DesignSpec = Omit<Schemas["design-spec.v1"], "$defs">;
 export type PrintabilityReport = Omit<Schemas["printability-report.v1"], "$defs">;
 export type PrintabilityCheck = Schemas["check"];
 export type PrintabilityCheckId = keyof PrintabilityReport["checks"];
 export type PrintEstimate = Schemas["print-estimate.v1"];
 export type PriceBreakdown = Schemas["price-breakdown.v1"];
+export type PriceLine = PriceBreakdown["lines"][number];
+
+// Outcome categories (Avatars), their bought-in hardware and customer uploads (the Chhaap).
+export type HardwareRef = Schemas["HardwareRef"];
+/** An Avatar; `templates` carries the live descriptors of the family (the `$defs` block stripped as above). */
+export type Family = Omit<Schemas["Family"], "templates"> & { templates: TemplateDescriptor[] };
+export type FamilyKind = Family["kind"];
+export type Upload = Schemas["Upload"];
+export type UploadKind = Upload["kind"];
+export type EditParamsRequest = paths["/api/versions/{versionId}/params"]["post"]["requestBody"]["content"]["application/json"];
+
+// Duniya (experiences), Mahaul (viewer backdrops) and the Buti motif library.
+/** An experience (Duniya); `avatars` are its orderable families in the experience's order, shaped like `Family`. */
+export type Experience = Omit<Schemas["Experience"], "avatars"> & { avatars: Family[] };
+export type ExperienceStyle = Experience["style"];
+export type ExperienceSurface = Schemas["ExperienceSurface"];
+export type SeasonWindow = Schemas["SeasonWindow"];
+/** A viewer backdrop (Mahaul): `preset_key` names the storefront viewer preset that renders it. */
+export type Environment = Schemas["Environment"];
+/** An entry of the Buti library (`GET /api/motifs`). The `motif` feature placed on a piece is `MotifFeature` in `@/lib/features`. */
+export type Motif = Schemas["Motif"];
 
 // Phase 1 (ADR-0013): identity, cart, checkout, orders, payments.
 export type User = Schemas["User"];

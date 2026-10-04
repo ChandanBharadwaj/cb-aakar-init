@@ -5,8 +5,8 @@ import { Canvas, useThree } from "@react-three/fiber";
 import { ContactShadows, OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import type { MaterialPbr } from "@/lib/api/types";
-import { physicalMaterialFrom } from "@/lib/viewer/materials";
-import { environmentBackground, presetFor } from "@/lib/viewer/environments";
+import { INK_OUTLINE, isCelShaded, materialFor } from "@/lib/viewer/materials";
+import { environmentBackdrop, environmentShadow, presetFor } from "@/lib/viewer/environments";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { Model, type ModelFrame } from "./Model";
 import { PlaceholderForm } from "./PlaceholderForm";
@@ -35,10 +35,20 @@ export interface DesignViewerProps {
   glbUrl?: string;
   pbr: MaterialPbr;
   environment?: string;
+  /**
+   * The piece's style variant (its `spec.style`, or a Duniya's preset while composing): `comic_pop` draws it
+   * cel-shaded with ink outlines; every other style keeps the PBR finish.
+   */
+  look?: string;
   /** Dim the stage (a new version is being sculpted). */
   dimmed?: boolean;
   /** Called when the GLB fails to load; the viewer falls back to the stand-in form. */
   onModelError?(error: Error): void;
+  /**
+   * A still stage (a Duniya page's strip): no orbit controls or double-click reset, frames drawn on demand rather than
+   * every tick, and hidden from assistive tech (the caller labels the strip).
+   */
+  still?: boolean;
   className?: string;
 }
 
@@ -77,7 +87,19 @@ function CameraRig({ resetKey, frame }: { resetKey: number; frame: ModelFrame | 
   );
 }
 
-export function DesignViewer({ glbUrl, pbr, environment, dimmed, onModelError, className }: DesignViewerProps) {
+/** The still stage's fixed view: the default camera aimed at the stand-in form. */
+function StillCamera() {
+  const camera = useThree((s) => s.camera);
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => {
+    camera.position.set(...CAMERA_POS);
+    camera.lookAt(...TARGET);
+    invalidate();
+  }, [camera, invalidate]);
+  return null;
+}
+
+export function DesignViewer({ glbUrl, pbr, environment, look, dimmed, onModelError, still, className }: DesignViewerProps) {
   const [resetKey, setResetKey] = useState(0);
   const [frame, setFrame] = useState<ModelFrame | null>(null);
   const onFramed = useCallback((next: ModelFrame) => {
@@ -87,17 +109,18 @@ export function DesignViewer({ glbUrl, pbr, environment, dimmed, onModelError, c
         : next,
     );
   }, []);
-  const material = useMemo(() => physicalMaterialFrom(pbr), [pbr]);
+  const celShaded = isCelShaded(look);
+  const material = useMemo(() => materialFor(pbr, celShaded ? look : undefined), [pbr, celShaded, look]);
   useEffect(() => () => material.dispose(), [material]);
+  const outline = celShaded ? INK_OUTLINE : undefined;
 
   const preset = presetFor(environment);
-  const backdrop = environmentBackground(environment);
 
   return (
     <div
       className={["relative h-full w-full select-none", className].filter(Boolean).join(" ")}
       style={{
-        background: `radial-gradient(60% 55% at 50% 62%, rgba(216,174,91,.16), transparent 70%), linear-gradient(180deg, ${backdrop} 0%, #1B2238 100%)`,
+        background: environmentBackdrop(environment),
         transition: "opacity var(--ak-motion-slow) var(--ak-ease), filter var(--ak-motion-slow) var(--ak-ease)",
         opacity: dimmed ? 0.55 : 1,
         filter: dimmed ? "saturate(.6)" : "none",
@@ -105,26 +128,28 @@ export function DesignViewer({ glbUrl, pbr, environment, dimmed, onModelError, c
     >
       <Canvas
         dpr={[1, 1.75]}
+        frameloop={still ? "demand" : "always"}
         camera={{ position: CAMERA_POS, fov: 34, near: 0.05, far: 50 }}
         gl={{ antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
-        onDoubleClick={() => setResetKey((k) => k + 1)}
-        aria-label="3D preview of your piece. Drag to turn, scroll to zoom, double-click to reset."
-        role="img"
+        onDoubleClick={still ? undefined : () => setResetKey((k) => k + 1)}
+        aria-label={still ? undefined : "3D preview of your piece. Drag to turn, scroll to zoom, double-click to reset."}
+        aria-hidden={still || undefined}
+        role={still ? undefined : "img"}
       >
         <StageEnvironment preset={preset} />
         <group position={[0, 0, 0]}>
           {glbUrl ? (
-            <ErrorBoundary fallback={<PlaceholderForm material={material} />} onError={onModelError} resetKey={glbUrl}>
+            <ErrorBoundary fallback={<PlaceholderForm material={material} outline={outline} />} onError={onModelError} resetKey={glbUrl}>
               <Suspense fallback={<PlaceholderForm material={material} ghost />}>
-                <Model url={glbUrl} material={material} onFramed={onFramed} />
+                <Model url={glbUrl} material={material} outline={outline} onFramed={onFramed} />
               </Suspense>
             </ErrorBoundary>
           ) : (
-            <PlaceholderForm material={material} />
+            <PlaceholderForm material={material} outline={outline} />
           )}
         </group>
-        <ContactShadows position={[0, -0.001, 0]} opacity={0.55} scale={3.2} blur={2.6} far={1.4} resolution={512} color="#0E1220" frames={60} />
-        <CameraRig resetKey={resetKey} frame={glbUrl ? frame : null} />
+        <ContactShadows position={[0, -0.001, 0]} opacity={0.55} scale={3.2} blur={2.6} far={1.4} resolution={512} color={environmentShadow(environment)} frames={60} />
+        {still ? <StillCamera /> : <CameraRig resetKey={resetKey} frame={glbUrl ? frame : null} />}
       </Canvas>
     </div>
   );

@@ -14,8 +14,10 @@
     "description": { "type": "string" },
     "environment": {
       "type": "string",
-      "enum": ["studio", "teak_table_candlelight", "desk_oak", "dashboard", "kitchen_marble", "balcony_daylight"],
-      "default": "studio"
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "maxLength": 40,
+      "default": "studio",
+      "description": "Viewer backdrop: an environment id from the reference data (experience.v1.json environments, packages/design-tokens/experiences.json; GET /api/environments)."
     },
     "params": {
       "type": "object",
@@ -35,13 +37,32 @@
     "materials": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
     "style_variants": {
       "type": "array",
-      "items": { "type": "string", "enum": ["jaipur_heritage", "modern_zen", "cyber_desi", "warli_line"] },
+      "items": { "type": "string", "enum": ["jaipur_heritage", "modern_zen", "cyber_desi", "warli_line", "comic_pop"] },
       "default": []
     },
     "features_supported": {
       "type": "array",
-      "items": { "type": "string", "enum": ["emboss_text", "motif"] },
+      "items": { "type": "string", "enum": ["emboss_text", "motif", "relief_image", "hero_mesh"] },
       "default": []
+    },
+    "hardware": {
+      "type": "array",
+      "default": [],
+      "description": "Bought-in parts this template's pockets, holes and slots are cut for; authoritative over the family default.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sku", "qty"],
+        "properties": {
+          "sku": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "qty": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "min_feature_mm": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Smallest printable stroke or detail (0.8 mm for a 0.4 mm nozzle); text and silhouette checks use it."
     }
   },
   "$defs": {
@@ -70,11 +91,40 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["id", "label", "projection"],
+      "description": "A named place where content may land: a surface (text, motif, relief) or a volume (a customer's own 3D form). size_mm/bounds_mm are the 3D analogue of a print area; bleed_mm the safe margin inside it.",
       "properties": {
         "id": { "type": "string" },
         "label": { "type": "string" },
+        "kind": { "type": "string", "enum": ["surface", "volume"], "default": "surface" },
         "projection": { "type": "string", "enum": ["planar", "cylindrical", "conformal"] },
-        "max_text_height_mm": { "type": "number" }
+        "max_text_height_mm": { "type": "number" },
+        "size_mm": {
+          "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 2, "maxItems": 2,
+          "description": "Printable width and height of a surface anchor."
+        },
+        "bleed_mm": { "type": "number", "minimum": 0, "default": 0, "description": "Content stays inside size_mm minus twice the bleed." },
+        "bounds_mm": {
+          "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 3, "maxItems": 3,
+          "description": "Width, depth and height of a volume anchor; content is scaled to fit."
+        },
+        "accepts": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["emboss_text", "motif", "relief_image", "hero_mesh"] },
+          "description": "Feature types allowed on this anchor; defaults to the template's features_supported."
+        },
+        "max_relief_mm": { "type": "number", "minimum": 0.4, "description": "At least 0.4 mm, the shallowest text depth, so every accepted feature can fit. Cap for relief_image.relief_mm (emboss and deboss) and emboss depth on this anchor. relief_image in lithophane mode is exempt: the plate itself is the relief and the template's lithophane hook owns its thickness range." },
+        "modes": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["emboss", "deboss", "lithophane"] },
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "The only modes content may take on this anchor: raised (emboss), cut in (deboss) or the photo as the plate itself (lithophane), e.g. [\"deboss\"] on a frame that prints face down, [\"lithophane\"] on a night-light plate. Absent: every mode the feature type allows. A feature that leaves mode out takes its type's default (emboss_text and relief_image emboss, motif deboss), which must then be listed, so clients send the mode explicitly."
+        },
+        "required": {
+          "type": "boolean",
+          "default": false,
+          "description": "The piece cannot be built without content on this anchor (the night-light plate needs its photo). Clients ask for it up front; the API and the geometry service refuse a design without it."
+        }
       }
     }
   }

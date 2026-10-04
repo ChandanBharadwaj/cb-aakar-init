@@ -165,6 +165,115 @@ class PriceCalculatorTest {
         assertThat(calculator.price(BOARD_EXAMPLE, TERRACOTTA_SILK).policyVersion()).isEqualTo("2026-09-phase0");
     }
 
+    // ---- outcome families: hardware, setup and the family minimum (plan §5) -------------------------------------------
+
+    /** The seed policy of 2026-10-carriers: 30 % hardware markup, keychain minimum ₹249, raw print minimum ₹349 + ₹99 setup. */
+    static final PricingPolicy CARRIERS = new PricingPolicy("2026-10-carriers", 20000, Map.of("matte", 8000L, "silk", 12000L), 0, 0, 9, 7900, 99900,
+            "Shipping · Delhivery, 4 days", 30, Map.of(
+                    "keychain", new PricingPolicy.FamilyRule(24_900, 0, List.of()),
+                    "raw_print", new PricingPolicy.FamilyRule(34_900, 9_900, List.of())));
+    static final PriceInputs.Hardware SPLIT_RING = new PriceInputs.Hardware("split_ring_25", "Steel split ring 25 mm", 1, 300);
+    static final PriceInputs.PrintEstimate CONTRACTS_EXAMPLE = new PriceInputs.PrintEstimate(13_200, 51.6);
+    static final PriceInputs.PrintEstimate TINY = new PriceInputs.PrintEstimate(1_800, 10);
+
+    private final PriceCalculator carriers = new PriceCalculator(fixed(CARRIERS));
+
+    @Test
+    void boardExampleIsUnchangedUnderTheCarriersPolicyWithoutAContext() {
+        PriceBreakdown price = carriers.price(BOARD_EXAMPLE, TERRACOTTA_SILK);
+        assertThat(price.subtotalPaise()).isEqualTo(124_900); // ₹1,249: the markup and the rules need a family and hardware
+        assertThat(price.lines()).extracting(PriceBreakdown.Line::code).containsExactly("material", "machine_time", "finishing");
+        assertThat(price.familyId()).isNull();
+        assertThat(price.minimumSubtotalPaise()).isNull();
+        // a family without rules and without hardware prices exactly the same, only named
+        PriceBreakdown stand = carriers.price(BOARD_EXAMPLE, TERRACOTTA_SILK, new PriceInputs.Context("phone_stand", List.of()));
+        assertThat(stand.subtotalPaise()).isEqualTo(124_900);
+        assertThat(stand.lines()).isEqualTo(price.lines());
+        assertThat(stand.familyId()).isEqualTo("phone_stand");
+    }
+
+    @Test
+    void hardwareIsOneLineAtCostPlusTheMarkup() {
+        PriceBreakdown price = carriers.price(CONTRACTS_EXAMPLE, TERRACOTTA_SILK, new PriceInputs.Context("keychain", List.of(SPLIT_RING)));
+
+        PriceBreakdown.Line hardware = line(price, "hardware");
+        assertThat(hardware.label()).isEqualTo("Steel split ring 25 mm · 1");
+        assertThat(hardware.amountPaise()).isEqualTo(400);  // ₹3 × 1.3 = ₹3.90 → ₹4
+        assertThat(hardware.detail()).isEqualTo("split_ring_25 × 1 at ₹3 + 30% sourcing");
+        assertThat(price.lines()).extracting(PriceBreakdown.Line::code).containsExactly("material", "machine_time", "finishing", "hardware");
+        assertThat(price.subtotalPaise()).isEqualTo(115_900);  // 296 + 733 + 120 + 4 = 1153 → 1159, above the ₹249 minimum
+        assertThat(price.minimumSubtotalPaise()).isNull();
+        assertThat(price.familyId()).isEqualTo("keychain");
+
+        PriceBreakdown two = carriers.price(CONTRACTS_EXAMPLE, TERRACOTTA_SILK, new PriceInputs.Context("fridge_magnet", List.of(
+                new PriceInputs.Hardware("magnet_d10x3", "Neodymium disc magnet 10 × 3 mm", 2, 1500), SPLIT_RING)));
+        assertThat(line(two, "hardware").label()).isEqualTo("Neodymium disc magnet 10 × 3 mm · 2 + Steel split ring 25 mm · 1");
+        assertThat(line(two, "hardware").amountPaise()).isEqualTo(4_300); // (2 × ₹15 + ₹3) × 1.3 = ₹42.90 → ₹43
+        assertThat(two.lines().stream().filter(l -> l.code().equals("hardware"))).hasSize(1);
+
+        // without a markup the parts cost what they cost
+        PricingPolicy noMarkup = new PricingPolicy("t", 20000, Map.of("silk", 12000L), 0, 0, 9, 7900, 99900, "Shipping", 0, Map.of());
+        assertThat(line(carriers.price(CONTRACTS_EXAMPLE, TERRACOTTA_SILK, noMarkup, new PriceInputs.Context("keychain", List.of(SPLIT_RING))),
+                "hardware").amountPaise()).isEqualTo(300);
+    }
+
+    @Test
+    void theSetupFeeIsItsOwnLine() {
+        PriceBreakdown price = carriers.price(new PriceInputs.PrintEstimate(5_400, 20), BASIC_WHITE, new PriceInputs.Context("raw_print", List.of()));
+
+        assertThat(price.lines()).extracting(PriceBreakdown.Line::code).containsExactly("material", "machine_time", "finishing", "setup");
+        assertThat(line(price, "setup").label()).isEqualTo("Studio setup");
+        assertThat(line(price, "setup").amountPaise()).isEqualTo(9_900);
+        // 20 cm³ × 1.24 = 24.8 g × ₹3.80 = ₹94; 1.5 h × ₹200 = ₹300; matte ₹80; setup ₹99 → 573 → ₹579, above the ₹349 minimum
+        assertThat(price.subtotalPaise()).isEqualTo(57_900);
+        assertThat(price.minimumSubtotalPaise()).isNull();
+        assertThat(price.lines()).extracting(PriceBreakdown.Line::code).doesNotContain("hardware");
+    }
+
+    @Test
+    void theFamilyMinimumLiftsASmallPiece() {
+        // ₹47 + ₹100 + ₹80 + ₹4 = ₹231 → ₹239, lifted to the keychain minimum of ₹249
+        PriceBreakdown keychain = carriers.price(TINY, BASIC_WHITE, new PriceInputs.Context("keychain", List.of(SPLIT_RING)));
+        assertThat(keychain.subtotalPaise()).isEqualTo(24_900);
+        assertThat(keychain.minimumSubtotalPaise()).isEqualTo(24_900);
+        assertThat(keychain.shippingPaise()).isEqualTo(7_900);
+        assertThat(keychain.totalPaise()).isEqualTo(32_800);
+        assertThat(keychain.lines().stream().mapToLong(PriceBreakdown.Line::amountPaise).sum()).isEqualTo(23_100); // the lines stay honest
+
+        // the raw minimum applies on top of the setup line: 47 + 100 + 80 + 99 = 326 → ₹329 → ₹349
+        PriceBreakdown raw = carriers.price(TINY, BASIC_WHITE, new PriceInputs.Context("raw_print", List.of()));
+        assertThat(raw.subtotalPaise()).isEqualTo(34_900);
+        assertThat(raw.minimumSubtotalPaise()).isEqualTo(34_900);
+
+        // a minimum that is not a price ending in 9 is rounded like any subtotal
+        PricingPolicy odd = new PricingPolicy("t", 20000, Map.of("matte", 8000L), 0, 0, 9, 7900, 99900, "Shipping", 0,
+                Map.of("keychain", new PricingPolicy.FamilyRule(25_000, 0, List.of())));
+        assertThat(carriers.price(TINY, BASIC_WHITE, odd, new PriceInputs.Context("keychain", List.of())).subtotalPaise()).isEqualTo(25_900);
+        assertThat(PriceCalculator.minimumSubtotal(odd, "keychain")).contains(25_900L);
+        assertThat(PriceCalculator.minimumSubtotal(odd, "fridge_magnet")).isEmpty();
+        assertThat(PriceCalculator.minimumSubtotal(odd, null)).isEmpty();
+        assertThat(carriers.minimumSubtotal("keychain")).contains(24_900L);
+    }
+
+    @Test
+    void aBreakdownWithHardwareSetupAndMinimumValidatesAgainstTheSchema() {
+        Path schema = Contracts.contracts("schemas/price-breakdown.v1.json");
+        Assumptions.assumeTrue(Files.exists(schema), () -> "Skipping: " + schema + " not found");
+        ObjectMapper json = Jackson2ObjectMapperBuilder.json().propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE).build();
+        PricingPolicy both = new PricingPolicy("t", 20000, Map.of("matte", 8000L), 0, 0, 9, 7900, 99900, "Shipping", 30,
+                Map.of("keychain", new PricingPolicy.FamilyRule(29_900, 1_900, List.of())));
+        JsonNode document = json.valueToTree(carriers.price(TINY, BASIC_WHITE, both, new PriceInputs.Context("keychain", List.of(SPLIT_RING))));
+
+        assertThat(Contracts.validate(schema, document)).isEmpty();
+        assertThat(document.get("family_id").asText()).isEqualTo("keychain");
+        assertThat(document.get("minimum_subtotal_paise").asLong()).isEqualTo(29_900); // 231 + 19 = 250 → ₹259, lifted to ₹299
+        assertThat(document.get("lines").findValuesAsText("code")).containsExactly("material", "machine_time", "finishing", "hardware", "setup");
+        // a print-only breakdown has neither field
+        JsonNode plain = json.valueToTree(calculator.price(BOARD_EXAMPLE, TERRACOTTA_SILK));
+        assertThat(plain.has("family_id")).isFalse();
+        assertThat(plain.has("minimum_subtotal_paise")).isFalse();
+    }
+
     /** A store pinned to one policy, for pure calculator tests. */
     static PricingPolicyStore fixed(PricingPolicy policy) {
         return new PricingPolicyStore() {

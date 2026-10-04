@@ -118,6 +118,338 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/catalog/shelves": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Shop shelves (catalog categories) in display order */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Shelves */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Shelf"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/families": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Outcome categories (Avatars) that are available and have a live template
+         * @description Feeds the Create picker ("Give your idea an Avatar"). Each family carries its consumer copy, size
+         *     envelope, bought-in hardware, material rules and content slot (Chhaap), plus the live template
+         *     descriptors of that family. The raw family (`kind: raw`, Swaroop) is included; Shop shelves never list it.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    kind?: "carrier" | "object" | "raw";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Families */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Family"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/families/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Family */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Family"];
+                    };
+                };
+                /** @description unknown_family */
+                404: components["responses"]["Problem"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/experiences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Experiences (Duniya) on the Shop, in display order
+         * @description The Shop's second persona, "Duniya · Experiences": themes that tie a stage backdrop, a default style and a motif
+         *     pack to a set of Avatars and curated Shop items. Only `available` experiences are listed, by `sort_order`.
+         *     `avatars` are the experience's families that can be ordered today (available and backed by a live template), in
+         *     the experience's order and in the shape of `GET /api/families`; `items` are its curated Shop items in order
+         *     (unavailable ones keep their Coming soon state). `price_from_paise` is the lowest floor among those avatars.
+         *     Needs the geometry service for readiness, like `GET /api/families` (503 `geometry_unavailable`).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Experiences */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Experience"][];
+                    };
+                };
+                /** @description geometry_unavailable */
+                503: components["responses"]["Problem"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/experiences/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Experience by URL slug
+         * @description Any experience, available or not (`available` says whether the Shop lists it), so a deep link such as
+         *     `/duniya/katha` can say "coming soon"; 404 `unknown_experience` otherwise.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    slug: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Experience */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Experience"];
+                    };
+                };
+                /** @description unknown_experience */
+                404: components["responses"]["Problem"];
+                /** @description geometry_unavailable */
+                503: components["responses"]["Problem"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/environments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Viewer backdrops (Mahaul) in display order
+         * @description The reference data behind every `environment` field (experiences, families, template descriptors, Shop items).
+         *     `preset_key` names the storefront viewer preset that renders the backdrop; presets are code, which backdrop a
+         *     piece uses is data.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Environments */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Environment"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/motifs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The Buti motif library (packages/design-tokens/motifs/index.json) with preview URLs
+         * @description Motifs a customer can place with a `motif` feature. `min_scale` is the smallest scale that still prints
+         *     (strokes and openings stay at least 0.8 mm); scale 1 fills the anchor's spot. Preview artwork is served at
+         *     `svg_url`.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Motifs */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Motif"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/motifs/{id}.svg": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Motif artwork (single-path SVG) for previews */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description SVG */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/svg+xml": string;
+                    };
+                };
+                /** @description unknown_motif */
+                404: components["responses"]["Problem"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/templates": {
         parameters: {
             query?: never;
@@ -192,6 +524,112 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload customer content (an image for a relief, or a model file for Swaroop or a hero form)
+         * @description `multipart/form-data` with `file` and `kind` (`image` | `model`). Images: png, jpg, webp, heic up to
+         *     15 MB. Models: stl, glb, 3mf, obj, ply, off, gltf up to 50 MB. Requires a known identity (user or
+         *     guest header). Uploads the content scanner flags answer with `status: pending_review` and cannot be
+         *     placed on a design until a reviewer approves them (409 `upload_not_ready`, 422 `upload_rejected`). The scanner
+         *     holds a file whose name mentions a content rule the studio manages in its portal (licensed heroes and brands,
+         *     the Katha guardrail), case, spaces and punctuation ignored.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "multipart/form-data": {
+                        /** Format: binary */
+                        file: string;
+                        /** @enum {string} */
+                        kind: "image" | "model";
+                    };
+                };
+            };
+            responses: {
+                /** @description Stored */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Upload"];
+                    };
+                };
+                /** @description Missing file or kind */
+                400: components["responses"]["Problem"];
+                /** @description No known identity (neither a signed-in user nor a guest header) */
+                401: components["responses"]["Problem"];
+                /** @description payload_too_large */
+                413: components["responses"]["Problem"];
+                /** @description Not a multipart request */
+                415: components["responses"]["Problem"];
+                /** @description unsupported_format, or upload_rejected when the scanner refuses the file outright, $ref: '#/components/responses/Problem' */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/uploads/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Upload */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Upload"];
+                    };
+                };
+                404: components["responses"]["Problem"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/designs": {
         parameters: {
             query?: never;
@@ -205,7 +643,20 @@ export interface paths {
          * Start a design
          * @description Shop path: `catalog_item_slug` (template and defaults come from the item).
          *     Remix-lite / direct path: `template_id` + optional `params`.
-         *     Create path: `prompt` → 422 until Phase 2.
+         *     Avatar path: `family_id` (+ optional `template_id`, else the family's default) + `features` (the Chhaap:
+         *     text, motif, a photo relief or the customer's own form referencing an upload).
+         *     Swaroop path: `source: upload`, `family_id: raw_print`, one `hero_mesh` feature.
+         *     Create path: `prompt` alone → 422 until Phase 2.
+         *     Any path may name the Duniya experience the customer came from (`experience_id`, 422 `unknown_experience`
+         *     otherwise); the design keeps it so the karigar's note and packaging card can name the theme, and takes the
+         *     experience's style as `spec.style` when the template offers it (`style_variants`), else `none`. Under
+         *     `comic_pop` a text or motif without a `mode` is raised where its anchor allows it, and a raised one without a
+         *     `depth_mm` stands 1.5 mm proud (capped at the anchor's `max_relief_mm`); explicit choices and photos are left alone.
+         *     Content is checked as the geometry service will build it: 422 `unsupported_feature` when a feature's mode (its
+         *     type's default when left out) is not in its anchor's `modes` (`params.field` = `features[i].mode`), 422
+         *     `validation_failed` when an anchor marked `required` has no content, and 422 `protected_term` when a text (Naam)
+         *     names a licensed hero or brand ("We can't print copyrighted heroes or their names, but your own hero is welcome.
+         *     Try your own hero's name."; the term is never echoed).
          *     Returns 202 with the design and the first generation job. Follow `/api/jobs/{id}/events`.
          */
         post: {
@@ -363,7 +814,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Edit parameters → new version (new job) */
+        /**
+         * Edit parameters → new version (new job)
+         * @description The new version keeps the parent's style. Its content is checked like a new design's, and every text (Naam), kept
+         *     or new, against the content rules again (422 `protected_term`), since a rule may have been added since.
+         */
         post: {
             parameters: {
                 query?: never;
@@ -380,6 +835,10 @@ export interface paths {
                             [key: string]: number | boolean | string;
                         };
                         material?: string;
+                        /** @description Replaces the parent version's features when present (empty array clears them); omitted or null keeps them. Items follow schemas/design-spec.v1.json#/$defs/feature. */
+                        features?: {
+                            [key: string]: unknown;
+                        }[] | null;
                     };
                 };
             };
@@ -393,7 +852,11 @@ export interface paths {
                         "application/json": components["schemas"]["DesignAccepted"];
                     };
                 };
+                /** @description More than 8 features or a malformed body */
+                400: components["responses"]["Problem"];
                 404: components["responses"]["Problem"];
+                /** @description upload_not_ready (a referenced upload is still in review) */
+                409: components["responses"]["Problem"];
                 422: components["responses"]["Problem"];
             };
         };
@@ -1736,8 +2199,10 @@ export interface components {
             /** @description False until the item's template exists in the geometry service; the Shop shows a 'Coming soon' ribbon and POST /api/designs answers 422 template_not_available. */
             available: boolean;
             name: string;
-            /** @enum {string} */
-            category: "home_decor" | "nameplates" | "kitchen" | "desk_tech" | "gifting";
+            /** @description A shelf id from GET /api/catalog/shelves */
+            category: string;
+            /** @description Outcome family (Avatar) of the item's template, when known */
+            family_id?: string | null;
             description?: string;
             template_id: string;
             default_params: {
@@ -1747,6 +2212,7 @@ export interface components {
             base_price_paise: number;
             /** @description e.g. 'Fits phones to 6.9″ · 92 × 78 × 120 mm · 64 g' */
             specs_line: string;
+            /** @description Viewer backdrop, an environment id from GET /api/environments */
             environment?: string;
             media?: {
                 kind?: string;
@@ -1773,17 +2239,187 @@ export interface components {
                 sheen_color?: string;
             };
         };
+        Motif: {
+            /** @description motif_id for a motif feature, e.g. paisley */
+            id: string;
+            /** @description Plain name shown with the Buti label, e.g. Paisley */
+            label: string;
+            tags: string[];
+            /** @description Smallest scale that still prints (strokes and openings at least 0.8 mm) */
+            min_scale: number;
+            /** @description Browser URL of the motif artwork */
+            svg_url: string;
+        };
+        Shelf: {
+            id: string;
+            label: string;
+            sort_order: number;
+        };
+        HardwareRef: {
+            sku: string;
+            qty: number;
+            /** @description Customer-facing hardware name, filled by the API from hardware_items */
+            name?: string;
+        };
+        /** @description An outcome category (Avatar). Same fields as schemas/template-family.v1.json#/$defs/family plus read-only state. */
+        Family: {
+            id: string;
+            /** @description Brand name shown to customers, e.g. Saathi */
+            codename: string;
+            /** @description Plain descriptor always shown with the codename, e.g. Keychain & bag charm */
+            name: string;
+            tagline?: string;
+            description?: string;
+            /** @enum {string} */
+            kind: "carrier" | "object" | "raw";
+            /** @enum {string} */
+            tier: "launch" | "next" | "later";
+            shelf: string;
+            demand_rank?: number;
+            default_template_id: string;
+            /** @description Default viewer backdrop, an environment id from GET /api/environments */
+            environment?: string;
+            size_envelope_mm?: {
+                min_longest_mm?: number;
+                max_longest_mm?: number;
+            };
+            hardware?: components["schemas"]["HardwareRef"][];
+            material_rules?: {
+                heat_safe_only?: boolean;
+                allowed?: string[] | null;
+                excluded_finish_classes?: string[];
+            };
+            /** @enum {string} */
+            shape_tolerance: "any" | "constrained" | "strict";
+            content_slot: {
+                accepts: ("emboss_text" | "motif" | "relief_image" | "hero_mesh")[];
+                anchors?: string[];
+                hero_volume?: boolean;
+                max_text_chars?: number;
+            };
+            available: boolean;
+            sort_order?: number;
+            /** @description True when at least one live template of this family exists in the geometry service */
+            ready: boolean;
+            templates: components["schemas"]["template-descriptor.v1"][];
+            /** @description A floor: the family's minimum from the active pricing policy, when one is set */
+            price_from_paise?: number | null;
+        };
+        /** @description A viewer backdrop (Mahaul). Same fields as schemas/experience.v1.json#/$defs/environment. */
+        Environment: {
+            id: string;
+            /** @description Plain name, e.g. Chettinad teak · candlelight */
+            label: string;
+            /**
+             * @description The surface the backdrop sits on
+             * @enum {string}
+             */
+            surface: "stage" | "paper";
+            /** @description The storefront viewer preset that renders it (src/lib/viewer/environments.ts) */
+            preset_key: string;
+            /** @description Swatches (sRGB hex) for thumbnails and theme previews, the backdrop colour first */
+            palette?: string[];
+            sort_order: number;
+        };
+        /** @description Page theming of an experience. The cream paper stays; the accent and the hero change. */
+        ExperienceSurface: {
+            /** @description sRGB hex from the brand palette */
+            accent: string;
+            /** @description A light tint over the cream paper; null keeps plain cream */
+            paper_tint?: string | null;
+            /** @description URL or site path of the hero image or loop; null until one is shot */
+            hero_media?: string | null;
+        };
+        /** @description A sub-collection, e.g. a licensed universe; none until a licence exists */
+        ExperienceCollection: {
+            id: string;
+            title: string;
+            /** @description The licence agreement that allows it; null for original work */
+            licence_ref?: string | null;
+        };
+        /** @description When an experience is in season. Both ends are dates (starts_on ≤ ends_on) or both are month-days that recur every year and may wrap the new year. */
+        SeasonWindow: {
+            /** @description A date (2026-10-20) or an ISO month-day (--10-01) */
+            starts_on: string;
+            /** @description A date (2026-11-10) or an ISO month-day (--11-30) */
+            ends_on: string;
+            /** @description Badge text, e.g. Diwali */
+            label: string;
+        };
+        /**
+         * @description An experience (Duniya): a theme on the Shop. The row fields are those of schemas/experience.v1.json#/$defs/experience;
+         *     here `avatars` are expanded to the families that can be ordered today (the shape of GET /api/families, in the
+         *     experience's order) and `items` to the curated Shop items.
+         */
+        Experience: {
+            /** @description snake_case id, e.g. festive; what CreateDesignRequest.experience_id names */
+            id: string;
+            /** @description Brand name shown to customers, e.g. Utsav */
+            codename: string;
+            /** @description URL slug of the experience page, e.g. utsav */
+            slug: string;
+            /** @description Plain descriptor always shown with the codename, e.g. Festive & gifting */
+            title: string;
+            tagline?: string;
+            description?: string;
+            /** @description The backdrop (an environment id) for the page's stage strip and the studio preset */
+            environment: string;
+            surface: components["schemas"]["ExperienceSurface"];
+            /**
+             * @description Style variant a design started from this experience takes (spec.style) when its template offers it (style_variants); none otherwise
+             * @enum {string}
+             */
+            style: "none" | "jaipur_heritage" | "modern_zen" | "cyber_desi" | "warli_line" | "comic_pop";
+            /** @description Motif ids (or a pack id) offered first in the Chhaap panel's Buti tab */
+            motif_pack: string[];
+            /** @description The experience's orderable families, in its order */
+            avatars: components["schemas"]["Family"][];
+            /** @description Curated Shop items, in order */
+            items: components["schemas"]["CatalogItem"][];
+            collections: components["schemas"]["ExperienceCollection"][];
+            season: components["schemas"]["SeasonWindow"][];
+            /** @description Whether the Shop lists it */
+            available: boolean;
+            sort_order: number;
+            /** @description The lowest price_from_paise among the avatars (a floor for 'from ₹249'); null when none sets one */
+            price_from_paise?: number | null;
+        };
+        Upload: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "image" | "model";
+            format: string;
+            bytes: number;
+            sha256?: string;
+            /** @enum {string} */
+            status: "ready" | "pending_review" | "rejected";
+            /** @description Browser-fetchable URL when ready */
+            url?: string | null;
+            /** @description Customer-facing note, e.g. the reviewer's reason when status is rejected */
+            message?: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
         CreateDesignRequest: {
             /** @enum {string} */
-            source: "shop" | "create" | "remix";
+            source: "shop" | "create" | "remix" | "upload";
             catalog_item_slug?: string;
+            /** @description Outcome family (Avatar). Without template_id the family's default template is used. raw_print with source upload is the Swaroop path. */
+            family_id?: string;
             template_id?: string;
             params?: {
                 [key: string]: number | boolean | string;
             };
             material?: string;
+            /** @description Content features (Chhaap) following schemas/design-spec.v1.json#/$defs/feature. Content sources name an upload_id; the API fills the url. */
+            features?: {
+                [key: string]: unknown;
+            }[];
             prompt?: string;
             title?: string;
+            /** @description The Duniya experience the customer started from (an id from GET /api/experiences, e.g. festive); 422 unknown_experience otherwise. Its style becomes spec.style when the template offers it (style_variants), else none */
+            experience_id?: string;
         };
         DesignAccepted: {
             /** Format: uuid */
@@ -1797,8 +2433,11 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            source: "shop" | "create" | "remix";
+            source: "shop" | "create" | "remix" | "upload";
             catalog_item_slug?: string | null;
+            family_id?: string | null;
+            /** @description The Duniya experience the design started from, when it named one */
+            experience_id?: string | null;
             title: string;
             /** @enum {string} */
             status: "generating" | "ready" | "failed";
@@ -1833,6 +2472,9 @@ export interface components {
             print_estimate?: components["schemas"]["print-estimate.v1"];
             /** @description For spec.material */
             price?: components["schemas"]["price-breakdown.v1"];
+            family_id?: string | null;
+            /** @description Bought-in parts packed with this piece */
+            hardware?: components["schemas"]["HardwareRef"][];
             karigar_note?: string;
             /** Format: uuid */
             job_id?: string;
@@ -1899,12 +2541,38 @@ export interface components {
             /** @description UI grouping, e.g. Size, Shape, Details. */
             group?: string;
         };
+        /** @description A named place where content may land: a surface (text, motif, relief) or a volume (a customer's own 3D form). size_mm/bounds_mm are the 3D analogue of a print area; bleed_mm the safe margin inside it. */
         anchor: {
             id: string;
             label: string;
+            /**
+             * @default surface
+             * @enum {string}
+             */
+            kind: "surface" | "volume";
             /** @enum {string} */
             projection: "planar" | "cylindrical" | "conformal";
             max_text_height_mm?: number;
+            /** @description Printable width and height of a surface anchor. */
+            size_mm?: number[];
+            /**
+             * @description Content stays inside size_mm minus twice the bleed.
+             * @default 0
+             */
+            bleed_mm: number;
+            /** @description Width, depth and height of a volume anchor; content is scaled to fit. */
+            bounds_mm?: number[];
+            /** @description Feature types allowed on this anchor; defaults to the template's features_supported. */
+            accepts?: ("emboss_text" | "motif" | "relief_image" | "hero_mesh")[];
+            /** @description At least 0.4 mm, the shallowest text depth, so every accepted feature can fit. Cap for relief_image.relief_mm (emboss and deboss) and emboss depth on this anchor. relief_image in lithophane mode is exempt: the plate itself is the relief and the template's lithophane hook owns its thickness range. */
+            max_relief_mm?: number;
+            /** @description The only modes content may take on this anchor: raised (emboss), cut in (deboss) or the photo as the plate itself (lithophane), e.g. ["deboss"] on a frame that prints face down, ["lithophane"] on a night-light plate. Absent: every mode the feature type allows. A feature that leaves mode out takes its type's default (emboss_text and relief_image emboss, motif deboss), which must then be listed, so clients send the mode explicitly. */
+            modes?: ("emboss" | "deboss" | "lithophane")[];
+            /**
+             * @description The piece cannot be built without content on this anchor (the night-light plate needs its photo). Clients ask for it up front; the API and the geometry service refuse a design without it.
+             * @default false
+             */
+            required: boolean;
         };
         /**
          * Aakar Template Descriptor v1
@@ -1917,10 +2585,10 @@ export interface components {
             name: string;
             description?: string;
             /**
+             * @description Viewer backdrop: an environment id from the reference data (experience.v1.json environments, packages/design-tokens/experiences.json; GET /api/environments).
              * @default studio
-             * @enum {string}
              */
-            environment: "studio" | "teak_table_candlelight" | "desk_oak" | "dashboard" | "kitchen_marble" | "balcony_daylight";
+            environment: string;
             params: {
                 [key: string]: components["schemas"]["param"];
             };
@@ -1932,9 +2600,19 @@ export interface components {
             };
             materials: string[];
             /** @default [] */
-            style_variants: ("jaipur_heritage" | "modern_zen" | "cyber_desi" | "warli_line")[];
+            style_variants: ("jaipur_heritage" | "modern_zen" | "cyber_desi" | "warli_line" | "comic_pop")[];
             /** @default [] */
-            features_supported: ("emboss_text" | "motif")[];
+            features_supported: ("emboss_text" | "motif" | "relief_image" | "hero_mesh")[];
+            /**
+             * @description Bought-in parts this template's pockets, holes and slots are cut for; authoritative over the family default.
+             * @default []
+             */
+            hardware: {
+                sku: string;
+                qty: number;
+            }[];
+            /** @description Smallest printable stroke or detail (0.8 mm for a 0.4 mm nozzle); text and silhouette checks use it. */
+            min_feature_mm?: number;
             $defs: {
                 param: {
                     /** @enum {string} */
@@ -1956,12 +2634,38 @@ export interface components {
                     /** @description UI grouping, e.g. Size, Shape, Details. */
                     group?: string;
                 };
+                /** @description A named place where content may land: a surface (text, motif, relief) or a volume (a customer's own 3D form). size_mm/bounds_mm are the 3D analogue of a print area; bleed_mm the safe margin inside it. */
                 anchor: {
                     id: string;
                     label: string;
+                    /**
+                     * @default surface
+                     * @enum {string}
+                     */
+                    kind: "surface" | "volume";
                     /** @enum {string} */
                     projection: "planar" | "cylindrical" | "conformal";
                     max_text_height_mm?: number;
+                    /** @description Printable width and height of a surface anchor. */
+                    size_mm?: number[];
+                    /**
+                     * @description Content stays inside size_mm minus twice the bleed.
+                     * @default 0
+                     */
+                    bleed_mm: number;
+                    /** @description Width, depth and height of a volume anchor; content is scaled to fit. */
+                    bounds_mm?: number[];
+                    /** @description Feature types allowed on this anchor; defaults to the template's features_supported. */
+                    accepts?: ("emboss_text" | "motif" | "relief_image" | "hero_mesh")[];
+                    /** @description At least 0.4 mm, the shallowest text depth, so every accepted feature can fit. Cap for relief_image.relief_mm (emboss and deboss) and emboss depth on this anchor. relief_image in lithophane mode is exempt: the plate itself is the relief and the template's lithophane hook owns its thickness range. */
+                    max_relief_mm?: number;
+                    /** @description The only modes content may take on this anchor: raised (emboss), cut in (deboss) or the photo as the plate itself (lithophane), e.g. ["deboss"] on a frame that prints face down, ["lithophane"] on a night-light plate. Absent: every mode the feature type allows. A feature that leaves mode out takes its type's default (emboss_text and relief_image emboss, motif deboss), which must then be listed, so clients send the mode explicitly. */
+                    modes?: ("emboss" | "deboss" | "lithophane")[];
+                    /**
+                     * @description The piece cannot be built without content on this anchor (the night-light plate needs its photo). Clients ask for it up front; the API and the geometry service refuse a design without it.
+                     * @default false
+                     */
+                    required: boolean;
                 };
             };
         };
@@ -1996,7 +2700,10 @@ export interface components {
             type: "motif";
             motif_id: string;
             anchor: string;
-            /** @default 1 */
+            /**
+             * @description 1 fills the anchor's spot; smaller scales shrink the motif, down to the library's min_scale for that motif.
+             * @default 1
+             */
             scale: number;
             /** @default 1 */
             depth_mm: number;
@@ -2006,7 +2713,71 @@ export interface components {
              */
             mode: "emboss" | "deboss";
         };
-        feature: components["schemas"]["emboss_text"] | components["schemas"]["motif"];
+        /** @description Customer content behind a relief_image or hero_mesh feature. The API resolves upload_id to a URL the geometry service can fetch; origin says whether the customer uploaded it or a generative provider produced it. */
+        content_source: {
+            /** Format: uuid */
+            upload_id: string;
+            url: string;
+            /** @enum {string} */
+            format?: "png" | "jpg" | "webp" | "heic" | "stl" | "glb" | "3mf" | "obj" | "ply" | "off" | "gltf";
+            /**
+             * @default upload
+             * @enum {string}
+             */
+            origin: "upload" | "generated";
+            /** @description Generative provider id when origin is generated. */
+            provider?: string;
+        };
+        /** @description Chhavi: a photo or image becomes a heightfield relief on a surface anchor (the MakerLab keychain and lithophane pattern). */
+        relief_image: {
+            /** @constant */
+            type: "relief_image";
+            source: components["schemas"]["content_source"];
+            /** @description A surface anchor id from the template descriptor. */
+            anchor: string;
+            /**
+             * @default emboss
+             * @enum {string}
+             */
+            mode: "emboss" | "deboss" | "lithophane";
+            /** @default 0.6 */
+            relief_mm: number;
+            /**
+             * @default contain
+             * @enum {string}
+             */
+            fit: "contain" | "cover";
+            /** @default false */
+            invert: boolean;
+            /**
+             * @default none
+             * @enum {string}
+             */
+            cutout: "none" | "silhouette";
+        };
+        /** @description Roop: the customer's own 3D form (uploaded or generated), repaired, scaled into a volume anchor and fused onto the carrier body. The raw_print family carries exactly one hero_mesh and no body; it has no template params, so its size (fit longest with longest_mm inside the family envelope) and orientation live on this feature. */
+        hero_mesh: {
+            /** @constant */
+            type: "hero_mesh";
+            source: components["schemas"]["content_source"];
+            /** @description A volume anchor id from the template descriptor. */
+            anchor: string;
+            /**
+             * @default contain
+             * @enum {string}
+             */
+            fit: "contain" | "longest";
+            /** @description Target longest dimension when fit is longest. */
+            longest_mm?: number;
+            /** @default 0 */
+            yaw_deg: number;
+            /**
+             * @default as_uploaded
+             * @enum {string}
+             */
+            orientation: "as_uploaded" | "lay_flat";
+        };
+        feature: components["schemas"]["emboss_text"] | components["schemas"]["motif"] | components["schemas"]["relief_image"] | components["schemas"]["hero_mesh"];
         constraints: {
             /** @default 1.2 */
             min_wall_mm: number;
@@ -2039,10 +2810,11 @@ export interface components {
             /** @default [] */
             features: components["schemas"]["feature"][];
             /**
+             * @description Style variant of the piece; an experience (experience.v1.json style) may preset it. comic_pop is Katha's comic-book look.
              * @default none
              * @enum {string}
              */
-            style: "none" | "jaipur_heritage" | "modern_zen" | "cyber_desi" | "warli_line";
+            style: "none" | "jaipur_heritage" | "modern_zen" | "cyber_desi" | "warli_line" | "comic_pop";
             /** @description Digital material id, e.g. terracotta_silk. Affects rendering and price, never geometry. */
             material?: string;
             constraints?: components["schemas"]["constraints"];
@@ -2061,7 +2833,71 @@ export interface components {
                      */
                     bed_mm: number[];
                 };
-                feature: components["schemas"]["emboss_text"] | components["schemas"]["motif"];
+                feature: components["schemas"]["emboss_text"] | components["schemas"]["motif"] | components["schemas"]["relief_image"] | components["schemas"]["hero_mesh"];
+                /** @description Customer content behind a relief_image or hero_mesh feature. The API resolves upload_id to a URL the geometry service can fetch; origin says whether the customer uploaded it or a generative provider produced it. */
+                content_source: {
+                    /** Format: uuid */
+                    upload_id: string;
+                    url: string;
+                    /** @enum {string} */
+                    format?: "png" | "jpg" | "webp" | "heic" | "stl" | "glb" | "3mf" | "obj" | "ply" | "off" | "gltf";
+                    /**
+                     * @default upload
+                     * @enum {string}
+                     */
+                    origin: "upload" | "generated";
+                    /** @description Generative provider id when origin is generated. */
+                    provider?: string;
+                };
+                /** @description Chhavi: a photo or image becomes a heightfield relief on a surface anchor (the MakerLab keychain and lithophane pattern). */
+                relief_image: {
+                    /** @constant */
+                    type: "relief_image";
+                    source: components["schemas"]["content_source"];
+                    /** @description A surface anchor id from the template descriptor. */
+                    anchor: string;
+                    /**
+                     * @default emboss
+                     * @enum {string}
+                     */
+                    mode: "emboss" | "deboss" | "lithophane";
+                    /** @default 0.6 */
+                    relief_mm: number;
+                    /**
+                     * @default contain
+                     * @enum {string}
+                     */
+                    fit: "contain" | "cover";
+                    /** @default false */
+                    invert: boolean;
+                    /**
+                     * @default none
+                     * @enum {string}
+                     */
+                    cutout: "none" | "silhouette";
+                };
+                /** @description Roop: the customer's own 3D form (uploaded or generated), repaired, scaled into a volume anchor and fused onto the carrier body. The raw_print family carries exactly one hero_mesh and no body; it has no template params, so its size (fit longest with longest_mm inside the family envelope) and orientation live on this feature. */
+                hero_mesh: {
+                    /** @constant */
+                    type: "hero_mesh";
+                    source: components["schemas"]["content_source"];
+                    /** @description A volume anchor id from the template descriptor. */
+                    anchor: string;
+                    /**
+                     * @default contain
+                     * @enum {string}
+                     */
+                    fit: "contain" | "longest";
+                    /** @description Target longest dimension when fit is longest. */
+                    longest_mm?: number;
+                    /** @default 0 */
+                    yaw_deg: number;
+                    /**
+                     * @default as_uploaded
+                     * @enum {string}
+                     */
+                    orientation: "as_uploaded" | "lay_flat";
+                };
                 emboss_text: {
                     /** @constant */
                     type: "emboss_text";
@@ -2093,7 +2929,10 @@ export interface components {
                     type: "motif";
                     motif_id: string;
                     anchor: string;
-                    /** @default 1 */
+                    /**
+                     * @description 1 fills the anchor's spot; smaller scales shrink the motif, down to the library's min_scale for that motif.
+                     * @default 1
+                     */
                     scale: number;
                     /** @default 1 */
                     depth_mm: number;
@@ -2186,7 +3025,7 @@ export interface components {
             print_seconds: number;
             lines: {
                 /** @enum {string} */
-                code: "material" | "machine_time" | "finishing" | "packaging";
+                code: "material" | "machine_time" | "finishing" | "packaging" | "hardware" | "setup";
                 /** @description Customer-facing, e.g. 'Material · 84 g' or 'Print time · 3 h 40 m'. */
                 label: string;
                 detail?: string;
@@ -2199,6 +3038,10 @@ export interface components {
             shipping_label?: string;
             total_paise: number;
             policy_version: string;
+            /** @description Outcome family the piece belongs to, when known; drives hardware, setup and minimum rules. */
+            family_id?: string;
+            /** @description Present when the family's minimum lifted the subtotal above the computed lines. */
+            minimum_subtotal_paise?: number;
         };
         /**
          * Aakar Event Envelope v1
@@ -2235,7 +3078,7 @@ export interface components {
                     status?: number;
                     detail?: string;
                     instance?: string;
-                    /** @description Stable machine code, e.g. not_found, not_yet_available, param_out_of_range, version_not_ready, unauthenticated, otp_invalid, otp_expired, otp_rate_limited, not_printable, cart_empty, not_serviceable, payment_final */
+                    /** @description Stable machine code, e.g. not_found, validation_failed, not_yet_available, param_out_of_range, unsupported_feature, protected_term (a text naming a licensed hero or brand), version_not_ready, unauthenticated, otp_invalid, otp_expired, otp_rate_limited, not_printable, cart_empty, not_serviceable, payment_final, unknown_family, unknown_experience */
                     code?: string;
                 };
             };

@@ -29,7 +29,10 @@ def test_templates_endpoints(client):
     resp = client.get("/v1/templates")
     assert resp.status_code == 200
     descriptors = resp.json()
-    assert [d["id"] for d in descriptors] == ["jharokha_phone_stand"]
+    assert [d["id"] for d in descriptors] == [
+        "desk_nameplate", "fridge_magnet", "hanging_ornament", "jharokha_phone_stand", "keycap_mx", "keychain_tag",
+        "lithophane_plate", "pet_tag", "photo_frame_std", "plinth_round", "raw_print",
+    ]
     for d in descriptors:
         validate("template-descriptor", d)
     assert client.get("/v1/templates/jharokha_phone_stand").json()["version"] == 1

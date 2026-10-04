@@ -12,6 +12,11 @@ aakar:
     public-url: http://localhost:8080
   media:
     dir: build/test-media
+    # Specs name uploads by the URL the geometry service fetches; a distinct origin makes that visible in tests.
+    internal-base-url: http://api.internal:8080
+  uploads:
+    # File names mentioning these land in the review queue (TermsContentScanner).
+    flag-terms: [marvel, "iron man"]
 logging:
   level:
     studio.aakar: DEBUG

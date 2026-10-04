@@ -17,7 +17,8 @@ def test_descriptor_validates_and_matches_plan():
     assert [a["id"] for a in desc["anchors"]] == ["side_left", "side_right", "back"]
     assert all(a["projection"] == "planar" for a in desc["anchors"])
     assert desc["constraints"] == {"min_wall_mm": 1.2, "max_overhang_deg": 55, "bed_mm": [250, 250, 250]}
-    assert desc["features_supported"] == []
+    assert desc["features_supported"] == ["emboss_text", "motif"]
+    assert all(a["accepts"] == ["emboss_text", "motif"] for a in desc["anchors"])
     assert set(desc["materials"]) == {
         "basic_white", "terracotta_matte", "terracotta_silk", "polished_brass", "sandalwood_silk", "indigo_matte",
     }
@@ -32,7 +33,10 @@ def test_descriptor_validates_and_matches_plan():
 
 
 def test_registry_lookup():
-    assert [t.ref() for t in list_templates()] == ["jharokha_phone_stand@1"]
+    assert [t.ref() for t in list_templates()] == [
+        "desk_nameplate@1", "fridge_magnet@1", "hanging_ornament@1", "jharokha_phone_stand@1", "keycap_mx@1", "keychain_tag@1",
+        "lithophane_plate@1", "pet_tag@1", "photo_frame_std@1", "plinth_round@1", "raw_print@1",
+    ]
     assert get_template("jharokha_phone_stand@1") is JharokhaPhoneStand
     assert parse_ref("jharokha_phone_stand@1") == ("jharokha_phone_stand", 1)
     with pytest.raises(UnknownTemplate):
@@ -137,3 +141,43 @@ def test_example_inspects_as_printable(built_example):
     assert 45 <= grams <= 70
     assert 3 * 3600 <= estimate["print_seconds"] <= 5 * 3600
     assert estimate["layers"] == math.ceil(120 / 0.2)
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {},
+        {"width_mm": 70, "depth_mm": 60, "height_mm": 90, "tilt_deg": 78, "lip_height_mm": 8, "wall_mm": 2.4, "arch_cusps": 3},
+        {"width_mm": 110, "depth_mm": 100, "height_mm": 150, "tilt_deg": 66, "lip_height_mm": 18, "wall_mm": 4.0, "arch_cusps": 7},
+    ],
+)
+def test_anchor_frames_lie_on_the_surface(overrides):
+    """Every anchor's centre and printable corners sit on the built skin with the frame's normal pointing out."""
+    import numpy as np
+    from trimesh.proximity import closest_point
+
+    params = JharokhaPhoneStand.validate(overrides)
+    mesh = JharokhaPhoneStand.build_body(params)
+    for anchor in JharokhaPhoneStand.anchors:
+        frame = JharokhaPhoneStand.anchor_frame(anchor.id, params)
+        assert frame.size_mm is not None and min(frame.size_mm) > 5
+        points = np.vstack([frame.origin[None, :], frame.corners()])
+        _, distance, triangle = closest_point(mesh, points)
+        assert distance.max() < 0.05, (anchor.id, distance)
+        assert float(np.dot(mesh.face_normals[triangle[0]], frame.normal)) > 0.999
+    with pytest.raises(NotImplementedError):
+        JharokhaPhoneStand.anchor_frame("lid", params)
+
+
+def test_descriptor_publishes_default_anchor_sizes_and_no_hardware():
+    desc = JharokhaPhoneStand.descriptor()
+    validate("template-descriptor", desc)
+    by_id = {a["id"]: a for a in desc["anchors"]}
+    defaults = JharokhaPhoneStand.validate({})
+    for anchor_id, anchor in by_id.items():
+        assert anchor["kind"] == "surface" and anchor["max_relief_mm"] == 1.2 and anchor["bleed_mm"] == 0.0
+        frame = JharokhaPhoneStand.anchor_frame(anchor_id, defaults)
+        assert anchor["size_mm"] == pytest.approx(list(frame.size_mm), abs=0.06)
+    assert by_id["back"]["size_mm"][0] == pytest.approx(92 - 2 * 8 - 2 * 1.0, abs=0.06)  # width minus frame margins
+    assert desc["hardware"] == [] and desc["min_feature_mm"] == 0.8
+    assert JharokhaPhoneStand.hardware_for(defaults) == []

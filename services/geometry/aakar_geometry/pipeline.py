@@ -1,9 +1,13 @@
 """``build_design``: design.generate payload -> design.completed (or design.failed) payload.
 
-Steps (PLAN §7.11): validate request + spec → resolve template → validate params → progress
-``understanding`` → progress ``sculpting`` → CAD → export + store → progress ``checking`` → inspect
-→ assemble and validate the completed payload. Every failure becomes a ``design.failed`` payload
-with the matching code; nothing raises out of this function.
+Steps (PLAN §7.11): validate request + spec → resolve template → check family / features (anchor modes,
+required content) / style / material → validate params → normalise (a style the template offers may put its own
+content defaults first) → ``Template.validate_content`` (limits coupling params and content) →
+progress ``understanding`` → progress ``sculpting`` → CAD body + features (Chhaap: names and motifs
+shaped and set in, photo reliefs and hero forms fetched through the ``ContentFetcher``) → refuse an
+empty result → export + store → progress ``checking`` → inspect → assemble and validate the completed
+payload (with the template's ``hardware_for(params)`` and a karigar's note that names the lettering). Every failure becomes a ``design.failed`` payload with the matching code;
+nothing raises out of this function.
 """
 
 from __future__ import annotations
@@ -14,7 +18,7 @@ import os
 import time
 import traceback
 import uuid
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 import trimesh
 
@@ -29,6 +33,8 @@ from .errors import (
 )
 from .events import CallbackSink, NullSink, ProgressSink, progress_payload
 from .exports import SUPPORTED_OUTPUTS, export_all
+from .features import validate as feature_validation
+from .features.fetch import ContentFetcher, HttpFetcher
 from .inspection import HttpInspector, Inspector, inspector_from_env
 from .storage import AssetRecord, Storage, asset_key, storage_from_env
 from .templates import Template, get_template
@@ -44,6 +50,7 @@ HTTP_STATUS_BY_CODE = {
     "unknown_template": 422,
     "unsupported_feature": 422,
     "param_out_of_range": 422,
+    "content_unusable": 422,
     "not_printable": 422,
     "build_error": 500,
     "storage_error": 500,
@@ -84,13 +91,15 @@ def http_status_for(payload: Mapping[str, Any]) -> int:
 def normalise_spec(template: type[Template], spec: Mapping[str, Any], params: Mapping[str, Any]) -> dict[str, Any]:
     constraints = template.constraints.descriptor()
     constraints.update({k: v for k, v in (spec.get("constraints") or {}).items() if v is not None})
+    style = spec.get("style") or "none"
     out: dict[str, Any] = {
         "spec_version": "1.0",
         "family": template.family,
         "template": template.ref(),
         "params": dict(params),
-        "features": list(spec.get("features") or []),
-        "style": spec.get("style") or "none",
+        # a style the template offers may put its own content defaults first (comic_pop: raised, bolder names)
+        "features": feature_validation.normalise_features(spec.get("features") or [], template=template, style=style),
+        "style": style,
         "constraints": constraints,
     }
     if spec.get("material"):
@@ -105,13 +114,9 @@ def _check_spec_against_template(template: type[Template], spec: Mapping[str, An
             f"Template {template.ref()} belongs to family {template.family}, not {spec.get('family')}",
             {"family": spec.get("family"), "template_family": template.family},
         )
-    features = spec.get("features") or []
-    unsupported = sorted({f.get("type", "?") for f in features if f.get("type") not in template.features_supported})
-    if unsupported:
-        raise UnsupportedFeature(
-            f"{template.name} does not support {', '.join(unsupported)} yet",
-            {"unsupported": unsupported, "features_supported": list(template.features_supported)},
-        )
+    # Feature semantics: type supported, anchor exists and accepts it, the modes it lists, one photo/form per
+    # anchor, relief depth within the anchor's cap, text length within the family's cap, required anchors filled.
+    feature_validation.check(template, spec)
     style = spec.get("style") or "none"
     if style != "none" and style not in template.style_variants:
         raise UnsupportedFeature(
@@ -120,12 +125,30 @@ def _check_spec_against_template(template: type[Template], spec: Mapping[str, An
         )
     material = spec.get("material")
     if material and material not in template.materials():
-        raise InvalidSpec(f"Unknown material {material}", {"material": material, "materials": template.materials()})
+        from .materials import load_materials
+
+        names = {m["id"]: m.get("name") or m["id"] for m in load_materials()}
+        allowed = template.materials()
+        if material in names:  # a real finish that this family's material rules leave out (Roshni: white only)
+            raise InvalidSpec(
+                f"{template.name} comes in {', '.join(names.get(m, m) for m in allowed)} only",
+                {"material": material, "materials": allowed},
+            )
+        raise InvalidSpec(f"Unknown material {material}", {"material": material, "materials": allowed})
 
 
-def _build_with_timeout(template: type[Template], params: Mapping[str, Any], timeout_s: float) -> trimesh.Trimesh:
+def _build_with_timeout(
+    template: type[Template],
+    params: Mapping[str, Any],
+    timeout_s: float,
+    features: Sequence[Mapping[str, Any]] = (),
+    fetcher: ContentFetcher | None = None,
+) -> trimesh.Trimesh:
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="aakar-cad")
-    future = executor.submit(template.build, params)
+    if features:
+        future = executor.submit(template.build, params, features=list(features), fetcher=fetcher)
+    else:  # no content: identical call to the pre-features pipeline
+        future = executor.submit(template.build, params)
     try:
         return future.result(timeout=timeout_s)
     except concurrent.futures.TimeoutError as exc:
@@ -147,10 +170,15 @@ def build_design(
     sink: ProgressSink | None = None,
     storage: Storage | None = None,
     inspector: Inspector | None = None,
+    fetcher: ContentFetcher | None = None,
     build_timeout_s: float | None = None,
     slicing: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Run the full build for a ``design.generate`` payload and return the completed/failed payload."""
+    """Run the full build for a ``design.generate`` payload and return the completed/failed payload.
+
+    ``fetcher`` fetches ``content_source`` files behind relief_image / hero_mesh features
+    (default ``HttpFetcher``; tests and the CLI pass a ``LocalFileFetcher``).
+    """
     started = time.perf_counter()
     job_id = request.get("job_id") if isinstance(request, Mapping) else None
     design_id = request.get("design_id") if isinstance(request, Mapping) else None
@@ -171,6 +199,8 @@ def build_design(
         _check_spec_against_template(template, spec)
         params = template.validate(spec.get("params"))
         normalised = normalise_spec(template, spec, params)
+        # limits that couple params and content (skin under a cut-in photo, a raw print's model), before any CAD
+        template.validate_content(params, normalised["features"])
         outputs = list(dict.fromkeys(request.get("outputs") or DEFAULT_OUTPUTS))
         skipped = [o for o in outputs if o not in SUPPORTED_OUTPUTS]
         if skipped:
@@ -181,10 +211,16 @@ def build_design(
         inspector = inspector or inspector_from_env()
         if isinstance(inspector, HttpInspector) and "stl" not in outputs:
             outputs.append("stl")
+        fetcher = fetcher or HttpFetcher()
 
         sink.emit("design.progress", progress_payload("understanding", 10))
         sink.emit("design.progress", progress_payload("sculpting", 35))
-        mesh = _build_with_timeout(template, params, timeout_s)
+        mesh = _build_with_timeout(template, params, timeout_s, normalised["features"], fetcher)
+        if not isinstance(mesh, trimesh.Trimesh) or mesh.is_empty or len(mesh.faces) == 0:
+            raise GeometryError(
+                "Something went wrong while shaping this design: it came out empty",
+                {"template": template.ref(), "reason": "the build returned no geometry"},
+            )
 
         files = export_all(mesh, outputs, name=f"{template.id}_v{template.version}")
         normalised_design_id = _uuid_or_nil(design_id)
@@ -212,10 +248,11 @@ def build_design(
             "version_no": version_no,
             "template": {"id": template.id, "version": template.version},
             "spec": normalised,
+            "hardware": template.hardware_for(params),
             "assets": {kind: rec.to_dict() for kind, rec in assets.items()},
             "printability": report,
             "print_estimate": estimate,
-            "karigar_note": template.karigar_note(params),
+            "karigar_note": template.karigar_note_for(params, normalised["features"], style=normalised["style"]),
             "build_ms": int(round((time.perf_counter() - started) * 1000)),
         }
         try:

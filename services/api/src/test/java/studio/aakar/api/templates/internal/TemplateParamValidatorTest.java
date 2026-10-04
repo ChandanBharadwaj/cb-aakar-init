@@ -87,7 +87,7 @@ class TemplateParamValidatorTest {
         TemplateDescriptor withEnum = new TemplateDescriptor("t", 1, "f", "T", null, null, Map.of(
                 "tray", new TemplateDescriptor.Param("boolean", "Tray", null, "", true, null, null, null, null, null, null),
                 "finish", new TemplateDescriptor.Param("enum", "Finish", null, "", "smooth", null, null, null, List.of("smooth", "fluted"), null, null)),
-                List.of(), null, List.of("basic_white"), null, null);
+                List.of(), null, List.of("basic_white"), null, null, null, null);
 
         assertThatCode(() -> validator.validate(withEnum, Map.of("tray", false, "finish", "fluted"))).doesNotThrowAnyException();
         assertThatThrownBy(() -> validator.validate(withEnum, Map.of("tray", "yes", "finish", "glossy")))

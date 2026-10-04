@@ -115,7 +115,7 @@ export interface paths {
                             orders_today: number;
                             revenue_today_paise: number;
                             revenue_month_paise: number;
-                            /** @description Orders in queued */
+                            /** @description Orders in queued, finishing or qc that need a staff step */
                             awaiting_action: number;
                         };
                     };
@@ -534,6 +534,8 @@ export interface paths {
                         material: string;
                         extruded_volume_cm3: number;
                         print_seconds: number;
+                        /** @description Applies the family's hardware default, setup fee and minimum */
+                        family_id?: string;
                     };
                 };
             };
@@ -764,6 +766,674 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/api/catalog/shelves": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Shop shelves in display order */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Shelves */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Shelf"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/api/families": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every outcome family (Avatar), available or not, with readiness */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Families */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminFamily"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create a family (owner only, audited as family.create) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AdminFamilyInput"];
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminFamily"];
+                    };
+                };
+                403: components["responses"]["Problem"];
+                /** @description family_exists */
+                409: components["responses"]["Problem"];
+                422: components["responses"]["Problem"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/api/families/{familyId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update a family's copy, tier, shelf, envelope, hardware, rules, content slot or availability (owner only, audited as family.update) */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    familyId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AdminFamilyInput"];
+                };
+            };
+            responses: {
+                /** @description Updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminFamily"];
+                    };
+                };
+                403: components["responses"]["Problem"];
+                /** @description unknown_family */
+                404: components["responses"]["Problem"];
+                422: components["responses"]["Problem"];
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/api/hardware": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bought-in hardware items */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Hardware */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminHardware"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create a hardware item (owner only, audited as hardware.create) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AdminHardwareInput"];
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminHardware"];
+                    };
+                };
+                403: components["responses"]["Problem"];
+                /** @description hardware_exists */
+                409: components["responses"]["Problem"];
+                422: components["responses"]["Problem"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/api/hardware/{sku}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update a hardware item (owner only, audited as hardware.update) */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    sku: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AdminHardwareInput"];
+                };
+            };
+            responses: {
+                /** @description Updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminHardware"];
+                    };
+                };
+                403: components["responses"]["Problem"];
+                404: components["responses"]["Problem"];
+                422: components["responses"]["Problem"];
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/api/experiences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every experience (Duniya), available or not, in display order
+         * @description Rows as stored, for the portal's Duniya page: `avatars` are family ids and `items` Shop item slugs, in order.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Experiences */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminExperience"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Create an experience (owner only, audited as experience.create)
+         * @description 409 `experience_exists` for a taken id, 409 `slug_exists` for a taken slug. 422 `validation_failed` for a schema
+         *     violation, an environment that is not in GET /admin/api/environments (the detail names the known ones), an unknown
+         *     Shop item slug, a repeated avatar, item or motif, or a season window whose ends are not both dates (in order) or both
+         *     month-days; 422 `unknown_family` for an avatar that is not a family.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AdminExperienceInput"];
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminExperience"];
+                    };
+                };
+                403: components["responses"]["Problem"];
+                /** @description experience_exists or slug_exists */
+                409: components["responses"]["Problem"];
+                /** @description validation_failed or unknown_family */
+                422: components["responses"]["Problem"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/api/experiences/{experienceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update an experience's copy, slug, backdrop, style, motif pack, avatars, items, collections, seasons or availability (owner only, audited as experience.update)
+         * @description The id in the path wins over the body. 404 `unknown_experience`; 409 `slug_exists` when another experience has the slug; 422 as on create.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    experienceId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AdminExperienceInput"];
+                };
+            };
+            responses: {
+                /** @description Updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminExperience"];
+                    };
+                };
+                403: components["responses"]["Problem"];
+                /** @description unknown_experience */
+                404: components["responses"]["Problem"];
+                /** @description slug_exists */
+                409: components["responses"]["Problem"];
+                /** @description validation_failed or unknown_family */
+                422: components["responses"]["Problem"];
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/api/environments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Viewer backdrops (Mahaul) in display order, read-only reference data
+         * @description The valid `environment` values for experiences, families and Shop items. New backdrops need a storefront preset first (engineering).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Environments */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Environment"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/api/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Customer uploads, newest first (filter by status for the review queue) */
+        get: {
+            parameters: {
+                query?: {
+                    status?: "ready" | "pending_review" | "rejected";
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Uploads */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminUpload"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/api/content-reviews/{reviewId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decide a flagged upload (studio or owner, audited as review.decide) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    reviewId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ContentReviewDecision"];
+                };
+            };
+            responses: {
+                /** @description Decided */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminUpload"];
+                    };
+                };
+                404: components["responses"]["Problem"];
+                /** @description review_already_decided */
+                409: components["responses"]["Problem"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/api/content-terms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Content rules (the trademark guardrail), every term active or not
+         * @description The names the studio won't print (Katha, docs/research/outcome-categories/implementation-plan.md §8 and open
+         *     decision 16): publishers and brands (`trademark`), heroes and villains (`character`) and anything else (`other`).
+         *     An upload whose file name mentions an active term waits in the review queue (`pending_review`, the reason names the
+         *     term); a design whose text (Naam) mentions one is refused with 422 `protected_term`, and customers never see the
+         *     list. Matching folds accents, ignores case, spaces and punctuation (letters and digits only, `normalised_term`), so
+         *     "iron man", "Iron-Man" and "IRONMAN" are one term; a term of six letters or digits or fewer (`whole_word`) only
+         *     matches as a whole word, so "DC" never catches "Adcock" nor "Thor" "Thorat". Sorted by `normalised_term`. Any staff role.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Content terms */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ContentTerm"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Add a content rule (owner only, audited as content_term.create)
+         * @description 409 `content_term_exists` when a term with the same letters and digits exists, active or not (edit or switch on that
+         *     one instead); 422 `validation_failed` for a schema violation or a term with fewer than two letters or digits.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ContentTermInput"];
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ContentTerm"];
+                    };
+                };
+                403: components["responses"]["Problem"];
+                /** @description content_term_exists */
+                409: components["responses"]["Problem"];
+                422: components["responses"]["Problem"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/api/content-terms/{termId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change a content rule's kind, reason or active switch (owner only, audited as content_term.update)
+         * @description The term is the rule's key and can't be renamed: the body's `term` must have the same letters and digits as the stored
+         *     one (another spelling of it is accepted and the stored spelling stays), 422 `validation_failed` otherwise; add the new
+         *     spelling as its own term and switch this one off. Rules are never deleted, so the audit trail stays readable. Switching
+         *     a term off stops it holding uploads and refusing names at once. 404 for an unknown id.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    termId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ContentTermInput"];
+                };
+            };
+            responses: {
+                /** @description Updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ContentTerm"];
+                    };
+                };
+                403: components["responses"]["Problem"];
+                404: components["responses"]["Problem"];
+                422: components["responses"]["Problem"];
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/api/motifs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The Buti motif library, for experience motif packs and template previews */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Motifs */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Motif"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/api/templates": {
         parameters: {
             query?: never;
@@ -796,6 +1466,10 @@ export interface paths {
                             live: boolean;
                             /** @description Slugs using this template */
                             catalog_items?: string[];
+                            /** @description Chhaap types the template accepts */
+                            features_supported?: ("emboss_text" | "motif" | "relief_image" | "hero_mesh")[];
+                            /** @description Bought-in parts the template is cut for */
+                            hardware?: components["schemas"]["HardwareRef"][];
                         }[];
                     };
                 };
@@ -1007,6 +1681,21 @@ export interface components {
             shipping_flat_paise: number;
             free_shipping_above_paise: number;
             shipping_label: string;
+            /** @description Applied to bought-in hardware unit costs; 0 when absent */
+            hardware_markup_pct?: number;
+            /** @description Per-outcome rules keyed by family id */
+            family_rules?: {
+                [key: string]: {
+                    /** @description Lifts the subtotal to at least this (rounded to the policy ending) */
+                    minimum_subtotal_paise?: number;
+                    /** @description Studio setup line, e.g. repair and orientation labour for raw prints */
+                    setup_fee_paise?: number;
+                    qty_breaks?: {
+                        min_qty: number;
+                        discount_pct: number;
+                    }[];
+                };
+            };
         };
         PricingPolicyVersion: {
             version: string;
@@ -1041,8 +1730,10 @@ export interface components {
         CatalogItemInput: {
             slug: string;
             name: string;
-            /** @enum {string} */
-            category: "home_decor" | "nameplates" | "kitchen" | "desk_tech" | "gifting";
+            /** @description A shelf id from GET /admin/api/catalog/shelves; 422 validation_failed otherwise */
+            category: string;
+            /** @description Outcome family (Avatar); 422 unknown_family when not seeded */
+            family_id?: string | null;
             description?: string;
             template_id: string;
             default_params: {
@@ -1051,12 +1742,186 @@ export interface components {
             default_material: string;
             base_price_paise: number;
             specs_line: string;
-            environment?: string;
+            /** @description An environment id from GET /admin/api/environments; 422 validation_failed otherwise */
+            environment?: string | null;
             available: boolean;
             media?: {
                 kind?: string;
                 url?: string;
             }[];
+        };
+        /** @description Same fields as schemas/template-family.v1.json#/$defs/family. On PUT the id in the path wins. */
+        AdminFamilyInput: {
+            id: string;
+            codename: string;
+            name: string;
+            tagline?: string;
+            description?: string;
+            /** @enum {string} */
+            kind: "carrier" | "object" | "raw";
+            /** @enum {string} */
+            tier: "launch" | "next" | "later";
+            shelf: string;
+            demand_rank?: number;
+            default_template_id: string;
+            /** @description An environment id from GET /admin/api/environments (studio when absent); 422 validation_failed otherwise */
+            environment?: string;
+            size_envelope_mm?: {
+                min_longest_mm: number;
+                max_longest_mm: number;
+            };
+            hardware?: {
+                sku: string;
+                qty: number;
+            }[];
+            material_rules?: {
+                heat_safe_only?: boolean;
+                allowed?: string[] | null;
+                excluded_finish_classes?: ("matte" | "silk")[];
+            };
+            /** @enum {string} */
+            shape_tolerance: "any" | "constrained" | "strict";
+            content_slot: {
+                accepts: ("emboss_text" | "motif" | "relief_image" | "hero_mesh")[];
+                anchors?: string[];
+                hero_volume?: boolean;
+                max_text_chars?: number;
+            };
+            available: boolean;
+            /** @default 100 */
+            sort_order: number;
+        };
+        AdminFamily: components["schemas"]["AdminFamilyInput"] & {
+            /** @description At least one live template of this family exists */
+            ready: boolean;
+            template_ids?: string[];
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        AdminHardwareInput: {
+            sku: string;
+            name: string;
+            unit_cost_paise: number;
+            weight_g?: number;
+            supplier?: string;
+            url?: string;
+            notes?: string;
+            /** @default true */
+            available: boolean;
+        };
+        AdminHardware: components["schemas"]["AdminHardwareInput"] & {
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        /** @description Same fields as schemas/experience.v1.json#/$defs/experience. On PUT the id in the path wins. */
+        AdminExperienceInput: {
+            /** @description snake_case English, never renamed (festive, desk_gaming, …) */
+            id: string;
+            /** @description Brand name, e.g. Utsav */
+            codename: string;
+            /** @description URL slug (/duniya/<slug>) */
+            slug: string;
+            /** @description Plain descriptor, e.g. Festive & gifting */
+            title: string;
+            tagline?: string;
+            description?: string;
+            /** @description An environment id from GET /admin/api/environments */
+            environment: string;
+            surface: components["schemas"]["ExperienceSurface"];
+            /**
+             * @default none
+             * @enum {string}
+             */
+            style: "none" | "jaipur_heritage" | "modern_zen" | "cyber_desi" | "warli_line" | "comic_pop";
+            /** @description Motif ids (or a pack id) offered first, in order */
+            motif_pack?: string[];
+            /** @description Family ids in display order */
+            avatars: string[];
+            /** @description Shop item slugs in display order */
+            items?: string[];
+            collections?: components["schemas"]["ExperienceCollection"][];
+            season?: components["schemas"]["SeasonWindow"][];
+            available: boolean;
+            /** @default 100 */
+            sort_order: number;
+        };
+        /** @description The row as stored. The lists and defaults the input may leave out are always returned. */
+        AdminExperience: components["schemas"]["AdminExperienceInput"] & {
+            /** @enum {string} */
+            style: "none" | "jaipur_heritage" | "modern_zen" | "cyber_desi" | "warli_line" | "comic_pop";
+            /** @description Motif ids (or a pack id) in order; empty when none */
+            motif_pack: string[];
+            /** @description Shop item slugs in display order; empty when none */
+            items: string[];
+            collections: components["schemas"]["ExperienceCollection"][];
+            season: components["schemas"]["SeasonWindow"][];
+            sort_order: number;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        AdminUpload: components["schemas"]["Upload"] & {
+            owner?: {
+                /** Format: uuid */
+                user_id?: string | null;
+                /** Format: uuid */
+                guest_id?: string | null;
+                phone?: string | null;
+            };
+            /** @description Staff get the file URL in every status so reviewers can see it */
+            url?: string | null;
+            /** @enum {string} */
+            origin?: "upload" | "generated";
+            review?: {
+                /** Format: uuid */
+                id?: string;
+                reason?: string;
+                /** @enum {string} */
+                status?: "pending" | "approved" | "rejected";
+                decision_note?: string | null;
+                reviewer_email?: string | null;
+                /** Format: date-time */
+                decided_at?: string | null;
+            } | null;
+        };
+        ContentReviewDecision: {
+            /** @enum {string} */
+            decision: "approved" | "rejected";
+            note?: string;
+        };
+        /** @description A content rule as staff write it. On PUT the term must be the stored one (same letters and digits). */
+        ContentTermInput: {
+            /** @description The name as staff spell it (Spider-Man); at least two letters or digits */
+            term: string;
+            /**
+             * @description A publisher or brand, a character, or anything else
+             * @enum {string}
+             */
+            kind: "trademark" | "character" | "other";
+            /** @description Why it is protected, for staff and reviewers, e.g. Marvel character (Disney) */
+            reason?: string | null;
+            /**
+             * @description Off keeps the rule but stops it holding uploads and refusing names
+             * @default true
+             */
+            active: boolean;
+        };
+        /** @description A content rule as stored, with how the matcher compares it. */
+        ContentTerm: {
+            /** Format: uuid */
+            id: string;
+            term: string;
+            /** @enum {string} */
+            kind: "trademark" | "character" | "other";
+            reason: string | null;
+            active: boolean;
+            /** @description Folded, lowercase, letters and digits only (spiderman): the rule's unique key */
+            normalised_term: string;
+            /** @description Six letters or digits or fewer: matches only as a whole word of a text (DC, Thor, Batman) */
+            whole_word: boolean;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
         };
         NotificationRecord: {
             /** Format: uuid */
@@ -1085,9 +1950,9 @@ export interface components {
             /** Format: date-time */
             at: string;
             staff_email: string;
-            /** @description order.advance */
+            /** @description order.advance, pricing.publish, material.update, catalog.update, template.live, family.create, family.update, hardware.create, hardware.update, experience.create, experience.update, review.decide, content_term.create, content_term.update */
             action: string;
-            /** @description Order number */
+            /** @description Order number, policy version, material id, slug, template id, family id, hardware sku, experience id, review id or content term */
             target: string;
             before?: {
                 [key: string]: unknown;
@@ -1134,7 +1999,7 @@ export interface components {
             print_seconds: number;
             lines: {
                 /** @enum {string} */
-                code: "material" | "machine_time" | "finishing" | "packaging";
+                code: "material" | "machine_time" | "finishing" | "packaging" | "hardware" | "setup";
                 /** @description Customer-facing, e.g. 'Material · 84 g' or 'Print time · 3 h 40 m'. */
                 label: string;
                 detail?: string;
@@ -1147,6 +2012,10 @@ export interface components {
             shipping_label?: string;
             total_paise: number;
             policy_version: string;
+            /** @description Outcome family the piece belongs to, when known; drives hardware, setup and minimum rules. */
+            family_id?: string;
+            /** @description Present when the family's minimum lifted the subtotal above the computed lines. */
+            minimum_subtotal_paise?: number;
         };
         OrderItem: {
             /** Format: uuid */
@@ -1265,8 +2134,10 @@ export interface components {
             /** @description False until the item's template exists in the geometry service; the Shop shows a 'Coming soon' ribbon and POST /api/designs answers 422 template_not_available. */
             available: boolean;
             name: string;
-            /** @enum {string} */
-            category: "home_decor" | "nameplates" | "kitchen" | "desk_tech" | "gifting";
+            /** @description A shelf id from GET /api/catalog/shelves */
+            category: string;
+            /** @description Outcome family (Avatar) of the item's template, when known */
+            family_id?: string | null;
             description?: string;
             template_id: string;
             default_params: {
@@ -1276,11 +2147,92 @@ export interface components {
             base_price_paise: number;
             /** @description e.g. 'Fits phones to 6.9″ · 92 × 78 × 120 mm · 64 g' */
             specs_line: string;
+            /** @description Viewer backdrop, an environment id from GET /api/environments */
             environment?: string;
             media?: {
                 kind?: string;
                 url?: string;
             }[];
+        };
+        Shelf: {
+            id: string;
+            label: string;
+            sort_order: number;
+        };
+        /** @description Page theming of an experience. The cream paper stays; the accent and the hero change. */
+        ExperienceSurface: {
+            /** @description sRGB hex from the brand palette */
+            accent: string;
+            /** @description A light tint over the cream paper; null keeps plain cream */
+            paper_tint?: string | null;
+            /** @description URL or site path of the hero image or loop; null until one is shot */
+            hero_media?: string | null;
+        };
+        /** @description A sub-collection, e.g. a licensed universe; none until a licence exists */
+        ExperienceCollection: {
+            id: string;
+            title: string;
+            /** @description The licence agreement that allows it; null for original work */
+            licence_ref?: string | null;
+        };
+        /** @description When an experience is in season. Both ends are dates (starts_on ≤ ends_on) or both are month-days that recur every year and may wrap the new year. */
+        SeasonWindow: {
+            /** @description A date (2026-10-20) or an ISO month-day (--10-01) */
+            starts_on: string;
+            /** @description A date (2026-11-10) or an ISO month-day (--11-30) */
+            ends_on: string;
+            /** @description Badge text, e.g. Diwali */
+            label: string;
+        };
+        /** @description A viewer backdrop (Mahaul). Same fields as schemas/experience.v1.json#/$defs/environment. */
+        Environment: {
+            id: string;
+            /** @description Plain name, e.g. Chettinad teak · candlelight */
+            label: string;
+            /**
+             * @description The surface the backdrop sits on
+             * @enum {string}
+             */
+            surface: "stage" | "paper";
+            /** @description The storefront viewer preset that renders it (src/lib/viewer/environments.ts) */
+            preset_key: string;
+            /** @description Swatches (sRGB hex) for thumbnails and theme previews, the backdrop colour first */
+            palette?: string[];
+            sort_order: number;
+        };
+        Upload: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "image" | "model";
+            format: string;
+            bytes: number;
+            sha256?: string;
+            /** @enum {string} */
+            status: "ready" | "pending_review" | "rejected";
+            /** @description Browser-fetchable URL when ready */
+            url?: string | null;
+            /** @description Customer-facing note, e.g. the reviewer's reason when status is rejected */
+            message?: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        Motif: {
+            /** @description motif_id for a motif feature, e.g. paisley */
+            id: string;
+            /** @description Plain name shown with the Buti label, e.g. Paisley */
+            label: string;
+            tags: string[];
+            /** @description Smallest scale that still prints (strokes and openings at least 0.8 mm) */
+            min_scale: number;
+            /** @description Browser URL of the motif artwork */
+            svg_url: string;
+        };
+        HardwareRef: {
+            sku: string;
+            qty: number;
+            /** @description Customer-facing hardware name, filled by the API from hardware_items */
+            name?: string;
         };
     };
     responses: {

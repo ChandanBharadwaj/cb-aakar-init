@@ -20,6 +20,8 @@ class CatalogItemEntity {
     private String slug;
     private String name;
     private String category;
+    @Column(name = "family_id")
+    private String familyId;
     private String description;
     @Column(name = "template_id")
     private String templateId;
@@ -61,7 +63,8 @@ class CatalogItemEntity {
 
     void apply(CatalogItemInput input, Instant now) {
         this.name = input.name().trim();
-        this.category = input.category();
+        this.category = input.category().trim();
+        this.familyId = input.familyId() == null || input.familyId().isBlank() ? null : input.familyId().trim();
         this.description = input.description() == null || input.description().isBlank() ? null : input.description().trim();
         this.templateId = input.templateId().trim();
         this.defaultParams = input.defaultParams() == null ? Map.of() : input.defaultParams();
@@ -75,7 +78,7 @@ class CatalogItemEntity {
     }
 
     CatalogItemDto toDto() {
-        return new CatalogItemDto(slug, name, category, description, templateId,
+        return new CatalogItemDto(slug, name, category, familyId, description, templateId,
                 defaultParams == null ? Map.of() : defaultParams, defaultMaterial, basePricePaise, specsLine,
                 environment, available, media == null ? List.of() : media);
     }

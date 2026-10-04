@@ -14,12 +14,12 @@ from pathlib import Path
 from typing import Any
 
 LAUNCH_MATERIALS: list[dict[str, Any]] = [
-    {"id": "basic_white", "name": "Basic White", "density_g_cm3": 1.24},
-    {"id": "terracotta_matte", "name": "Terracotta Matte", "density_g_cm3": 1.24},
-    {"id": "terracotta_silk", "name": "Terracotta Silk", "density_g_cm3": 1.24},
-    {"id": "polished_brass", "name": "Polished Brass", "density_g_cm3": 1.24},
-    {"id": "sandalwood_silk", "name": "Sandalwood Silk", "density_g_cm3": 1.26},
-    {"id": "indigo_matte", "name": "Indigo Matte", "density_g_cm3": 1.24},
+    {"id": "basic_white", "name": "Basic White", "density_g_cm3": 1.24, "finish_class": "matte", "heat_safe": False},
+    {"id": "terracotta_matte", "name": "Terracotta Matte", "density_g_cm3": 1.24, "finish_class": "matte", "heat_safe": False},
+    {"id": "terracotta_silk", "name": "Terracotta Silk", "density_g_cm3": 1.24, "finish_class": "silk", "heat_safe": False},
+    {"id": "polished_brass", "name": "Polished Brass", "density_g_cm3": 1.24, "finish_class": "silk", "heat_safe": False},
+    {"id": "sandalwood_silk", "name": "Sandalwood Silk", "density_g_cm3": 1.26, "finish_class": "silk", "heat_safe": False},
+    {"id": "indigo_matte", "name": "Indigo Matte", "density_g_cm3": 1.24, "finish_class": "matte", "heat_safe": False},
 ]
 
 

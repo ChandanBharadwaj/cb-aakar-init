@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aakar.studio/schemas/experience.v1.json",
+  "title": "Aakar Experiences v1 (Duniya) and viewer environments (Mahaul)",
+  "description": "Experiences are a curation layer on the Shop: a theme that ties a page surface and a stage backdrop to a set of outcome families (Avatars), curated Shop items, a default style, a motif pack and seasons. They add no geometry. Environments are the viewer backdrops that experiences, families, template descriptors and Shop items name; each is rendered by a storefront preset (code), while which backdrop a piece uses is data. Seeded from packages/design-tokens/experiences.json, stored in environments / experiences / experience_avatars / experience_items, edited in the management portal. Code ids stay snake_case English; brand names (codename, title, tagline) are data.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["environments", "experiences"],
+  "properties": {
+    "$comment": { "type": "string" },
+    "environments": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/environment" } },
+    "experiences": { "type": "array", "items": { "$ref": "#/$defs/experience" } }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "maxLength": 40 },
+    "hex_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+    "iso_date": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$",
+      "description": "A calendar date, e.g. 2026-10-20: a one-off window."
+    },
+    "month_day": {
+      "type": "string",
+      "pattern": "^--(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$",
+      "description": "An ISO 8601 month-day, e.g. --10-01: a window that recurs every year and may wrap the new year (--12-20 to --01-05)."
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "surface", "preset_key"],
+      "description": "A viewer backdrop (Mahaul). Read-only reference data until presets become uploadable; adding one is an engineering task (a preset in the storefront viewer) plus a seed row.",
+      "properties": {
+        "id": { "$ref": "#/$defs/id", "description": "What experiences, families, template descriptors and Shop items name as their `environment`." },
+        "label": { "type": "string", "minLength": 1, "maxLength": 80, "description": "Plain name shown in the portal, e.g. 'Chettinad teak · candlelight'." },
+        "surface": {
+          "type": "string",
+          "enum": ["stage", "paper"],
+          "description": "The surface the backdrop sits on: stage (the indigo viewer) or paper (cream browsing pages)."
+        },
+        "preset_key": {
+          "$ref": "#/$defs/id",
+          "description": "The storefront viewer preset that renders it (apps/web src/lib/viewer/environments.ts, keyed like packages/design-tokens/tokens.json environments). Several backdrops may share a preset."
+        },
+        "palette": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/hex_color" },
+          "minItems": 1,
+          "maxItems": 6,
+          "description": "Swatches for the portal's Backgrounds page and theme previews, the backdrop colour first."
+        },
+        "sort_order": { "type": "integer", "default": 100 }
+      }
+    },
+    "surface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["accent"],
+      "description": "Page theming for the experience. The cream paper stays (ADR-0001); the accent and the hero change.",
+      "properties": {
+        "accent": { "$ref": "#/$defs/hex_color", "description": "Accent for chips, links and buttons on the experience page, from the brand palette." },
+        "paper_tint": {
+          "type": ["string", "null"],
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "description": "A light tint laid over the cream paper; null keeps plain cream."
+        },
+        "hero_media": {
+          "type": ["string", "null"],
+          "maxLength": 500,
+          "description": "URL or site path of the page's hero image or loop; null until one is shot (the page then leads with the stage strip)."
+        }
+      }
+    },
+    "collection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title"],
+      "description": "A sub-collection inside an experience, e.g. a licensed universe with its own motif pack. Katha keeps none until a licence exists.",
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "licence_ref": {
+          "type": ["string", "null"],
+          "maxLength": 120,
+          "description": "Reference to the licence agreement that allows the collection; null for original work."
+        }
+      }
+    },
+    "season_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["starts_on", "ends_on", "label"],
+      "description": "When the experience is in season (a badge on the Shop, e.g. 'Diwali'). Both ends are calendar dates (starts_on ≤ ends_on) or both are month-days (recurring every year).",
+      "properties": {
+        "starts_on": { "type": "string" },
+        "ends_on": { "type": "string" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 40 }
+      },
+      "oneOf": [
+        { "properties": { "starts_on": { "$ref": "#/$defs/iso_date" }, "ends_on": { "$ref": "#/$defs/iso_date" } } },
+        { "properties": { "starts_on": { "$ref": "#/$defs/month_day" }, "ends_on": { "$ref": "#/$defs/month_day" } } }
+      ]
+    },
+    "experience": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "codename", "slug", "title", "environment", "surface", "style", "avatars", "available"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id",
+          "description": "snake_case English and never renamed (festive, desk_gaming, memories, kids_party, comics); designs.experience_id references it."
+        },
+        "codename": { "type": "string", "minLength": 1, "maxLength": 40, "description": "Brand name shown to customers, e.g. 'Utsav'. Portal-editable." },
+        "slug": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "minLength": 2,
+          "maxLength": 60,
+          "description": "URL slug of the experience page (/duniya/<slug>), unique. Editable, but links change with it."
+        },
+        "title": { "type": "string", "minLength": 1, "maxLength": 80, "description": "Plain descriptor always shown with the codename, e.g. 'Festive & gifting'." },
+        "tagline": { "type": "string", "maxLength": 120 },
+        "description": { "type": "string", "maxLength": 500 },
+        "environment": { "$ref": "#/$defs/id", "description": "The backdrop (an environments id): the experience page's stage strip and the studio preset." },
+        "surface": { "$ref": "#/$defs/surface" },
+        "style": {
+          "type": "string",
+          "enum": ["none", "jaipur_heritage", "modern_zen", "cyber_desi", "warli_line", "comic_pop"],
+          "default": "none",
+          "description": "Default style variant the studio presets (the design-spec.v1.json style values)."
+        },
+        "motif_pack": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/id" },
+          "uniqueItems": true,
+          "maxItems": 24,
+          "default": [],
+          "description": "Buti offered first in the Chhaap panel, in order: motif ids from the motif library (packages/design-tokens/motifs/index.json), or a pack id naming the set of motifs tagged with it (Katha's comic_bursts)."
+        },
+        "avatars": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/id" },
+          "uniqueItems": true,
+          "maxItems": 24,
+          "description": "Outcome family ids (template-family.v1.json) shown in the theme, in order; carrier and object kinds. The Shop shows the orderable ones."
+        },
+        "items": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9-]{3,60}$" },
+          "uniqueItems": true,
+          "maxItems": 24,
+          "default": [],
+          "description": "Curated Shop item slugs, in order."
+        },
+        "collections": { "type": "array", "items": { "$ref": "#/$defs/collection" }, "maxItems": 24, "default": [] },
+        "season": { "type": "array", "items": { "$ref": "#/$defs/season_window" }, "maxItems": 12, "default": [] },
+        "available": { "type": "boolean", "description": "The staff switch: the Shop lists available experiences only." },
+        "sort_order": { "type": "integer", "default": 100 }
+      }
+    }
+  }
+}

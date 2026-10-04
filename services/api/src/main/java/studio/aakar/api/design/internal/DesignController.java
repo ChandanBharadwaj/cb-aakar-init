@@ -38,7 +38,15 @@ class DesignController {
     @Operation(summary = "Start a design", description = """
             Shop path: `catalog_item_slug` (template and defaults come from the item). \
             Remix-lite / direct path: `template_id` + optional `params`. \
-            Create path: `prompt` → 422 `not_yet_available` until Phase 2. \
+            Avatar path: `family_id` (+ optional `template_id`, else the family's default) + `features` (the Chhaap: a photo \
+            relief, text, a motif or the customer's own form, each content source naming an `upload_id`; the API fills the url). \
+            Swaroop path: `source: upload`, `family_id: raw_print`, `params: {}` and one `hero_mesh` with `fit: longest` and \
+            `longest_mm` inside the family envelope. 404 `unknown_family`, 422 `family_not_available`, 409 `upload_not_ready`, \
+            422 `upload_rejected`, 422 `unsupported_feature` / `param_out_of_range` / `validation_failed` for content (an anchor's \
+            `modes` and `required` content included), 422 `protected_term` for a text (Naam) that names a licensed hero or brand. \
+            Create path: `prompt` without `family_id` → 422 `not_yet_available` until Phase 2. \
+            With `experience_id` the design takes the experience's style as `spec.style` when the template offers it, else `none` \
+            (under `comic_pop` texts and motifs without a mode are raised where the anchor allows it, 1.5 mm deep within its cap). \
             Returns 202 with the design and the first generation job; follow `events_url`. \
             The design belongs to the bearer token's user or to the `X-Aakar-Guest` identity.""")
     ResponseEntity<DesignAccepted> create(@Valid @RequestBody CreateDesignRequest request, Identity identity) {
@@ -68,9 +76,12 @@ class DesignController {
 
     @PostMapping("/versions/{versionId}/params")
     @Tag(name = "versions")
-    @Operation(summary = "Edit parameters → new version (new job)")
-    ResponseEntity<DesignAccepted> editParams(@PathVariable UUID versionId, @Valid @RequestBody EditParamsRequest request) {
-        return ResponseEntity.status(HttpStatus.ACCEPTED).body(designs.editParams(versionId, request));
+    @Operation(summary = "Edit parameters → new version (new job)", description = "`features` replaces the parent version's content "
+            + "features when present (an empty array clears them); omitted or null keeps them. A new upload must belong to the caller. "
+            + "The parent's style stays; every text (Naam), kept or new, is checked again: 422 `protected_term` when it names a licensed "
+            + "hero or brand.")
+    ResponseEntity<DesignAccepted> editParams(@PathVariable UUID versionId, @Valid @RequestBody EditParamsRequest request, Identity identity) {
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(designs.editParams(versionId, request, identity));
     }
 
     @GetMapping("/versions/{versionId}/printability")

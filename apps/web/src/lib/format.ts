@@ -5,6 +5,17 @@ export function formatMm(value: number, digits = 0): string {
   return `${value.toFixed(digits).replace(/\.0+$/, "")} mm`;
 }
 
+/** "photo relief" → "Photo relief". */
+export function capitalise(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** ["a photo", "your name"] → "a photo or your name"; three or more take commas: "a, b and c". */
+export function joinList(parts: readonly string[], conjunction: "and" | "or" = "and"): string {
+  if (parts.length <= 1) return parts.join("");
+  return `${parts.slice(0, -1).join(", ")} ${conjunction} ${parts[parts.length - 1]}`;
+}
+
 /** 84.3 → "84 g". */
 export function formatGrams(value: number): string {
   return `${Math.round(value)} g`;
