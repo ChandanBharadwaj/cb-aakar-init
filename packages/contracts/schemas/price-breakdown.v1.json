@@ -18,7 +18,7 @@
         "additionalProperties": false,
         "required": ["code", "label", "amount_paise"],
         "properties": {
-          "code": { "type": "string", "enum": ["material", "machine_time", "finishing", "packaging", "hardware", "setup"] },
+          "code": { "type": "string", "enum": ["material", "machine_time", "finishing", "packaging", "hardware", "setup", "assembly", "base"], "description": "assembly: the studio's time seating a Chhaap on its base (hybrid families). base: the bought-in base itself, added after margin, rounding and the family minimum, never marked up by them; absent for a customer-owned base." },
           "label": { "type": "string", "description": "Customer-facing, e.g. 'Material · 84 g' or 'Print time · 3 h 40 m'." },
           "detail": { "type": "string" },
           "amount_paise": { "type": "integer", "minimum": 0 }
@@ -31,6 +31,8 @@
     "total_paise": { "type": "integer" },
     "policy_version": { "type": "string" },
     "family_id": { "type": "string", "description": "Outcome family the piece belongs to, when known; drives hardware, setup and minimum rules." },
-    "minimum_subtotal_paise": { "type": "integer", "minimum": 0, "description": "Present when the family's minimum lifted the subtotal above the computed lines." }
+    "minimum_subtotal_paise": { "type": "integer", "minimum": 0, "description": "Present when the family's minimum lifted the subtotal above the computed lines." },
+    "base_sku": { "type": "string", "description": "The bought-in base priced on the base line (hybrid pieces), or the customer-owned class the piece fits." },
+    "shipping_weight_g": { "type": "number", "minimum": 0, "description": "Print mass plus the base's and the hardware's weight: what the policy's shipping_tiers are read against (the cart sums it over quantities)." }
   }
 }

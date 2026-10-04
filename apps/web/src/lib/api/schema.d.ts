@@ -236,6 +236,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/bases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bought-in bases (Buniyaad) that hybrid families (Jod) plug into
+         * @description Available bases only, in display order, with the hybrid families that fit each one (`families`, the ids of
+         *     orderable families listing the base). Stock is summarised, never itemised: `availability.in_stock`,
+         *     `available_qty` (stock minus reservations, capped for display) and `lead_days`. A customer-owned base (the
+         *     customer's own bottle or pot) is a size class: `customer_owned`, no price, always in stock.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Only bases that family lists */
+                    family_id?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Bases */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BaseItem"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bases/{sku}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One base, available or not (`available` says whether it is offered) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    sku: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Base */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BaseItem"];
+                    };
+                };
+                /** @description unknown_base */
+                404: components["responses"]["Problem"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/experiences": {
         parameters: {
             query?: never;
@@ -652,6 +737,10 @@ export interface paths {
          *     experience's style as `spec.style` when the template offers it (`style_variants`), else `none`. Under
          *     `comic_pop` a text or motif without a `mode` is raised where its anchor allows it, and a raised one without a
          *     `depth_mm` stands 1.5 mm proud (capped at the anchor's `max_relief_mm`); explicit choices and photos are left alone.
+         *     A hybrid family (Jod) needs a base: `base_sku` names one of the family's bases, else the family's default is taken
+         *     (422 `base_required` when the family lists none that is available); 404 `unknown_base`, 422 `base_not_available`
+         *     (switched off or out of stock with no lead time), 422 `incompatible_base` (the base's Kadi is not the family's).
+         *     The version keeps the base (`base_sku`, `base`) and its spec carries `spec.base` for the geometry service.
          *     Content is checked as the geometry service will build it: 422 `unsupported_feature` when a feature's mode (its
          *     type's default when left out) is not in its anchor's `modes` (`params.field` = `features[i].mode`), 422
          *     `validation_failed` when an anchor marked `required` has no content, and 422 `protected_term` when a text (Naam)
@@ -839,6 +928,8 @@ export interface paths {
                         features?: {
                             [key: string]: unknown;
                         }[] | null;
+                        /** @description Hybrid pieces: switch the base (one the family lists; same errors as POST /api/designs); omitted or null keeps the parent's */
+                        base_sku?: string | null;
                     };
                 };
             };
@@ -1942,6 +2033,12 @@ export interface paths {
                             reprint_path: string;
                             /** @description Storefront path that opens the design for editing, e.g. /design/<design_id> */
                             remix_path: string;
+                            /** @description Hybrid pieces: the base the printed part plugs into */
+                            base_sku?: string | null;
+                            /** @description Its customer-facing name, e.g. Steel headphone stand */
+                            base_name?: string | null;
+                            /** @description Storefront page of the base with every top that fits it, e.g. /shop/base/<sku> */
+                            base_path?: string | null;
                         };
                     };
                 };
@@ -2058,10 +2155,14 @@ export interface components {
             unit_price: components["schemas"]["price-breakdown.v1"];
             line_total_paise: number;
             thumbnail_url?: string | null;
-            /** @description False when the version failed printability or the template is no longer live */
+            /** @description False when the version failed printability, the template is no longer live, or the piece's base is switched off or out of stock with no lead time */
             purchasable: boolean;
             /** @description True when the active pricing policy changed since the item was added */
             repriced?: boolean;
+            /** @description The outcome family of the piece, for the cart's Jod cross-sell */
+            family_id?: string | null;
+            /** @description Hybrid pieces: the base shipped with the printed part (or the customer-owned class it fits), with its availability */
+            base?: components["schemas"]["BaseItem"] | null;
         };
         Cart: {
             /** Format: uuid */
@@ -2072,16 +2173,18 @@ export interface components {
             subtotal_paise: number;
             shipping_paise: number;
             shipping_label?: string;
+            /** @description Sum of the items' shipping_weight_g × qty: what the weight tier was read against */
+            shipping_weight_g?: number;
             total_paise: number;
             policy_version: string;
             /** Format: date-time */
             updated_at: string;
         };
         /**
-         * @description Internal status. The customer stage is derived.
+         * @description Internal status. The customer stage is derived. assembling (the Chhaap seated on its base, an adapter bonded) sits between finishing and qc and is offered only for orders that carry a base.
          * @enum {string}
          */
-        OrderStatus: "pending_payment" | "confirmed" | "queued" | "slicing" | "printing" | "finishing" | "qc" | "packed" | "shipped" | "delivered" | "cancelled" | "on_hold" | "reprint";
+        OrderStatus: "pending_payment" | "confirmed" | "queued" | "slicing" | "printing" | "finishing" | "assembling" | "qc" | "packed" | "shipped" | "delivered" | "cancelled" | "on_hold" | "reprint";
         /**
          * @description Customer-facing collapsed stage (board 06).
          * @enum {string}
@@ -2106,6 +2209,12 @@ export interface components {
             assets?: {
                 [key: string]: unknown;
             };
+            /** @description Hybrid pieces: the base shipped with (or fitted by) this item */
+            base_sku?: string | null;
+            /** @description The base as sold: sku, name, customer_owned, weight_g, the base price line, the adapter sku and the Kadi (kind, nominal_mm), so the print pack and the card never drift */
+            base_snapshot?: {
+                [key: string]: unknown;
+            } | null;
         };
         OrderSummary: {
             /** Format: uuid */
@@ -2261,6 +2370,99 @@ export interface components {
             /** @description Customer-facing hardware name, filled by the API from hardware_items */
             name?: string;
         };
+        /** @description The Kadi a hybrid family (Jod) cuts into its Chhaap. Same fields as schemas/template-family.v1.json#/$defs/connector. */
+        Connector: {
+            /** @enum {string} */
+            kind: "socket" | "dovetail" | "magnet" | "thread" | "rim_clip";
+            nominal_mm: number;
+            /** @enum {string} */
+            fit: "slide" | "press_ribbed" | "snap" | "pocket";
+            /**
+             * @description rim_clip only
+             * @enum {string}
+             */
+            form?: "cap" | "lid" | "rim";
+            /**
+             * @description thread only
+             * @enum {string}
+             */
+            thread?: "unc_1_4" | "m10x1" | "e27" | "e14";
+            /**
+             * @description magnet only
+             * @enum {string}
+             */
+            mode?: "magnets" | "steel_disc";
+            /** @description Bought-in male part packed with the piece when the base has none of its own */
+            adapter_sku?: string;
+        };
+        /** @description What a base presents to the Chhaap, seen from the male side. Same fields as schemas/template-family.v1.json#/$defs/base_interface. */
+        BaseInterface: {
+            /** @enum {string} */
+            kind: "socket" | "dovetail" | "magnet" | "thread" | "rim_clip";
+            nominal_mm: number;
+            /** @enum {string} */
+            tolerance_class?: "machined" | "molded" | "wood" | "ceramic" | "glass" | "steel";
+            /** @description Customer-owned bases: the size class the Chhaap grips */
+            range_mm?: number[];
+            /** @enum {string} */
+            form?: "cap" | "lid" | "rim";
+            /** @enum {string} */
+            thread?: "unc_1_4" | "m10x1" | "e27" | "e14";
+            /** @enum {string} */
+            mode?: "magnets" | "steel_disc";
+            adapter_sku?: string;
+        };
+        /** @description Where the Chhaap's connector mouth sits on the base, in the base's frame (standing on z = 0, centred on the z axis). */
+        MountFrame: {
+            origin_mm: number[];
+            up: number[];
+            forward?: number[];
+        };
+        BaseAvailability: {
+            /** @description True when stock minus reservations is positive, or the base is customer-owned */
+            in_stock: boolean;
+            /** @description Stock minus reservations, capped at 20 for display; 0 for a customer-owned base */
+            available_qty: number;
+            lead_days: number;
+            /** @description Customer copy, e.g. 'In stock · ships in 2 days', 'Back in about 7 days', 'Yours already' */
+            label: string;
+        };
+        /**
+         * @description A bought-in base (Buniyaad) a hybrid family's Chhaap plugs into: the public view of
+         *     schemas/template-family.v1.json#/$defs/base_item (no cost, supplier or stock ledger).
+         */
+        BaseItem: {
+            sku: string;
+            /** @description Customer-facing, e.g. Steel headphone stand */
+            name: string;
+            description?: string;
+            /** @enum {string} */
+            category: "desk" | "home" | "lighting" | "auto" | "kids" | "bath" | "plants";
+            base_material: string;
+            /** @description Width, depth, height */
+            dimensions_mm: number[];
+            weight_g: number;
+            interface: components["schemas"]["BaseInterface"];
+            mount_frame: components["schemas"]["MountFrame"];
+            /** @description The base's model for the two-model viewer (generated from its preview shape, or uploaded by staff) */
+            preview_glb_url?: string | null;
+            photos?: {
+                url: string;
+                alt?: string;
+            }[];
+            finish_pbr: components["schemas"]["Material"]["pbr"];
+            /** @description The base line a customer pays (retail, or cost with the policy's base markup); null for a customer-owned base */
+            price_paise?: number | null;
+            customer_owned: boolean;
+            lead_days: number;
+            hsn_code?: string | null;
+            compliance_notes?: string | null;
+            available: boolean;
+            availability: components["schemas"]["BaseAvailability"];
+            /** @description Ids of the orderable hybrid families that list this base, default-first */
+            families: string[];
+            sort_order?: number;
+        };
         /** @description An outcome category (Avatar). Same fields as schemas/template-family.v1.json#/$defs/family plus read-only state. */
         Family: {
             id: string;
@@ -2302,8 +2504,18 @@ export interface components {
             /** @description True when at least one live template of this family exists in the geometry service */
             ready: boolean;
             templates: components["schemas"]["template-descriptor.v1"][];
-            /** @description A floor: the family's minimum from the active pricing policy, when one is set */
+            /** @description A floor: the family's minimum from the active pricing policy, when one is set; for a hybrid family the default base's price line is added */
             price_from_paise?: number | null;
+            /** @description Hybrid families: the Kadi their templates cut */
+            connector?: components["schemas"]["Connector"] | null;
+            /** @description Hybrid families: the bases the Chhaap fits, default first; only available ones (a customer-owned class always is) */
+            bases?: components["schemas"]["BaseItem"][];
+            /** @description Studio time to seat the Chhaap on its base */
+            assembly_minutes?: number | null;
+            /** @description The other form of the same idea (the fully printed family for a hybrid, and the reverse) for the 'Whole or plug-in?' compare */
+            pair_family_id?: string | null;
+            /** @description Printer time of a typical piece, for the compare card */
+            typical_print_minutes?: number | null;
         };
         /** @description A viewer backdrop (Mahaul). Same fields as schemas/experience.v1.json#/$defs/environment. */
         Environment: {
@@ -2383,6 +2595,11 @@ export interface components {
             sort_order: number;
             /** @description The lowest price_from_paise among the avatars (a floor for 'from ₹249'); null when none sets one */
             price_from_paise?: number | null;
+            /** @description Family kinds the theme page lists first and the ribbon they wear (a Jod: 'Faster · lighter on the pocket'); null keeps the avatars' own order */
+            promote?: {
+                kinds: ("carrier" | "object" | "raw" | "hybrid")[];
+                ribbon?: string;
+            } | null;
         };
         Upload: {
             /** Format: uuid */
@@ -2420,6 +2637,8 @@ export interface components {
             title?: string;
             /** @description The Duniya experience the customer started from (an id from GET /api/experiences, e.g. festive); 422 unknown_experience otherwise. Its style becomes spec.style when the template offers it (style_variants), else none */
             experience_id?: string;
+            /** @description Hybrid families: the base the Chhaap will plug into (one of the family's bases; its default when omitted). 404 unknown_base, 422 base_not_available / incompatible_base / base_required */
+            base_sku?: string;
         };
         DesignAccepted: {
             /** Format: uuid */
@@ -2475,6 +2694,10 @@ export interface components {
             family_id?: string | null;
             /** @description Bought-in parts packed with this piece */
             hardware?: components["schemas"]["HardwareRef"][];
+            /** @description Hybrid pieces: the base this version was modelled for */
+            base_sku?: string | null;
+            /** @description That base with its availability, for the two-model viewer and the Ships line */
+            base?: components["schemas"]["BaseItem"] | null;
             karigar_note?: string;
             /** Format: uuid */
             job_id?: string;
@@ -2613,7 +2836,7 @@ export interface components {
             }[];
             /** @description Smallest printable stroke or detail (0.8 mm for a 0.4 mm nozzle); text and silhouette checks use it. */
             min_feature_mm?: number;
-            /** @description Hybrid (Jod) templates only: the Kadi cut into the piece so it plugs into a bought-in base. The female feature is always on the printed Chhaap (it prints flat, no supports); the male side belongs to the base or to the bought-in adapter adapter_sku. Phase 1 builds the ribbed press socket (Kadi-S). */
+            /** @description Hybrid (Jod) templates only: the Kadi cut into the piece so it plugs into a bought-in base. The female feature is always on the printed Chhaap (it prints flat, no supports); the male side belongs to the base or to the bought-in adapter adapter_sku. Kadi-S is the ribbed press socket; Kadi-D the dovetail channel (form-free, slide fit); Kadi-T a thread or an E27 / E14 shade collar; Kadi-M the magnet pockets or steel-disc pocket; Kadi-C the compliant rim clip (cap skirt, lid lip or rim jaws), PETG only. */
             connector?: {
                 /** @enum {string} */
                 kind: "socket" | "dovetail" | "magnet" | "thread" | "rim_clip";
@@ -2626,8 +2849,23 @@ export interface components {
                 fit: "slide" | "press_ribbed" | "snap" | "pocket";
                 depth_mm?: number;
                 rib_count?: number;
-                /** @description Diametral clearance between the printed bore wall and the pin. */
+                /** @description Diametral clearance between the printed bore wall and the pin (flank clearance for a rail, radial for a thread, pocket clearance for a disc, lip over-travel for a clip). */
                 clearance_mm?: number;
+                /**
+                 * @description rim_clip only: a skirt over a cap, a lip inside an opening, or C-jaws over a rim.
+                 * @enum {string}
+                 */
+                form?: "cap" | "lid" | "rim";
+                /**
+                 * @description thread only: the standard; e27 and e14 are collar holes clamped by the holder's shade ring, not threads.
+                 * @enum {string}
+                 */
+                thread?: "unc_1_4" | "m10x1" | "e27" | "e14";
+                /**
+                 * @description magnet only: magnets in pockets, or one steel disc that holds to the base's magnet.
+                 * @enum {string}
+                 */
+                mode?: "magnets" | "steel_disc";
                 /** @description hardware_items sku of the bought-in male part packed when the base has no pin of its own. */
                 adapter_sku?: string;
             };
@@ -2810,6 +3048,35 @@ export interface components {
              */
             bed_mm: number[];
         };
+        /** @description Hybrid (Jod) pieces only: the bought-in base this Chhaap plugs into, filled by the API from the base item's interface (never by the customer or the agent). The geometry service refuses a template whose Kadi disagrees with it (incompatible_base), models the connector for this base's pin and tolerance class, and reports fit_tested on the connector_fit check; it adds no geometry of the base. */
+        base: {
+            sku: string;
+            /**
+             * @description The Kadi the base presents; must equal the template's connector kind.
+             * @enum {string}
+             */
+            kind?: "socket" | "dovetail" | "magnet" | "thread" | "rim_clip";
+            /** @description The size the base presents; must equal the template's connector nominal. */
+            nominal_mm?: number;
+            /** @description Measured pin (rail, disc, cap, rim) size when the studio measured this base; defaults to nominal_mm. */
+            pin_d_mm?: number;
+            /** @enum {string} */
+            tolerance_class?: "machined" | "molded" | "wood" | "ceramic" | "glass" | "steel";
+            /** @description The size class of a customer-owned base. */
+            range_mm?: number[];
+            /** @enum {string} */
+            form?: "cap" | "lid" | "rim";
+            /** @enum {string} */
+            thread?: "unc_1_4" | "m10x1" | "e27" | "e14";
+            /** @enum {string} */
+            mode?: "magnets" | "steel_disc";
+            adapter_sku?: string;
+            /**
+             * @description True when a passing fit test exists for this base and the spec's material; connector_fit then passes instead of warning 'fit test pending'.
+             * @default false
+             */
+            fit_tested: boolean;
+        };
         /**
          * Aakar Design Spec v1
          * @description The only thing the co-designer agent (or a viewer control) may hand to the geometry service. Geometry is produced by our own templates from this document; no executable code ever crosses this boundary.
@@ -2836,7 +3103,37 @@ export interface components {
             /** @description Digital material id, e.g. terracotta_silk. Affects rendering and price, never geometry. */
             material?: string;
             constraints?: components["schemas"]["constraints"];
+            base?: components["schemas"]["base"];
             $defs: {
+                /** @description Hybrid (Jod) pieces only: the bought-in base this Chhaap plugs into, filled by the API from the base item's interface (never by the customer or the agent). The geometry service refuses a template whose Kadi disagrees with it (incompatible_base), models the connector for this base's pin and tolerance class, and reports fit_tested on the connector_fit check; it adds no geometry of the base. */
+                base: {
+                    sku: string;
+                    /**
+                     * @description The Kadi the base presents; must equal the template's connector kind.
+                     * @enum {string}
+                     */
+                    kind?: "socket" | "dovetail" | "magnet" | "thread" | "rim_clip";
+                    /** @description The size the base presents; must equal the template's connector nominal. */
+                    nominal_mm?: number;
+                    /** @description Measured pin (rail, disc, cap, rim) size when the studio measured this base; defaults to nominal_mm. */
+                    pin_d_mm?: number;
+                    /** @enum {string} */
+                    tolerance_class?: "machined" | "molded" | "wood" | "ceramic" | "glass" | "steel";
+                    /** @description The size class of a customer-owned base. */
+                    range_mm?: number[];
+                    /** @enum {string} */
+                    form?: "cap" | "lid" | "rim";
+                    /** @enum {string} */
+                    thread?: "unc_1_4" | "m10x1" | "e27" | "e14";
+                    /** @enum {string} */
+                    mode?: "magnets" | "steel_disc";
+                    adapter_sku?: string;
+                    /**
+                     * @description True when a passing fit test exists for this base and the spec's material; connector_fit then passes instead of warning 'fit test pending'.
+                     * @default false
+                     */
+                    fit_tested: boolean;
+                };
                 constraints: {
                     /** @default 1.2 */
                     min_wall_mm: number;
@@ -3044,8 +3341,11 @@ export interface components {
             mass_g: number;
             print_seconds: number;
             lines: {
-                /** @enum {string} */
-                code: "material" | "machine_time" | "finishing" | "packaging" | "hardware" | "setup";
+                /**
+                 * @description assembly: the studio's time seating a Chhaap on its base (hybrid families). base: the bought-in base itself, added after margin, rounding and the family minimum, never marked up by them; absent for a customer-owned base.
+                 * @enum {string}
+                 */
+                code: "material" | "machine_time" | "finishing" | "packaging" | "hardware" | "setup" | "assembly" | "base";
                 /** @description Customer-facing, e.g. 'Material · 84 g' or 'Print time · 3 h 40 m'. */
                 label: string;
                 detail?: string;
@@ -3062,6 +3362,10 @@ export interface components {
             family_id?: string;
             /** @description Present when the family's minimum lifted the subtotal above the computed lines. */
             minimum_subtotal_paise?: number;
+            /** @description The bought-in base priced on the base line (hybrid pieces), or the customer-owned class the piece fits. */
+            base_sku?: string;
+            /** @description Print mass plus the base's and the hardware's weight: what the policy's shipping_tiers are read against (the cart sums it over quantities). */
+            shipping_weight_g?: number;
         };
         /**
          * Aakar Event Envelope v1
@@ -3098,7 +3402,7 @@ export interface components {
                     status?: number;
                     detail?: string;
                     instance?: string;
-                    /** @description Stable machine code, e.g. not_found, validation_failed, not_yet_available, param_out_of_range, unsupported_feature, protected_term (a text naming a licensed hero or brand), version_not_ready, unauthenticated, otp_invalid, otp_expired, otp_rate_limited, not_printable, cart_empty, not_serviceable, payment_final, unknown_family, unknown_experience */
+                    /** @description Stable machine code, e.g. not_found, validation_failed, not_yet_available, param_out_of_range, unsupported_feature, protected_term (a text naming a licensed hero or brand), version_not_ready, unauthenticated, otp_invalid, otp_expired, otp_rate_limited, not_printable, cart_empty, not_serviceable, payment_final, unknown_family, unknown_experience, unknown_base, base_required, base_not_available, incompatible_base, base_out_of_stock */
                     code?: string;
                 };
             };

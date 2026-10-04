@@ -85,6 +85,31 @@ paths:
       responses:
         '200': { description: Family, content: { application/json: { schema: { $ref: '#/components/schemas/Family' } } } }
         '404': { description: unknown_family, $ref: '#/components/responses/Problem' }
+  /api/bases:
+    get:
+      summary: Bought-in bases (Buniyaad) that hybrid families (Jod) plug into
+      description: |
+        Available bases only, in display order, with the hybrid families that fit each one (`families`, the ids of
+        orderable families listing the base). Stock is summarised, never itemised: `availability.in_stock`,
+        `available_qty` (stock minus reservations, capped for display) and `lead_days`. A customer-owned base (the
+        customer's own bottle or pot) is a size class: `customer_owned`, no price, always in stock.
+      tags: [bases]
+      parameters:
+        - { name: family_id, in: query, schema: { type: string }, description: Only bases that family lists }
+      responses:
+        '200':
+          description: Bases
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/BaseItem' } }
+  /api/bases/{sku}:
+    get:
+      summary: One base, available or not (`available` says whether it is offered)
+      tags: [bases]
+      parameters: [{ name: sku, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: Base, content: { application/json: { schema: { $ref: '#/components/schemas/BaseItem' } } } }
+        '404': { description: unknown_base, $ref: '#/components/responses/Problem' }
   /api/experiences:
     get:
       summary: Experiences (Duniya) on the Shop, in display order
@@ -218,6 +243,10 @@ paths:
         experience's style as `spec.style` when the template offers it (`style_variants`), else `none`. Under
         `comic_pop` a text or motif without a `mode` is raised where its anchor allows it, and a raised one without a
         `depth_mm` stands 1.5 mm proud (capped at the anchor's `max_relief_mm`); explicit choices and photos are left alone.
+        A hybrid family (Jod) needs a base: `base_sku` names one of the family's bases, else the family's default is taken
+        (422 `base_required` when the family lists none that is available); 404 `unknown_base`, 422 `base_not_available`
+        (switched off or out of stock with no lead time), 422 `incompatible_base` (the base's Kadi is not the family's).
+        The version keeps the base (`base_sku`, `base`) and its spec carries `spec.base` for the geometry service.
         Content is checked as the geometry service will build it: 422 `unsupported_feature` when a feature's mode (its
         type's default when left out) is not in its anchor's `modes` (`params.field` = `features[i].mode`), 422
         `validation_failed` when an anchor marked `required` has no content, and 422 `protected_term` when a text (Naam)
@@ -283,6 +312,7 @@ paths:
                   maxItems: 8
                   description: Replaces the parent version's features when present (empty array clears them); omitted or null keeps them. Items follow schemas/design-spec.v1.json#/$defs/feature.
                   items: { type: object, additionalProperties: true }
+                base_sku: { type: [string, 'null'], description: "Hybrid pieces: switch the base (one the family lists; same errors as POST /api/designs); omitted or null keeps the parent's" }
       responses:
         '202': { description: Accepted, content: { application/json: { schema: { $ref: '#/components/schemas/DesignAccepted' } } } }
         '400': { description: More than 8 features or a malformed body, $ref: '#/components/responses/Problem' }
@@ -642,6 +672,9 @@ paths:
                   thumbnail_url: { type: [string, 'null'] }
                   reprint_path: { type: string, description: "Storefront path that recreates this exact piece in the cart, e.g. /design/new?version=<id>&material=<id>" }
                   remix_path: { type: string, description: "Storefront path that opens the design for editing, e.g. /design/<design_id>" }
+                  base_sku: { type: [string, 'null'], description: "Hybrid pieces: the base the printed part plugs into" }
+                  base_name: { type: [string, 'null'], description: "Its customer-facing name, e.g. Steel headphone stand" }
+                  base_path: { type: [string, 'null'], description: "Storefront page of the base with every top that fits it, e.g. /shop/base/<sku>" }
         '404': { $ref: '#/components/responses/Problem' }
   /internal/jobs/{jobId}/callback:
     post:
@@ -681,7 +714,7 @@ components:
               instance: { type: string }
               code:
                 type: string
-                description: "Stable machine code, e.g. not_found, validation_failed, not_yet_available, param_out_of_range, unsupported_feature, protected_term (a text naming a licensed hero or brand), version_not_ready, unauthenticated, otp_invalid, otp_expired, otp_rate_limited, not_printable, cart_empty, not_serviceable, payment_final, unknown_family, unknown_experience"
+                description: "Stable machine code, e.g. not_found, validation_failed, not_yet_available, param_out_of_range, unsupported_feature, protected_term (a text naming a licensed hero or brand), version_not_ready, unauthenticated, otp_invalid, otp_expired, otp_rate_limited, not_printable, cart_empty, not_serviceable, payment_final, unknown_family, unknown_experience, unknown_base, base_required, base_not_available, incompatible_base, base_out_of_stock"
   schemas:
     User:
       type: object
@@ -743,8 +776,10 @@ components:
         unit_price: { $ref: '../schemas/price-breakdown.v1.json' }
         line_total_paise: { type: integer }
         thumbnail_url: { type: [string, 'null'] }
-        purchasable: { type: boolean, description: False when the version failed printability or the template is no longer live }
+        purchasable: { type: boolean, description: "False when the version failed printability, the template is no longer live, or the piece's base is switched off or out of stock with no lead time" }
         repriced: { type: boolean, description: True when the active pricing policy changed since the item was added }
+        family_id: { type: [string, 'null'], description: "The outcome family of the piece, for the cart's Jod cross-sell" }
+        base: { oneOf: [{ $ref: '#/components/schemas/BaseItem' }, { type: 'null' }], description: "Hybrid pieces: the base shipped with the printed part (or the customer-owned class it fits), with its availability" }
     Cart:
       type: object
       required: [id, owner, items, subtotal_paise, shipping_paise, total_paise, policy_version, updated_at]
@@ -755,13 +790,14 @@ components:
         subtotal_paise: { type: integer }
         shipping_paise: { type: integer }
         shipping_label: { type: string }
+        shipping_weight_g: { type: number, description: "Sum of the items' shipping_weight_g × qty: what the weight tier was read against" }
         total_paise: { type: integer }
         policy_version: { type: string }
         updated_at: { type: string, format: date-time }
     OrderStatus:
       type: string
-      description: Internal status. The customer stage is derived.
-      enum: [pending_payment, confirmed, queued, slicing, printing, finishing, qc, packed, shipped, delivered, cancelled, on_hold, reprint]
+      description: "Internal status. The customer stage is derived. assembling (the Chhaap seated on its base, an adapter bonded) sits between finishing and qc and is offered only for orders that carry a base."
+      enum: [pending_payment, confirmed, queued, slicing, printing, finishing, assembling, qc, packed, shipped, delivered, cancelled, on_hold, reprint]
     OrderStage:
       type: string
       description: Customer-facing collapsed stage (board 06).
@@ -782,6 +818,8 @@ components:
         unit_price: { $ref: '../schemas/price-breakdown.v1.json' }
         line_total_paise: { type: integer }
         assets: { type: object, additionalProperties: true, description: Snapshot of the version assets at order time }
+        base_sku: { type: [string, 'null'], description: "Hybrid pieces: the base shipped with (or fitted by) this item" }
+        base_snapshot: { type: [object, 'null'], additionalProperties: true, description: "The base as sold: sku, name, customer_owned, weight_g, the base price line, the adapter sku and the Kadi (kind, nominal_mm), so the print pack and the card never drift" }
     OrderSummary:
       type: object
       required: [id, number, status, stage, total_paise, items_count, placed_at]
@@ -918,6 +956,75 @@ components:
         sku: { type: string }
         qty: { type: integer }
         name: { type: string, description: "Customer-facing hardware name, filled by the API from hardware_items" }
+    Connector:
+      type: object
+      description: The Kadi a hybrid family (Jod) cuts into its Chhaap. Same fields as schemas/template-family.v1.json#/$defs/connector.
+      required: [kind, nominal_mm, fit]
+      properties:
+        kind: { type: string, enum: [socket, dovetail, magnet, thread, rim_clip] }
+        nominal_mm: { type: number }
+        fit: { type: string, enum: [slide, press_ribbed, snap, pocket] }
+        form: { type: string, enum: [cap, lid, rim], description: rim_clip only }
+        thread: { type: string, enum: [unc_1_4, m10x1, e27, e14], description: thread only }
+        mode: { type: string, enum: [magnets, steel_disc], description: magnet only }
+        adapter_sku: { type: string, description: Bought-in male part packed with the piece when the base has none of its own }
+    BaseInterface:
+      type: object
+      description: What a base presents to the Chhaap, seen from the male side. Same fields as schemas/template-family.v1.json#/$defs/base_interface.
+      required: [kind, nominal_mm]
+      properties:
+        kind: { type: string, enum: [socket, dovetail, magnet, thread, rim_clip] }
+        nominal_mm: { type: number }
+        tolerance_class: { type: string, enum: [machined, molded, wood, ceramic, glass, steel] }
+        range_mm: { type: array, items: { type: number }, minItems: 2, maxItems: 2, description: "Customer-owned bases: the size class the Chhaap grips" }
+        form: { type: string, enum: [cap, lid, rim] }
+        thread: { type: string, enum: [unc_1_4, m10x1, e27, e14] }
+        mode: { type: string, enum: [magnets, steel_disc] }
+        adapter_sku: { type: string }
+    MountFrame:
+      type: object
+      description: Where the Chhaap's connector mouth sits on the base, in the base's frame (standing on z = 0, centred on the z axis).
+      required: [origin_mm, up]
+      properties:
+        origin_mm: { type: array, items: { type: number }, minItems: 3, maxItems: 3 }
+        up: { type: array, items: { type: number }, minItems: 3, maxItems: 3 }
+        forward: { type: array, items: { type: number }, minItems: 3, maxItems: 3 }
+    BaseAvailability:
+      type: object
+      required: [in_stock, available_qty, lead_days, label]
+      properties:
+        in_stock: { type: boolean, description: "True when stock minus reservations is positive, or the base is customer-owned" }
+        available_qty: { type: integer, description: "Stock minus reservations, capped at 20 for display; 0 for a customer-owned base" }
+        lead_days: { type: integer }
+        label: { type: string, description: "Customer copy, e.g. 'In stock · ships in 2 days', 'Back in about 7 days', 'Yours already'" }
+    BaseItem:
+      type: object
+      description: |
+        A bought-in base (Buniyaad) a hybrid family's Chhaap plugs into: the public view of
+        schemas/template-family.v1.json#/$defs/base_item (no cost, supplier or stock ledger).
+      required: [sku, name, category, base_material, dimensions_mm, weight_g, interface, mount_frame, finish_pbr, customer_owned, lead_days, available, availability, families]
+      properties:
+        sku: { type: string }
+        name: { type: string, description: "Customer-facing, e.g. Steel headphone stand" }
+        description: { type: string }
+        category: { type: string, enum: [desk, home, lighting, auto, kids, bath, plants] }
+        base_material: { type: string }
+        dimensions_mm: { type: array, items: { type: number }, minItems: 3, maxItems: 3, description: "Width, depth, height" }
+        weight_g: { type: number }
+        interface: { $ref: '#/components/schemas/BaseInterface' }
+        mount_frame: { $ref: '#/components/schemas/MountFrame' }
+        preview_glb_url: { type: [string, 'null'], description: "The base's model for the two-model viewer (generated from its preview shape, or uploaded by staff)" }
+        photos: { type: array, items: { type: object, required: [url], properties: { url: { type: string }, alt: { type: string } } } }
+        finish_pbr: { $ref: '#/components/schemas/Material/properties/pbr' }
+        price_paise: { type: [integer, 'null'], description: "The base line a customer pays (retail, or cost with the policy's base markup); null for a customer-owned base" }
+        customer_owned: { type: boolean }
+        lead_days: { type: integer }
+        hsn_code: { type: [string, 'null'] }
+        compliance_notes: { type: [string, 'null'] }
+        available: { type: boolean }
+        availability: { $ref: '#/components/schemas/BaseAvailability' }
+        families: { type: array, items: { type: string }, description: "Ids of the orderable hybrid families that list this base, default-first" }
+        sort_order: { type: integer }
     Family:
       type: object
       description: An outcome category (Avatar). Same fields as schemas/template-family.v1.json#/$defs/family plus read-only state.
@@ -959,7 +1066,12 @@ components:
         sort_order: { type: integer }
         ready: { type: boolean, description: True when at least one live template of this family exists in the geometry service }
         templates: { type: array, items: { $ref: '../schemas/template-descriptor.v1.json' } }
-        price_from_paise: { type: [integer, 'null'], description: "A floor: the family's minimum from the active pricing policy, when one is set" }
+        price_from_paise: { type: [integer, 'null'], description: "A floor: the family's minimum from the active pricing policy, when one is set; for a hybrid family the default base's price line is added" }
+        connector: { oneOf: [{ $ref: '#/components/schemas/Connector' }, { type: 'null' }], description: "Hybrid families: the Kadi their templates cut" }
+        bases: { type: array, items: { $ref: '#/components/schemas/BaseItem' }, description: "Hybrid families: the bases the Chhaap fits, default first; only available ones (a customer-owned class always is)" }
+        assembly_minutes: { type: [integer, 'null'], description: Studio time to seat the Chhaap on its base }
+        pair_family_id: { type: [string, 'null'], description: "The other form of the same idea (the fully printed family for a hybrid, and the reverse) for the 'Whole or plug-in?' compare" }
+        typical_print_minutes: { type: [integer, 'null'], description: "Printer time of a typical piece, for the compare card" }
     Environment:
       type: object
       description: A viewer backdrop (Mahaul). Same fields as schemas/experience.v1.json#/$defs/environment.
@@ -1020,6 +1132,13 @@ components:
         available: { type: boolean, description: Whether the Shop lists it }
         sort_order: { type: integer }
         price_from_paise: { type: [integer, 'null'], description: "The lowest price_from_paise among the avatars (a floor for 'from ₹249'); null when none sets one" }
+        promote:
+          type: [object, 'null']
+          description: "Family kinds the theme page lists first and the ribbon they wear (a Jod: 'Faster · lighter on the pocket'); null keeps the avatars' own order"
+          required: [kinds]
+          properties:
+            kinds: { type: array, items: { type: string, enum: [carrier, object, raw, hybrid] } }
+            ribbon: { type: string }
     Upload:
       type: object
       required: [id, kind, format, bytes, status, created_at]
@@ -1052,6 +1171,7 @@ components:
         prompt: { type: string, maxLength: 500 }
         title: { type: string, maxLength: 80 }
         experience_id: { type: string, maxLength: 40, description: "The Duniya experience the customer started from (an id from GET /api/experiences, e.g. festive); 422 unknown_experience otherwise. Its style becomes spec.style when the template offers it (style_variants), else none" }
+        base_sku: { type: string, maxLength: 40, description: "Hybrid families: the base the Chhaap will plug into (one of the family's bases; its default when omitted). 404 unknown_base, 422 base_not_available / incompatible_base / base_required" }
     DesignAccepted:
       type: object
       required: [design_id, version_no, job_id, events_url]
@@ -1092,6 +1212,8 @@ components:
         price: { $ref: '../schemas/price-breakdown.v1.json', description: For spec.material }
         family_id: { type: [string, 'null'] }
         hardware: { type: array, items: { $ref: '#/components/schemas/HardwareRef' }, description: Bought-in parts packed with this piece }
+        base_sku: { type: [string, 'null'], description: "Hybrid pieces: the base this version was modelled for" }
+        base: { oneOf: [{ $ref: '#/components/schemas/BaseItem' }, { type: 'null' }], description: "That base with its availability, for the two-model viewer and the Ships line" }
         karigar_note: { type: string }
         job_id: { type: string, format: uuid }
         created_by: { type: string, enum: [user, agent, system] }

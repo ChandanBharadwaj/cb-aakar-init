@@ -40,6 +40,13 @@
         }
       }
     },
+    "base": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["sku"],
+      "description": "Hybrid pieces: the base the Chhaap was modelled for (spec.base as the service read it, plus the connector it cut: kind, nominal_mm, fit, modelled dims and the as-printed targets), so the API can snapshot what the printed part fits.",
+      "properties": { "sku": { "type": "string" } }
+    },
     "printability": { "$ref": "https://aakar.studio/schemas/printability-report.v1.json" },
     "print_estimate": { "$ref": "https://aakar.studio/schemas/print-estimate.v1.json" },
     "karigar_note": { "type": "string", "description": "Short human sentence about what was made or changed. Phase 2 fills this from the agent; Phase 0 templates may supply a fixed note." },

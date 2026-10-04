@@ -1,22 +1,31 @@
 {
-  "$comment": "Digital material -> filament mapping (PLAN §7.10). Rates are integer paise per gram and are placeholders derived from the Checkout board (Terracotta Silk: ₹389 for 84 g); replace after measuring real costs. PBR presets target three.js MeshPhysicalMaterial. Calibrate each against a photograph of a real print.",
+  "$comment": "Digital material -> filament mapping (PLAN §7.10). Rates are integer paise per gram and are placeholders derived from the Checkout board (Terracotta Silk: ₹389 for 84 g); replace after measuring real costs. PBR presets target three.js MeshPhysicalMaterial. Calibrate each against a photograph of a real print. `compensation` is what the geometry service dials into a Kadi connector for the material (docs/research/hybrid-products §1.4: hole and outer XY compensation, elephant foot, shrink, the strain a snap may take, creep class, the wall a connector needs); PETG Slate is the heat-safe, low-creep finish the rim-clip families (Kadi-C) require. Seeded by Flyway V3 and V16.",
   "materials": [
     { "id": "basic_white", "name": "Basic White", "filament": "Matte PLA, white", "density_g_cm3": 1.24, "finish_class": "matte", "rate_per_g_paise": 380, "heat_safe": false,
-      "pbr": { "color": "#F4F1EA", "roughness": 0.55, "metalness": 0.0, "clearcoat": 0.0, "clearcoat_roughness": 0.0, "sheen": 0.0, "sheen_color": "#FFFFFF" } },
+      "pbr": { "color": "#F4F1EA", "roughness": 0.55, "metalness": 0.0, "clearcoat": 0.0, "clearcoat_roughness": 0.0, "sheen": 0.0, "sheen_color": "#FFFFFF" },
+      "compensation": { "process": "pla", "xy_hole_comp_mm": 0.20, "xy_outer_comp_mm": -0.10, "elephant_foot_mm": 0.30, "shrink_pct": 0.3, "max_strain_pct": 1.0, "creep_class": "high", "connector_min_wall_mm": 1.6 } },
     { "id": "terracotta_matte", "name": "Terracotta Matte", "filament": "Matte PLA, terracotta", "density_g_cm3": 1.24, "finish_class": "matte", "rate_per_g_paise": 420, "heat_safe": false,
-      "pbr": { "color": "#B56E52", "roughness": 0.75, "metalness": 0.0, "clearcoat": 0.0, "clearcoat_roughness": 0.0, "sheen": 0.0, "sheen_color": "#FFFFFF" } },
+      "pbr": { "color": "#B56E52", "roughness": 0.75, "metalness": 0.0, "clearcoat": 0.0, "clearcoat_roughness": 0.0, "sheen": 0.0, "sheen_color": "#FFFFFF" },
+      "compensation": { "process": "pla", "xy_hole_comp_mm": 0.20, "xy_outer_comp_mm": -0.10, "elephant_foot_mm": 0.30, "shrink_pct": 0.3, "max_strain_pct": 1.0, "creep_class": "high", "connector_min_wall_mm": 1.6 } },
     { "id": "terracotta_silk", "name": "Terracotta Silk", "filament": "Silk PLA, copper-terracotta", "density_g_cm3": 1.24, "finish_class": "silk", "rate_per_g_paise": 463, "heat_safe": false,
-      "pbr": { "color": "#C4785A", "roughness": 0.28, "metalness": 0.15, "clearcoat": 0.6, "clearcoat_roughness": 0.25, "sheen": 0.5, "sheen_color": "#E8B48F" } },
+      "pbr": { "color": "#C4785A", "roughness": 0.28, "metalness": 0.15, "clearcoat": 0.6, "clearcoat_roughness": 0.25, "sheen": 0.5, "sheen_color": "#E8B48F" },
+      "compensation": { "process": "pla", "xy_hole_comp_mm": 0.20, "xy_outer_comp_mm": -0.10, "elephant_foot_mm": 0.30, "shrink_pct": 0.3, "max_strain_pct": 1.0, "creep_class": "high", "connector_min_wall_mm": 1.6 } },
     { "id": "polished_brass", "name": "Polished Brass", "filament": "Silk PLA, gold", "density_g_cm3": 1.24, "finish_class": "silk", "rate_per_g_paise": 490, "heat_safe": false,
-      "pbr": { "color": "#C9A44C", "roughness": 0.22, "metalness": 0.55, "clearcoat": 0.5, "clearcoat_roughness": 0.2, "sheen": 0.3, "sheen_color": "#F1D48A" } },
+      "pbr": { "color": "#C9A44C", "roughness": 0.22, "metalness": 0.55, "clearcoat": 0.5, "clearcoat_roughness": 0.2, "sheen": 0.3, "sheen_color": "#F1D48A" },
+      "compensation": { "process": "pla", "xy_hole_comp_mm": 0.20, "xy_outer_comp_mm": -0.10, "elephant_foot_mm": 0.30, "shrink_pct": 0.3, "max_strain_pct": 1.0, "creep_class": "high", "connector_min_wall_mm": 1.6 } },
     { "id": "sandalwood_silk", "name": "Sandalwood Silk", "filament": "Silk PLA, beige (wood-fill PLA option)", "density_g_cm3": 1.26, "finish_class": "silk", "rate_per_g_paise": 475, "heat_safe": false,
-      "pbr": { "color": "#D3B58B", "roughness": 0.30, "metalness": 0.10, "clearcoat": 0.5, "clearcoat_roughness": 0.3, "sheen": 0.4, "sheen_color": "#EBD8B8" } },
+      "pbr": { "color": "#D3B58B", "roughness": 0.30, "metalness": 0.10, "clearcoat": 0.5, "clearcoat_roughness": 0.3, "sheen": 0.4, "sheen_color": "#EBD8B8" },
+      "compensation": { "process": "pla", "xy_hole_comp_mm": 0.20, "xy_outer_comp_mm": -0.10, "elephant_foot_mm": 0.30, "shrink_pct": 0.3, "max_strain_pct": 1.0, "creep_class": "high", "connector_min_wall_mm": 1.6 } },
     { "id": "indigo_matte", "name": "Indigo Matte", "filament": "Matte PLA, navy", "density_g_cm3": 1.24, "finish_class": "matte", "rate_per_g_paise": 420, "heat_safe": false,
-      "pbr": { "color": "#34426B", "roughness": 0.78, "metalness": 0.0, "clearcoat": 0.0, "clearcoat_roughness": 0.0, "sheen": 0.0, "sheen_color": "#FFFFFF" } }
+      "pbr": { "color": "#34426B", "roughness": 0.78, "metalness": 0.0, "clearcoat": 0.0, "clearcoat_roughness": 0.0, "sheen": 0.0, "sheen_color": "#FFFFFF" },
+      "compensation": { "process": "pla", "xy_hole_comp_mm": 0.20, "xy_outer_comp_mm": -0.10, "elephant_foot_mm": 0.30, "shrink_pct": 0.3, "max_strain_pct": 1.0, "creep_class": "high", "connector_min_wall_mm": 1.6 } },
+    { "id": "petg_slate", "name": "PETG Slate", "filament": "PETG, slate grey", "density_g_cm3": 1.27, "finish_class": "matte", "rate_per_g_paise": 520, "heat_safe": true,
+      "pbr": { "color": "#4A5563", "roughness": 0.60, "metalness": 0.0, "clearcoat": 0.0, "clearcoat_roughness": 0.0, "sheen": 0.0, "sheen_color": "#FFFFFF" },
+      "compensation": { "process": "petg", "xy_hole_comp_mm": 0.25, "xy_outer_comp_mm": -0.15, "elephant_foot_mm": 0.35, "shrink_pct": 0.6, "max_strain_pct": 3.0, "creep_class": "medium", "connector_min_wall_mm": 1.6 } }
   ],
   "pricing_policy": {
-    "$comment": "PLAN §7.10. Placeholders reproducing the Checkout board: ₹389 material + ₹740 print time + ₹120 finishing = ₹1,249. Revisit monthly against measured costs. hardware_markup_pct (on bought-in parts) and the per-outcome family_rules (minimum subtotals, the raw-print setup fee) are placeholders too, to be replaced once real hardware quotes and studio labour times are measured; seeded by services/api Flyway V9 (2026-10-carriers) and V14 (2026-10-keepsakes, which adds the Roshni night light and Pratima plinth minimums) as the active policy version.",
-    "version": "2026-10-keepsakes",
+    "$comment": "PLAN §7.10. Placeholders reproducing the Checkout board: ₹389 material + ₹740 print time + ₹120 finishing = ₹1,249. Revisit monthly against measured costs. hardware_markup_pct (on bought-in parts) and the per-outcome family_rules (minimum subtotals, the raw-print setup fee) are placeholders too, to be replaced once real hardware quotes and studio labour times are measured; seeded by services/api Flyway V9 (2026-10-carriers), V14 (2026-10-keepsakes, the Roshni night light and Pratima plinth minimums) and V16 (2026-11-jod: the base markup, labour rate, base packaging fee, weight-tiered shipping and the hybrid families' assembly fees and minimums; docs/research/hybrid-products §3.3) as the active policy version.",
+    "version": "2026-11-jod",
     "machine_rate_paise_per_hour": 20000,
     "finishing_fee_paise": { "matte": 8000, "silk": 12000 },
     "packaging_fee_paise": 0,
@@ -26,6 +35,15 @@
     "free_shipping_above_paise": 99900,
     "shipping_label": "Shipping · Delhivery, 4 days",
     "hardware_markup_pct": 30,
+    "base_markup_pct": 35,
+    "labour_rate_paise_per_minute": 500,
+    "base_packaging_fee_paise": 2500,
+    "shipping_tiers": [
+      { "max_g": 500, "paise": 7900 },
+      { "max_g": 1000, "paise": 12900 },
+      { "max_g": 2000, "paise": 17900 },
+      { "max_g": 5000, "paise": 24900 }
+    ],
     "family_rules": {
       "keychain": { "minimum_subtotal_paise": 24900 },
       "fridge_magnet": { "minimum_subtotal_paise": 29900 },
@@ -33,7 +51,14 @@
       "nameplate": { "minimum_subtotal_paise": 59900 },
       "lithophane": { "minimum_subtotal_paise": 59900 },
       "figurine_base": { "minimum_subtotal_paise": 69900 },
-      "raw_print": { "minimum_subtotal_paise": 34900, "setup_fee_paise": 9900 }
+      "raw_print": { "minimum_subtotal_paise": 34900, "setup_fee_paise": 9900 },
+      "headphone_topper": { "minimum_subtotal_paise": 29900, "assembly_fee_paise": 4900 },
+      "hook_plaque": { "minimum_subtotal_paise": 34900, "assembly_fee_paise": 5900 },
+      "lamp_shade_e27": { "minimum_subtotal_paise": 49900, "assembly_fee_paise": 3900 },
+      "dash_idol": { "minimum_subtotal_paise": 29900, "assembly_fee_paise": 2900 },
+      "drain_lid": { "minimum_subtotal_paise": 19900, "assembly_fee_paise": 1900 },
+      "bottle_cap_cover": { "minimum_subtotal_paise": 19900 },
+      "planter_rim": { "minimum_subtotal_paise": 24900 }
     }
   }
 }

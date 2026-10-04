@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://aakar.studio/schemas/template-family.v1.json",
   "title": "Aakar Template Families v1 (Avatars)",
-  "description": "The catalogue of outcome categories. A family is the form a customer's idea takes: a carrier (Avatar) that fuses the idea with an everyday object, one of the parametric object families, or the single raw print family. Seeded from packages/design-tokens/families.json, stored in template_families / shelves / hardware_items, edited in the management portal. Code ids stay snake_case English; brand names (codename, name, tagline) are data.",
+  "description": "The catalogue of outcome categories. A family is the form a customer's idea takes: a carrier (Avatar) that fuses the idea with an everyday object, one of the parametric object families, the single raw print family, or a hybrid (Jod): a small printed Chhaap that plugs into a bought-in base item (Buniyaad) through a standard Kadi connector. Seeded from packages/design-tokens/families.json, stored in template_families / shelves / hardware_items / base_items / family_bases, edited in the management portal. Code ids stay snake_case English; brand names (codename, name, tagline) are data.",
   "type": "object",
   "additionalProperties": false,
   "required": ["shelves", "hardware_items", "families"],
@@ -10,6 +10,12 @@
     "$comment": { "type": "string" },
     "shelves": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/shelf" } },
     "hardware_items": { "type": "array", "items": { "$ref": "#/$defs/hardware_item" } },
+    "base_items": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/base_item" },
+      "description": "Bought-in bases (Buniyaad) that hybrid families plug into: a steel headphone stand, a key-hook plate, an E27 lamp base, a magnetic dash mount, an acrylic soap box, or a class of the customer's own bottle or pot (customer_owned). Stored in base_items; stock moves through base_stock_movements."
+    },
     "families": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/family" } }
   },
   "$defs": {
@@ -46,6 +52,124 @@
       "properties": {
         "sku": { "$ref": "#/$defs/id" },
         "qty": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "connector_kind": { "type": "string", "enum": ["socket", "dovetail", "magnet", "thread", "rim_clip"], "description": "The Kadi standards (docs/research/hybrid-products §1): S ribbed press socket, D dovetail rail, M magnetic register, T thread or lamp collar, C compliant rim clip." },
+    "connector_form": { "type": "string", "enum": ["cap", "lid", "rim"], "description": "Kadi-C sub-form: a skirt over a cap, a lip inside an opening, or C-jaws over a rim." },
+    "connector_thread": { "type": "string", "enum": ["unc_1_4", "m10x1", "e27", "e14"], "description": "Kadi-T standard: a camera-tripod or lamp-nipple thread, or an E27 / E14 shade collar (no thread; the holder's ring clamps the collar)." },
+    "connector_mode": { "type": "string", "enum": ["magnets", "steel_disc"], "description": "Kadi-M: the Chhaap carries magnets in pockets, or a steel disc that holds to the base's magnet." },
+    "tolerance_class": { "type": "string", "enum": ["machined", "molded", "wood", "ceramic", "glass", "steel"], "description": "How much the base's male feature varies piece to piece: machined ± 0.10 mm, molded ± 0.15, wood ± 0.50; ceramic, glass and steel describe customer-owned rims and caps (a class, range_mm, rather than one size)." },
+    "connector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "nominal_mm", "fit"],
+      "description": "The Kadi a hybrid family's templates cut into the Chhaap. Always the female feature, printed flat without supports; the base presents the male side, or the bought-in adapter_sku does (a nylon dowel, a PETG rail, a steel disc). Templates publish the modelled connector on their descriptor; this is the family's promise, which the API checks against each listed base's interface.",
+      "properties": {
+        "kind": { "$ref": "#/$defs/connector_kind" },
+        "nominal_mm": { "type": "number", "exclusiveMinimum": 0, "description": "Kadi-S: the pin Ø (8, 12 or 16). Kadi-D: the rail floor width (12). Kadi-T: the thread major Ø, or the collar hole (e27 40.5, e14 28.9). Kadi-M: the disc or magnet Ø. Kadi-C: the cap OD, opening width or rim thickness the clip is sized for." },
+        "fit": { "type": "string", "enum": ["slide", "press_ribbed", "snap", "pocket"], "description": "The as-printed condition the connector is modelled for: press_ribbed (Kadi-S), slide (Kadi-D, Kadi-T), pocket (Kadi-M), snap (Kadi-C)." },
+        "form": { "$ref": "#/$defs/connector_form" },
+        "thread": { "$ref": "#/$defs/connector_thread" },
+        "mode": { "$ref": "#/$defs/connector_mode" },
+        "adapter_sku": { "$ref": "#/$defs/id", "description": "hardware_items sku of the bought-in male part packed with the piece when the base has none of its own." }
+      }
+    },
+    "base_interface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "nominal_mm"],
+      "description": "What a base presents to the Chhaap: the same Kadi vocabulary as a family's connector, seen from the male side. The API refuses a design whose family connector and base interface disagree on kind or nominal (incompatible_base).",
+      "properties": {
+        "kind": { "$ref": "#/$defs/connector_kind" },
+        "nominal_mm": { "type": "number", "exclusiveMinimum": 0, "description": "The pin, rail, thread, disc, cap, opening or rim size the base presents; for a customer-owned class, the middle of range_mm." },
+        "tolerance_class": { "$ref": "#/$defs/tolerance_class" },
+        "range_mm": {
+          "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 2, "maxItems": 2,
+          "description": "Customer-owned bases only: the size class the Chhaap must grip, e.g. [40, 44] for a bottle cap, [6, 12] for a pot rim."
+        },
+        "form": { "$ref": "#/$defs/connector_form" },
+        "thread": { "$ref": "#/$defs/connector_thread" },
+        "mode": { "$ref": "#/$defs/connector_mode" },
+        "adapter_sku": { "$ref": "#/$defs/id", "description": "The bought-in male part that bridges this base and the Chhaap, when the base has no pin or rail of its own." }
+      }
+    },
+    "vector_mm": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+    "mount_frame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["origin_mm", "up"],
+      "description": "Where the Chhaap's connector mouth sits on the base, in the base's own frame (the base stands on z = 0 with its centre on the z axis). The storefront places the printed part's mouth at origin_mm, its connector axis along up and its front along forward.",
+      "properties": {
+        "origin_mm": { "$ref": "#/$defs/vector_mm" },
+        "up": { "$ref": "#/$defs/vector_mm" },
+        "forward": { "$ref": "#/$defs/vector_mm", "default": [0, -1, 0] }
+      }
+    },
+    "preview_shape": {
+      "type": "object",
+      "required": ["shape"],
+      "description": "A schematic body the geometry service renders as the base's preview GLB (POST /v1/bases/preview) until a photographed or authored model is uploaded. Dimensions in mm; each shape documents its own keys (pillar_stand: foot_d_mm, foot_h_mm, pillar_d_mm, pillar_h_mm, tube_id_mm, tube_od_mm, tube_h_mm; hook_plate: width_mm, height_mm, thickness_mm, hooks, hook_len_mm; lamp_base: foot_d_mm, foot_h_mm, stem_d_mm, stem_h_mm, holder_d_mm, holder_h_mm; puck_mount: puck_d_mm, puck_h_mm, pad_w_mm, pad_h_mm; box: width_mm, depth_mm, height_mm, wall_mm; bottle: body_d_mm, body_h_mm, cap_d_mm, cap_h_mm; pot: top_d_mm, bottom_d_mm, height_mm, rim_t_mm, rim_h_mm).",
+      "properties": {
+        "shape": { "type": "string", "enum": ["pillar_stand", "hook_plate", "lamp_base", "puck_mount", "box", "bottle", "pot"] }
+      },
+      "additionalProperties": { "type": "number" }
+    },
+    "pbr": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["color", "roughness", "metalness"],
+      "description": "A three.js MeshPhysicalMaterial preset (the digital materials' shape).",
+      "properties": {
+        "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+        "roughness": { "type": "number", "minimum": 0, "maximum": 1 },
+        "metalness": { "type": "number", "minimum": 0, "maximum": 1 },
+        "clearcoat": { "type": "number", "minimum": 0, "maximum": 1 },
+        "clearcoat_roughness": { "type": "number", "minimum": 0, "maximum": 1 },
+        "sheen": { "type": "number", "minimum": 0, "maximum": 1 },
+        "sheen_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" }
+      }
+    },
+    "base_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sku", "name", "category", "base_material", "dimensions_mm", "interface", "mount_frame", "finish_pbr", "available"],
+      "description": "A bought-in base (Buniyaad). The studio stocks it (stock_qty, reorder_level) and ships it assembled with the printed Chhaap, or it is the customer's own object (customer_owned: a size class, nothing shipped, no base price line).",
+      "properties": {
+        "sku": { "$ref": "#/$defs/id" },
+        "name": { "type": "string", "maxLength": 120, "description": "Customer-facing, e.g. 'Steel headphone stand'." },
+        "description": { "type": "string", "maxLength": 500 },
+        "category": { "type": "string", "enum": ["desk", "home", "lighting", "auto", "kids", "bath", "plants"] },
+        "base_material": { "type": "string", "maxLength": 20, "description": "steel, metal, acrylic, plastic, wood, terracotta, glass." },
+        "dimensions_mm": { "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 3, "maxItems": 3, "description": "Width, depth, height of the base as shipped (or of the typical customer-owned object)." },
+        "weight_g": { "type": "number", "minimum": 0, "default": 0, "description": "Shipping weight of the base; 0 for a customer-owned one." },
+        "unit_cost_paise": { "type": "integer", "minimum": 0, "default": 0, "description": "What the studio pays; the base price line is retail_price_paise, else this cost with the policy's base_markup_pct." },
+        "retail_price_paise": { "type": ["integer", "null"], "minimum": 0, "description": "A fixed customer price for the base, overriding cost × markup." },
+        "supplier": { "type": "string", "maxLength": 120 },
+        "supplier_sku": { "type": "string", "maxLength": 80 },
+        "url": { "type": "string", "maxLength": 500 },
+        "lead_days": { "type": "integer", "minimum": 0, "default": 7, "description": "Days to ship when the base is in stock; shown as 'ships in N days'." },
+        "customer_owned": { "type": "boolean", "default": false },
+        "stock_qty": { "type": "integer", "minimum": 0, "default": 0, "description": "Opening stock in the seed; movements change it afterwards." },
+        "reorder_level": { "type": "integer", "minimum": 0, "default": 5 },
+        "interface": { "$ref": "#/$defs/base_interface" },
+        "mount_frame": { "$ref": "#/$defs/mount_frame" },
+        "preview_shape": { "$ref": "#/$defs/preview_shape" },
+        "preview_glb_url": { "type": ["string", "null"], "maxLength": 500, "description": "An authored or photographed model, when one exists; else the preview is generated from preview_shape." },
+        "photos": { "type": "array", "default": [], "items": { "type": "object", "additionalProperties": false, "required": ["url"], "properties": { "url": { "type": "string", "maxLength": 500 }, "alt": { "type": "string", "maxLength": 120 } } } },
+        "finish_pbr": { "$ref": "#/$defs/pbr", "description": "How the viewer draws the base (it is shown muted and locked next to the editable Chhaap)." },
+        "hsn_code": { "type": "string", "maxLength": 8 },
+        "compliance_notes": { "type": "string", "maxLength": 300, "description": "Safety and legal notes for staff and the product page, e.g. LED ≤ 5 W, cabin heat." },
+        "available": { "type": "boolean", "description": "The staff switch: an unavailable base is never offered, and a hybrid family with no available base is not orderable." },
+        "sort_order": { "type": "integer", "default": 100 }
+      }
+    },
+    "base_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sku"],
+      "properties": {
+        "sku": { "$ref": "#/$defs/id" },
+        "default": { "type": "boolean", "default": false, "description": "The base a design takes when the request names none; exactly one per hybrid family." }
       }
     },
     "size_envelope": {
@@ -117,6 +241,11 @@
           "description": "any: a plate or plinth absorbs whatever shape the content has; constrained: content must satisfy a rule (attachment region, flat top, shell); strict: the functional body is parametric and content only decorates it."
         },
         "content_slot": { "$ref": "#/$defs/content_slot" },
+        "connector": { "$ref": "#/$defs/connector", "description": "Hybrid families only: the Kadi their templates cut." },
+        "bases": { "type": "array", "default": [], "items": { "$ref": "#/$defs/base_ref" }, "description": "Hybrid families only: the base items this Chhaap fits, in display order, one of them default. Stored in family_bases." },
+        "assembly_minutes": { "type": "integer", "minimum": 0, "description": "Studio time to seat the Chhaap on its base (and bond an adapter), priced by the policy's labour rate unless the family rule names an assembly fee." },
+        "pair_family_id": { "$ref": "#/$defs/id", "description": "The other form of the same idea: for a hybrid, the fully printed family (and the reverse), so the studio can show 'Whole or plug-in?' side by side." },
+        "typical_print_minutes": { "type": "integer", "minimum": 0, "description": "Printer time of a typical piece at the default size, for the compare card ('about 3 printer-hours')." },
         "available": { "type": "boolean" },
         "sort_order": { "type": "integer", "default": 100 }
       }

@@ -68,14 +68,17 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["kind", "nominal_mm", "fit"],
-      "description": "Hybrid (Jod) templates only: the Kadi cut into the piece so it plugs into a bought-in base. The female feature is always on the printed Chhaap (it prints flat, no supports); the male side belongs to the base or to the bought-in adapter adapter_sku. Phase 1 builds the ribbed press socket (Kadi-S).",
+      "description": "Hybrid (Jod) templates only: the Kadi cut into the piece so it plugs into a bought-in base. The female feature is always on the printed Chhaap (it prints flat, no supports); the male side belongs to the base or to the bought-in adapter adapter_sku. Kadi-S is the ribbed press socket; Kadi-D the dovetail channel (form-free, slide fit); Kadi-T a thread or an E27 / E14 shade collar; Kadi-M the magnet pockets or steel-disc pocket; Kadi-C the compliant rim clip (cap skirt, lid lip or rim jaws), PETG only.",
       "properties": {
         "kind": { "type": "string", "enum": ["socket", "dovetail", "magnet", "thread", "rim_clip"] },
         "nominal_mm": { "type": "number", "exclusiveMinimum": 0, "description": "The pin (rail, thread, magnet) diameter the base presents, e.g. 12 for a Kadi-S Ø 12." },
         "fit": { "type": "string", "enum": ["slide", "press_ribbed", "snap", "pocket"], "description": "The as-printed condition the connector is modelled for; press_ribbed = three crush ribs take up the pin's variation." },
         "depth_mm": { "type": "number", "exclusiveMinimum": 0 },
         "rib_count": { "type": "integer", "minimum": 0 },
-        "clearance_mm": { "type": "number", "minimum": 0, "description": "Diametral clearance between the printed bore wall and the pin." },
+        "clearance_mm": { "type": "number", "minimum": 0, "description": "Diametral clearance between the printed bore wall and the pin (flank clearance for a rail, radial for a thread, pocket clearance for a disc, lip over-travel for a clip)." },
+        "form": { "type": "string", "enum": ["cap", "lid", "rim"], "description": "rim_clip only: a skirt over a cap, a lip inside an opening, or C-jaws over a rim." },
+        "thread": { "type": "string", "enum": ["unc_1_4", "m10x1", "e27", "e14"], "description": "thread only: the standard; e27 and e14 are collar holes clamped by the holder's shade ring, not threads." },
+        "mode": { "type": "string", "enum": ["magnets", "steel_disc"], "description": "magnet only: magnets in pockets, or one steel disc that holds to the base's magnet." },
         "adapter_sku": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "hardware_items sku of the bought-in male part packed when the base has no pin of its own." }
       }
     }

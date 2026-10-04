@@ -45,6 +45,19 @@ paths:
                     infill_pct: { type: number, default: 15 }
                     nozzle_mm: { type: number, default: 0.4 }
                     walls: { type: integer, default: 3 }
+                connector:
+                  type: object
+                  additionalProperties: true
+                  description: |
+                    Hybrid pieces: the template's connector report (kind, fit, nominal_mm, depth_mm, mouth_mm, axis, modelled
+                    dims, compensation, pin_d_mm, pin_tolerance_mm, min_wall_mm, fit_tested) so the report can carry the
+                    `connector_fit` check: as-printed clearance and grip against the pin's variation, wall around the
+                    connector at least the material's connector_min_wall_mm, connector axis along -Z (or along the frame it
+                    names) within 5°, mouth on the bed, and `warn` while no fit test has passed for the base × finish.
+                  properties:
+                    kind: { type: string, enum: [socket, dovetail, magnet, thread, rim_clip] }
+                    nominal_mm: { type: number }
+                    fit_tested: { type: boolean }
       responses:
         '200':
           description: Report and estimate

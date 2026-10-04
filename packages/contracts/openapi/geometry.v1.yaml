@@ -45,6 +45,98 @@ paths:
         '200': { description: Built, content: { application/json: { schema: { $ref: '../schemas/events/design.completed.v1.json' } } } }
         '422': { description: Failed, content: { application/json: { schema: { $ref: '../schemas/events/design.failed.v1.json' } } } }
         '500': { description: Failed, content: { application/json: { schema: { $ref: '../schemas/events/design.failed.v1.json' } } } }
+  /v1/coupons:
+    post:
+      summary: Build a fit coupon for a Kadi in a finish
+      description: |
+        The studio prints one coupon per base × finish before switching a hybrid family on. Builds the coupon body for the
+        connector (a flanged socket for Kadi-S, a rail block for Kadi-D, a collar ring for Kadi-T, a disc plate for Kadi-M,
+        the clip itself for Kadi-C) in the material's compensation, inspects it, stores the STL under
+        `coupons/<kind>_<nominal>_<material>_w<wall>.stl` and returns the asset with the modelled dims, the as-printed targets
+        the calipers should read, and the `connector_fit` check. 422 for an unknown kind, nominal or material, or a Kadi the
+        material refuses (a rim clip in PLA).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [connector, material]
+              properties:
+                connector:
+                  type: object
+                  required: [kind, nominal_mm]
+                  properties:
+                    kind: { type: string, enum: [socket, dovetail, magnet, thread, rim_clip] }
+                    nominal_mm: { type: number, exclusiveMinimum: 0 }
+                    fit: { type: string, enum: [slide, press_ribbed, snap, pocket] }
+                    form: { type: string, enum: [cap, lid, rim] }
+                    thread: { type: string, enum: [unc_1_4, m10x1, e27, e14] }
+                    mode: { type: string, enum: [magnets, steel_disc] }
+                    adapter_sku: { type: string }
+                material: { type: string, description: A digital material id }
+                wall_mm: { type: number, minimum: 1, maximum: 6, default: 2.4 }
+                base:
+                  type: object
+                  additionalProperties: true
+                  description: The base's interface (pin_d_mm, tolerance_class, range_mm) so the coupon is modelled for that base
+      responses:
+        '200':
+          description: Coupon
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [asset, connector, dims, expected_printed, connector_fit]
+                properties:
+                  asset: { type: object, required: [key, url, bytes, content_type], additionalProperties: true }
+                  connector: { type: object, additionalProperties: true, description: "The connector report (kind, fit, nominal_mm, modelled dims, compensation used)" }
+                  dims: { type: object, additionalProperties: { type: number }, description: Modelled dimensions }
+                  expected_printed: { type: object, additionalProperties: { type: number }, description: What a good print should measure }
+                  measured: { type: object, additionalProperties: { type: number }, description: What the mesh itself measures (a self-check of the modelling) }
+                  connector_fit: { type: object, additionalProperties: true, description: The inspect check on the coupon }
+                  mass_g: { type: number }
+        '422': { description: Refused, content: { application/json: { schema: { $ref: '../schemas/events/design.failed.v1.json' } } } }
+  /v1/bases/preview:
+    post:
+      summary: Render a schematic preview model of a bought-in base
+      description: |
+        A watertight body from the base's `preview_shape` (pillar_stand, hook_plate, lamp_base, puck_mount, box, bottle, pot
+        with their mm dimensions), exported as GLB under `bases/<sku>/preview.glb`, with the mount frame the shape computes
+        (where a Chhaap's connector mouth sits) and the overall dimensions. Used by the portal until a photographed or
+        authored model is uploaded.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [sku, shape]
+              properties:
+                sku: { type: string, pattern: '^[a-z][a-z0-9_]*$' }
+                shape: { type: string, enum: [pillar_stand, hook_plate, lamp_base, puck_mount, box, bottle, pot] }
+                dims: { type: object, additionalProperties: { type: number }, description: The shape's keys (schemas/template-family.v1.json#/$defs/preview_shape) }
+      responses:
+        '200':
+          description: Preview
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [asset, mount_frame, dimensions_mm]
+                properties:
+                  asset: { type: object, required: [key, url, bytes, content_type], additionalProperties: true }
+                  mount_frame:
+                    type: object
+                    required: [origin_mm, up, forward]
+                    properties:
+                      origin_mm: { type: array, items: { type: number }, minItems: 3, maxItems: 3 }
+                      up: { type: array, items: { type: number }, minItems: 3, maxItems: 3 }
+                      forward: { type: array, items: { type: number }, minItems: 3, maxItems: 3 }
+                  dimensions_mm: { type: array, items: { type: number }, minItems: 3, maxItems: 3 }
+        '422': { description: Unknown shape or a dimension out of range, content: { application/json: { schema: { $ref: '../schemas/events/design.failed.v1.json' } } } }
   /assets/{path}:
     get:
       summary: Static assets when AAKAR_STORAGE=local

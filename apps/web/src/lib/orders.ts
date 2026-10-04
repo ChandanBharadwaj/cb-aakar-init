@@ -34,6 +34,7 @@ export const STATUS_LABEL: Record<OrderStatus, string> = {
   slicing: "Slicing",
   printing: "Printing",
   finishing: "Finishing",
+  assembling: "Assembling",
   qc: "Quality check",
   packed: "Packed",
   shipped: "Shipped",

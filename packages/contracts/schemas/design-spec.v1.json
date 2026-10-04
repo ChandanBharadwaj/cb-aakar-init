@@ -39,9 +39,29 @@
       "description": "Digital material id, e.g. terracotta_silk. Affects rendering and price, never geometry.",
       "pattern": "^[a-z][a-z0-9_]*$"
     },
-    "constraints": { "$ref": "#/$defs/constraints" }
+    "constraints": { "$ref": "#/$defs/constraints" },
+    "base": { "$ref": "#/$defs/base" }
   },
   "$defs": {
+    "base": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sku"],
+      "description": "Hybrid (Jod) pieces only: the bought-in base this Chhaap plugs into, filled by the API from the base item's interface (never by the customer or the agent). The geometry service refuses a template whose Kadi disagrees with it (incompatible_base), models the connector for this base's pin and tolerance class, and reports fit_tested on the connector_fit check; it adds no geometry of the base.",
+      "properties": {
+        "sku": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "maxLength": 40 },
+        "kind": { "type": "string", "enum": ["socket", "dovetail", "magnet", "thread", "rim_clip"], "description": "The Kadi the base presents; must equal the template's connector kind." },
+        "nominal_mm": { "type": "number", "exclusiveMinimum": 0, "description": "The size the base presents; must equal the template's connector nominal." },
+        "pin_d_mm": { "type": "number", "exclusiveMinimum": 0, "description": "Measured pin (rail, disc, cap, rim) size when the studio measured this base; defaults to nominal_mm." },
+        "tolerance_class": { "type": "string", "enum": ["machined", "molded", "wood", "ceramic", "glass", "steel"] },
+        "range_mm": { "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 2, "maxItems": 2, "description": "The size class of a customer-owned base." },
+        "form": { "type": "string", "enum": ["cap", "lid", "rim"] },
+        "thread": { "type": "string", "enum": ["unc_1_4", "m10x1", "e27", "e14"] },
+        "mode": { "type": "string", "enum": ["magnets", "steel_disc"] },
+        "adapter_sku": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "fit_tested": { "type": "boolean", "default": false, "description": "True when a passing fit test exists for this base and the spec's material; connector_fit then passes instead of warning 'fit test pending'." }
+      }
+    },
     "constraints": {
       "type": "object",
       "additionalProperties": false,

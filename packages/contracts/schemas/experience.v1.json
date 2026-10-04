@@ -141,7 +141,7 @@
           "items": { "$ref": "#/$defs/id" },
           "uniqueItems": true,
           "maxItems": 24,
-          "description": "Outcome family ids (template-family.v1.json) shown in the theme, in order; carrier and object kinds. The Shop shows the orderable ones."
+          "description": "Outcome family ids (template-family.v1.json) shown in the theme, in order; carrier, object and hybrid (Jod) kinds. The Shop shows the orderable ones."
         },
         "items": {
           "type": "array",
@@ -153,6 +153,16 @@
         },
         "collections": { "type": "array", "items": { "$ref": "#/$defs/collection" }, "maxItems": 24, "default": [] },
         "season": { "type": "array", "items": { "$ref": "#/$defs/season_window" }, "maxItems": 12, "default": [] },
+        "promote": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["kinds"],
+          "description": "Family kinds the theme page lists first, with the ribbon they wear (a Jod: 'Faster · lighter on the pocket'); null lists avatars in their own order with no ribbon.",
+          "properties": {
+            "kinds": { "type": "array", "items": { "type": "string", "enum": ["carrier", "object", "raw", "hybrid"] }, "uniqueItems": true, "minItems": 1 },
+            "ribbon": { "type": "string", "maxLength": 40 }
+          }
+        },
         "available": { "type": "boolean", "description": "The staff switch: the Shop lists available experiences only." },
         "sort_order": { "type": "integer", "default": 100 }
       }

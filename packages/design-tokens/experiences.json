@@ -1,5 +1,5 @@
 {
-  "$comment": "Experiences (Duniya) and viewer environments (Mahaul). Validated against packages/contracts/schemas/experience.v1.json; seeded by services/api Flyway V11 (ExperiencesSeedTest fails if the two diverge); edited afterwards in the management portal (experiences) or read-only there (environments, until backdrop presets become uploadable data). An experience curates existing concepts (a backdrop, a default style, a motif pack, ordered Avatars, curated Shop items, seasons) and adds no geometry. Ids are snake_case English and never change; codename/title/tagline are brand copy and may, slugs are URLs (/duniya/<slug>). Environment labels and backdrop colours mirror tokens.json environments, whose keys are the storefront's preset keys; comic_rooftop_night is Katha's comic backdrop, built offline in the storefront (PR 12). Accents come from the tokens.json brand colours; the cream paper stays (paper_tint null) and hero media arrives when shot.",
+  "$comment": "Experiences (Duniya) and viewer environments (Mahaul). Validated against packages/contracts/schemas/experience.v1.json; seeded by services/api Flyway V11 and V16 (Ghar, Safar and `promote`, which lists the hybrid Jod first on every theme page with its ribbon; ExperiencesSeedTest fails if the two diverge); edited afterwards in the management portal (experiences) or read-only there (environments, until backdrop presets become uploadable data). An experience curates existing concepts (a backdrop, a default style, a motif pack, ordered Avatars, curated Shop items, seasons) and adds no geometry. Ids are snake_case English and never change; codename/title/tagline are brand copy and may, slugs are URLs (/duniya/<slug>). Environment labels and backdrop colours mirror tokens.json environments, whose keys are the storefront's preset keys; comic_rooftop_night is Katha's comic backdrop, built offline in the storefront (PR 12). Accents come from the tokens.json brand colours; the cream paper stays (paper_tint null) and hero media arrives when shot.",
   "environments": [
     { "id": "studio", "label": "Studio", "surface": "stage", "preset_key": "studio", "palette": ["#1B2238"], "sort_order": 10 },
     { "id": "teak_table_candlelight", "label": "Chettinad teak · candlelight", "surface": "stage", "preset_key": "teak_table_candlelight", "palette": ["#1A1512"], "sort_order": 20 },
@@ -21,7 +21,7 @@
       "surface": { "accent": "#D8AE5B", "paper_tint": null, "hero_media": null },
       "style": "jaipur_heritage",
       "motif_pack": ["star_rangoli", "lotus", "paisley"],
-      "avatars": ["lithophane", "ornament", "nameplate", "keychain", "fridge_magnet"],
+      "avatars": ["lithophane", "lamp_shade_e27", "ornament", "nameplate", "keychain", "fridge_magnet"],
       "items": ["kantha-nameplate", "ajrakh-coasters"],
       "collections": [],
       "season": [
@@ -30,6 +30,7 @@
         { "starts_on": "--08-01", "ends_on": "--08-31", "label": "Rakhi" },
         { "starts_on": "--02-01", "ends_on": "--02-14", "label": "Valentine's" }
       ],
+      "promote": { "kinds": ["hybrid"], "ribbon": "Faster · lighter on the pocket" },
       "available": true,
       "sort_order": 10
     },
@@ -44,10 +45,11 @@
       "surface": { "accent": "#34426B", "paper_tint": null, "hero_media": null },
       "style": "cyber_desi",
       "motif_pack": ["jaali_lattice"],
-      "avatars": ["keycap", "keychain", "nameplate", "phone_stand", "desk_organizer", "headphone_stand"],
+      "avatars": ["headphone_topper", "hook_plaque", "keycap", "keychain", "nameplate", "phone_stand", "desk_organizer", "headphone_stand"],
       "items": ["jharokha-phone-stand", "pillar-headphone-stand"],
       "collections": [],
       "season": [],
+      "promote": { "kinds": ["hybrid"], "ribbon": "Faster · lighter on the pocket" },
       "available": true,
       "sort_order": 20
     },
@@ -62,10 +64,11 @@
       "surface": { "accent": "#7E9A7B", "paper_tint": null, "hero_media": null },
       "style": "modern_zen",
       "motif_pack": ["lotus", "paisley"],
-      "avatars": ["lithophane", "figurine_base", "photo_frame", "fridge_magnet"],
+      "avatars": ["lithophane", "lamp_shade_e27", "figurine_base", "photo_frame", "fridge_magnet"],
       "items": [],
       "collections": [],
       "season": [],
+      "promote": { "kinds": ["hybrid"], "ribbon": "Faster · lighter on the pocket" },
       "available": true,
       "sort_order": 30
     },
@@ -80,10 +83,11 @@
       "surface": { "accent": "#B56E52", "paper_tint": null, "hero_media": null },
       "style": "warli_line",
       "motif_pack": ["warli_dancer", "star_rangoli"],
-      "avatars": ["keychain", "fridge_magnet", "ornament", "cake_topper"],
+      "avatars": ["bottle_cap_cover", "keychain", "fridge_magnet", "ornament", "cake_topper"],
       "items": [],
       "collections": [],
       "season": [],
+      "promote": { "kinds": ["hybrid"], "ribbon": "Faster · lighter on the pocket" },
       "available": true,
       "sort_order": 40
     },
@@ -98,12 +102,51 @@
       "surface": { "accent": "#B24B3F", "paper_tint": null, "hero_media": null },
       "style": "comic_pop",
       "motif_pack": ["comic_bursts"],
-      "avatars": ["keychain", "keycap", "figurine_base", "nameplate", "fridge_magnet", "lithophane"],
+      "avatars": ["headphone_topper", "keychain", "keycap", "figurine_base", "nameplate", "fridge_magnet", "lithophane"],
       "items": [],
       "collections": [],
       "season": [],
+      "promote": { "kinds": ["hybrid"], "ribbon": "Faster · lighter on the pocket" },
       "available": true,
       "sort_order": 50
+    },
+    {
+      "id": "home_utility",
+      "codename": "Ghar",
+      "slug": "ghar",
+      "title": "Home utility",
+      "tagline": "Small fixes with your name on",
+      "description": "Things the house uses every day, done your way: a nameplate above the key hooks, a drain lid for the soap box, a band for the planter, a shade for the lamp. The base is bought in, the top is printed for you.",
+      "environment": "kitchen_marble",
+      "surface": { "accent": "#7E9A7B", "paper_tint": null, "hero_media": null },
+      "style": "modern_zen",
+      "motif_pack": ["lotus", "jaali_lattice"],
+      "avatars": ["hook_plaque", "drain_lid", "planter_rim", "lamp_shade_e27", "fridge_magnet", "planter"],
+      "items": ["fluted-planter"],
+      "collections": [],
+      "season": [],
+      "promote": { "kinds": ["hybrid"], "ribbon": "Faster · lighter on the pocket" },
+      "available": true,
+      "sort_order": 60
+    },
+    {
+      "id": "on_the_road",
+      "codename": "Safar",
+      "slug": "safar",
+      "title": "On the road",
+      "tagline": "For the dashboard and the bag",
+      "description": "A small idol that holds to a magnetic dash mount, a charm for the keys and a cover for the bottle that rides along: pieces for the journey, in heat-safe finishes.",
+      "environment": "dashboard",
+      "surface": { "accent": "#5E8C61", "paper_tint": null, "hero_media": null },
+      "style": "cyber_desi",
+      "motif_pack": ["jaali_lattice", "paisley"],
+      "avatars": ["dash_idol", "bottle_cap_cover", "keychain", "car_accessory"],
+      "items": [],
+      "collections": [],
+      "season": [],
+      "promote": { "kinds": ["hybrid"], "ribbon": "Faster · lighter on the pocket" },
+      "available": true,
+      "sort_order": 70
     }
   ]
 }

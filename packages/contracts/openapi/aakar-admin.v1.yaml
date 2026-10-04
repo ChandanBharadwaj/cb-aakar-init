@@ -6,8 +6,9 @@ info:
     Staff-only API behind the management portal (`apps/admin`, ADR-0012). Served by `services/api`
     under `/admin/api/*` with its own staff authentication (email + password, seeded account in the
     local profile; never customer tokens). Owns operational configuration (pricing policies, materials,
-    catalog, live templates, Avatars, hardware, Duniya experiences, the content rules of the trademark guardrail) and
-    fulfilment operations (orders queue, stage advancement, QC, print pack, content reviews, messages log). Every write is
+    catalog, live templates, Avatars, hardware, bases (Buniyaad) with their stock and fit tests, Duniya experiences, the
+    content rules of the trademark guardrail) and fulfilment operations (orders queue, stage advancement incl. the
+    assembling step of a Jod, QC, print pack with its assembly sheet, content reviews, messages log). Every write is
     recorded in the audit log.
 
     Roles: `owner` (everything), `studio` (fulfilment, content reviews and read-only configuration).
@@ -59,7 +60,7 @@ paths:
                   orders_today: { type: integer }
                   revenue_today_paise: { type: integer }
                   revenue_month_paise: { type: integer }
-                  awaiting_action: { type: integer, description: "Orders in queued, finishing or qc that need a staff step" }
+                  awaiting_action: { type: integer, description: "Orders in queued, finishing, assembling or qc that need a staff step" }
   /admin/api/orders:
     get:
       summary: Orders queue
@@ -92,7 +93,7 @@ paths:
   /admin/api/orders/{orderId}/advance:
     post:
       summary: Move the order to its next status
-      description: "Allowed transitions: confirmed→queued→slicing→printing→finishing→qc→packed→shipped→delivered; any active status→on_hold and back to the previous status; qc→reprint→printing; any status before shipped→cancelled. Packed creates the shipment; shipped adds the carrier event. Invalid moves answer 409 invalid_transition."
+      description: "Allowed transitions: confirmed→queued→slicing→printing→finishing→(assembling→)qc→packed→shipped→delivered; assembling is offered only for an order with a base (a Jod) and may be skipped; any active status→on_hold and back to the previous status; qc→reprint→printing; any status before shipped→cancelled. Payment reserves each item's base stock, packed consumes it, cancelled releases it. Packed creates the shipment; shipped adds the carrier event. Invalid moves answer 409 invalid_transition."
       tags: [orders]
       parameters: [{ $ref: '#/components/parameters/OrderId' }]
       requestBody:
@@ -117,7 +118,7 @@ paths:
   /admin/api/orders/{orderId}/print-pack:
     get:
       summary: Everything the outsourced printer needs, as one zip
-      description: "Per item: model.3mf and model.stl (from the version's assets), plus print-sheet.txt (order number, item, material and filament, quantity, finish class, dimensions, mass, estimated time, notes). Printing is outsourced for now (ADR-0004)."
+      description: "Per item: model.3mf and model.stl (from the version's assets), plus print-sheet.txt (order number, item, material and filament, quantity, finish class, dimensions, mass, estimated time, notes; base and Kadi for a Jod) and, for an item with a base, assembly-sheet.txt (base, adapter, Kadi, the passing fit test, the seating steps); packing-list.txt totals the bases to pull from stock. Printing is outsourced for now (ADR-0004)."
       tags: [orders]
       parameters: [{ $ref: '#/components/parameters/OrderId' }]
       responses:
@@ -200,7 +201,8 @@ paths:
                 material: { type: string }
                 extruded_volume_cm3: { type: number }
                 print_seconds: { type: integer }
-                family_id: { type: string, description: "Applies the family's hardware default, setup fee and minimum" }
+                family_id: { type: string, description: "Applies the family's hardware default, setup fee, assembly and minimum" }
+                base_sku: { type: string, description: "Adds the base line and its weight (a hybrid family's base; its default when the family is given and this is not)" }
       responses:
         '200': { description: Breakdown, content: { application/json: { schema: { $ref: '../schemas/price-breakdown.v1.json' } } } }
         '422': { $ref: '#/components/responses/Problem' }
@@ -319,6 +321,162 @@ paths:
         '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/AdminHardware' } } } }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /admin/api/bases:
+    get:
+      summary: Bought-in bases (Buniyaad), available or not, with stock and fit-test state
+      tags: [bases]
+      responses:
+        '200': { description: Bases, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AdminBase' } } } } }
+    post:
+      summary: Create a base (owner only, audited as base.create)
+      description: |
+        409 `base_exists` for a taken sku. 422 `validation_failed` for a schema violation or an `interface.adapter_sku` that is
+        not a hardware item. `stock_qty` in the body is the opening stock (a `receipt` movement is recorded for it).
+      tags: [bases]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminBaseInput' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/AdminBase' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { description: base_exists, $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /admin/api/bases/{sku}:
+    get:
+      tags: [bases]
+      parameters: [{ $ref: '#/components/parameters/BaseSku' }]
+      responses:
+        '200': { description: Base, content: { application/json: { schema: { $ref: '#/components/schemas/AdminBase' } } } }
+        '404': { description: unknown_base, $ref: '#/components/responses/Problem' }
+    put:
+      summary: Update a base's copy, classification, cost, interface, mount frame, preview shape, finish or availability (owner only, audited as base.update)
+      description: The sku in the path wins over the body. Stock is never set here; post a movement instead. 404 `unknown_base`; 422 as on create.
+      tags: [bases]
+      parameters: [{ $ref: '#/components/parameters/BaseSku' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminBaseInput' }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/AdminBase' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { description: unknown_base, $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /admin/api/bases/{sku}/stock:
+    get:
+      summary: The base's stock ledger, newest first
+      tags: [bases]
+      parameters: [{ $ref: '#/components/parameters/BaseSku' }]
+      responses:
+        '200': { description: Movements, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/StockMovement' } } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+    post:
+      summary: Receive stock or adjust it after a count (studio or owner, audited as base.stock)
+      description: |
+        `receipt` adds `qty` (positive); `adjust` sets the counted stock to `qty` and records the difference. Reservations,
+        releases and consumption are written by the order lifecycle, never here. 422 `validation_failed` when an adjustment
+        would leave less stock than is reserved.
+      tags: [bases]
+      parameters: [{ $ref: '#/components/parameters/BaseSku' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StockMovementInput' }
+      responses:
+        '201': { description: Base after the movement, content: { application/json: { schema: { $ref: '#/components/schemas/AdminBase' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /admin/api/bases/{sku}/preview:
+    post:
+      summary: Upload the base's preview model (a GLB, owner only, audited as base.preview)
+      description: "`multipart/form-data` with `file` (glb, up to 15 MB). Replaces a generated preview; the mount frame is left as it is."
+      tags: [bases]
+      parameters: [{ $ref: '#/components/parameters/BaseSku' }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '201': { description: Base with its preview URL, content: { application/json: { schema: { $ref: '#/components/schemas/AdminBase' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '413': { description: Larger than 15 MB (payload_too_large), $ref: '#/components/responses/Problem' }
+        '415': { description: Not a GLB (unsupported_format), $ref: '#/components/responses/Problem' }
+  /admin/api/bases/{sku}/preview/generate:
+    post:
+      summary: Render the preview model from the base's preview shape (owner only, audited as base.preview)
+      description: |
+        Asks the geometry service (`POST /v1/bases/preview`) for a schematic GLB of `preview_shape`, stores it and, when the
+        body says so, takes the shape's mount frame. 422 `validation_failed` when the base has no preview shape; 503
+        `geometry_unavailable` when the service is down.
+      tags: [bases]
+      parameters: [{ $ref: '#/components/parameters/BaseSku' }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                take_mount_frame: { type: boolean, default: true, description: Replace the base's mount frame with the one the shape computes }
+      responses:
+        '200': { description: Base with its preview URL, content: { application/json: { schema: { $ref: '#/components/schemas/AdminBase' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+        '503': { description: geometry_unavailable, $ref: '#/components/responses/Problem' }
+  /admin/api/bases/{sku}/fit-tests:
+    get:
+      summary: Fit tests of this base, newest first
+      description: "One row per coupon built for a base × finish; a row with `passed: true` turns `fit_tested` on for every new design of that pair."
+      tags: [bases]
+      parameters: [{ $ref: '#/components/parameters/BaseSku' }]
+      responses:
+        '200': { description: Fit tests, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/FitTest' } } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+    post:
+      summary: Build a fit coupon for a finish (studio or owner, audited as fit_test.create)
+      description: |
+        Asks the geometry service (`POST /v1/coupons`) for the coupon of this base's Kadi in `material_id` at `wall_mm`,
+        stores the STL and the service's report (modelled dims, as-printed targets, connector_fit) on a new fit test row,
+        and returns it with `coupon_url` to download and print. 422 `validation_failed` for an unknown finish or a finish
+        this Kadi refuses (a rim clip in PLA); 503 `geometry_unavailable`.
+      tags: [bases]
+      parameters: [{ $ref: '#/components/parameters/BaseSku' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FitTestInput' }
+      responses:
+        '201': { description: Fit test with its coupon, content: { application/json: { schema: { $ref: '#/components/schemas/FitTest' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+        '503': { description: geometry_unavailable, $ref: '#/components/responses/Problem' }
+  /admin/api/fit-tests/{fitTestId}:
+    put:
+      summary: Record what the printed coupon measured and whether it passed (studio or owner, audited as fit_test.update)
+      tags: [bases]
+      parameters: [{ name: fitTestId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FitTestResult' }
+      responses:
+        '200': { description: Fit test, content: { application/json: { schema: { $ref: '#/components/schemas/FitTest' } } } }
+        '404': { description: fit_test_not_found, $ref: '#/components/responses/Problem' }
         '422': { $ref: '#/components/responses/Problem' }
   /admin/api/experiences:
     get:
@@ -471,6 +629,7 @@ paths:
                     catalog_items: { type: array, items: { type: string }, description: Slugs using this template }
                     features_supported: { type: array, items: { type: string, enum: [emboss_text, motif, relief_image, hero_mesh] }, description: Chhaap types the template accepts }
                     hardware: { type: array, items: { $ref: 'aakar-api.v1.yaml#/components/schemas/HardwareRef' }, description: Bought-in parts the template is cut for }
+                    connector: { oneOf: [{ $ref: '../schemas/template-descriptor.v1.json#/properties/connector' }, { type: 'null' }], description: "Hybrid templates: the Kadi cut into the piece" }
   /admin/api/templates/{templateId}:
     put:
       tags: [templates]
@@ -529,6 +688,7 @@ components:
     staffBearer: { type: http, scheme: bearer, bearerFormat: JWT, description: Staff token from /admin/api/auth/login; distinct from customer tokens }
   parameters:
     OrderId: { name: orderId, in: path, required: true, schema: { type: string, format: uuid } }
+    BaseSku: { name: sku, in: path, required: true, schema: { type: string } }
   responses:
     Problem:
       description: Problem Details
@@ -583,7 +743,7 @@ components:
       required: [id, kind, url, content_type, bytes, created_at]
       properties:
         id: { type: string, format: uuid }
-        kind: { type: string, enum: [qc_photo, packaging_card, other] }
+        kind: { type: string, enum: [qc_photo, packaging_card, base_preview, fit_coupon, other] }
         url: { type: string }
         content_type: { type: string }
         bytes: { type: integer }
@@ -604,6 +764,18 @@ components:
         free_shipping_above_paise: { type: integer, minimum: 0 }
         shipping_label: { type: string, maxLength: 60 }
         hardware_markup_pct: { type: number, minimum: 0, maximum: 500, description: Applied to bought-in hardware unit costs; 0 when absent }
+        base_markup_pct: { type: number, minimum: 0, maximum: 500, description: "Applied to a base item's unit cost when it has no retail price; the base line is added after margin, rounding and the minimum; 0 when absent" }
+        labour_rate_paise_per_minute: { type: integer, minimum: 0, description: "Prices a hybrid family's assembly_minutes when its rule names no assembly fee; 0 when absent" }
+        base_packaging_fee_paise: { type: integer, minimum: 0, description: "Extra packaging for a piece shipped with a base (a bigger box), folded into the packaging line; 0 when absent" }
+        shipping_tiers:
+          type: array
+          description: "Weight tiers read against the breakdown's shipping_weight_g (the cart sums it); the first tier whose max_g is not exceeded applies, heavier than every tier takes the last; empty keeps shipping_flat_paise. free_shipping_above_paise still wins."
+          items:
+            type: object
+            required: [max_g, paise]
+            properties:
+              max_g: { type: number, exclusiveMinimum: 0 }
+              paise: { type: integer, minimum: 0 }
         family_rules:
           type: object
           description: Per-outcome rules keyed by family id
@@ -613,6 +785,7 @@ components:
             properties:
               minimum_subtotal_paise: { type: integer, minimum: 0, description: Lifts the subtotal to at least this (rounded to the policy ending) }
               setup_fee_paise: { type: integer, minimum: 0, description: "Studio setup line, e.g. repair and orientation labour for raw prints" }
+              assembly_fee_paise: { type: integer, minimum: 0, description: "A fixed assembly line for a hybrid family, instead of assembly_minutes × the labour rate" }
               qty_breaks:
                 type: array
                 items:
@@ -709,6 +882,11 @@ components:
             anchors: { type: array, items: { type: string } }
             hero_volume: { type: boolean }
             max_text_chars: { type: integer, minimum: 1, maximum: 40 }
+        connector: { oneOf: [{ $ref: 'aakar-api.v1.yaml#/components/schemas/Connector' }, { type: 'null' }], description: "Hybrid families: the Kadi their templates cut; required when kind is hybrid (422 validation_failed otherwise), null for the other kinds" }
+        bases: { type: array, items: { type: object, required: [sku], properties: { sku: { type: string }, default: { type: boolean, default: false } } }, description: "Hybrid families: base skus in display order, exactly one default; each base's interface must match the connector (422 incompatible_base), 404 unknown_base" }
+        assembly_minutes: { type: [integer, 'null'], minimum: 0 }
+        pair_family_id: { type: [string, 'null'], description: The other form of the same idea; 422 unknown_family when not a family }
+        typical_print_minutes: { type: [integer, 'null'], minimum: 0 }
         available: { type: boolean }
         sort_order: { type: integer, default: 100 }
     AdminFamily:
@@ -739,6 +917,113 @@ components:
         - type: object
           properties:
             updated_at: { type: string, format: date-time }
+    AdminBaseInput:
+      type: object
+      description: Same fields as schemas/template-family.v1.json#/$defs/base_item. On PUT the sku in the path wins; stock_qty is read on create only (it becomes the opening receipt).
+      additionalProperties: false
+      required: [sku, name, category, base_material, dimensions_mm, interface, mount_frame, finish_pbr, available]
+      properties:
+        sku: { type: string, pattern: '^[a-z][a-z0-9_]*$', maxLength: 40 }
+        name: { type: string, maxLength: 120 }
+        description: { type: string, maxLength: 500 }
+        category: { type: string, enum: [desk, home, lighting, auto, kids, bath, plants] }
+        base_material: { type: string, maxLength: 20 }
+        dimensions_mm: { type: array, items: { type: number, exclusiveMinimum: 0 }, minItems: 3, maxItems: 3 }
+        weight_g: { type: number, minimum: 0, default: 0 }
+        unit_cost_paise: { type: integer, minimum: 0, default: 0 }
+        retail_price_paise: { type: [integer, 'null'], minimum: 0 }
+        supplier: { type: string, maxLength: 120 }
+        supplier_sku: { type: string, maxLength: 80 }
+        url: { type: string, maxLength: 500 }
+        lead_days: { type: integer, minimum: 0, default: 7 }
+        customer_owned: { type: boolean, default: false }
+        stock_qty: { type: integer, minimum: 0, default: 0, description: Opening stock on create; ignored on update }
+        reorder_level: { type: integer, minimum: 0, default: 5 }
+        interface: { $ref: 'aakar-api.v1.yaml#/components/schemas/BaseInterface' }
+        mount_frame: { $ref: 'aakar-api.v1.yaml#/components/schemas/MountFrame' }
+        preview_shape:
+          type: [object, 'null']
+          required: [shape]
+          description: A schematic the geometry service renders as the preview (see schemas/template-family.v1.json#/$defs/preview_shape for each shape's keys)
+          properties:
+            shape: { type: string, enum: [pillar_stand, hook_plate, lamp_base, puck_mount, box, bottle, pot] }
+          additionalProperties: { type: number }
+        photos: { type: array, items: { type: object, required: [url], properties: { url: { type: string, maxLength: 500 }, alt: { type: string, maxLength: 120 } } } }
+        finish_pbr: { $ref: 'aakar-api.v1.yaml#/components/schemas/Material/properties/pbr' }
+        hsn_code: { type: [string, 'null'], maxLength: 8 }
+        compliance_notes: { type: [string, 'null'], maxLength: 300 }
+        available: { type: boolean }
+        sort_order: { type: integer, default: 100 }
+    AdminBase:
+      description: The row as stored, with its stock position and what the fit tests say.
+      allOf:
+        - $ref: '#/components/schemas/AdminBaseInput'
+        - type: object
+          required: [stock_qty, reserved_qty, available_qty, fit_tested_materials, families, updated_at]
+          properties:
+            stock_qty: { type: integer, description: On hand }
+            reserved_qty: { type: integer, description: Held by paid orders not yet packed }
+            available_qty: { type: integer, description: stock_qty minus reserved_qty }
+            below_reorder: { type: boolean, description: available_qty at or under reorder_level }
+            preview_glb_url: { type: [string, 'null'] }
+            preview_source: { type: [string, 'null'], enum: [generated, uploaded, null], description: Where the preview came from }
+            fit_tested_materials: { type: array, items: { type: string }, description: Finishes with a passing fit test for this base }
+            families: { type: array, items: { type: string }, description: Hybrid families that list this base }
+            updated_at: { type: string, format: date-time }
+    StockMovementInput:
+      type: object
+      additionalProperties: false
+      required: [kind, qty]
+      properties:
+        kind: { type: string, enum: [receipt, adjust], description: receipt adds qty; adjust sets the counted stock to qty }
+        qty: { type: integer, minimum: 0 }
+        note: { type: string, maxLength: 200 }
+    StockMovement:
+      type: object
+      required: [id, base_sku, kind, qty, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        base_sku: { type: string }
+        kind: { type: string, enum: [receipt, reserve, release, consume, adjust] }
+        qty: { type: integer, description: "Signed change to stock_qty (receipt, consume, adjust) or to reserved_qty (reserve, release)" }
+        order_id: { type: [string, 'null'], format: uuid }
+        note: { type: [string, 'null'] }
+        created_by: { type: [string, 'null'], description: "Staff email, or system for the order lifecycle" }
+        created_at: { type: string, format: date-time }
+    FitTestInput:
+      type: object
+      additionalProperties: false
+      required: [material_id]
+      properties:
+        material_id: { type: string, description: The finish the coupon is printed in }
+        wall_mm: { type: number, minimum: 1, maximum: 6, default: 2.4, description: Wall around the connector on the coupon }
+        note: { type: string, maxLength: 300 }
+    FitTestResult:
+      type: object
+      additionalProperties: false
+      required: [passed]
+      properties:
+        measured: { type: object, additionalProperties: { type: number }, description: "What the calipers and the pull test said, keyed as the coupon report's expected_printed (bore_d_mm, crest_d_mm, slot_w_mm, insertion_n, pull_off_n …)" }
+        passed: { type: boolean }
+        note: { type: string, maxLength: 300 }
+    FitTest:
+      type: object
+      required: [id, base_sku, material_id, connector_kind, nominal_mm, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        base_sku: { type: string }
+        material_id: { type: string }
+        connector_kind: { type: string, enum: [socket, dovetail, magnet, thread, rim_clip] }
+        nominal_mm: { type: number }
+        wall_mm: { type: number }
+        coupon_url: { type: [string, 'null'], description: The coupon STL to print }
+        coupon_report: { type: [object, 'null'], additionalProperties: true, description: "What the geometry service returned: modelled dims, expected as-printed numbers, the connector_fit check" }
+        measured: { type: [object, 'null'], additionalProperties: true }
+        passed: { type: [boolean, 'null'], description: null until recorded }
+        note: { type: [string, 'null'] }
+        tested_by: { type: [string, 'null'] }
+        created_at: { type: string, format: date-time }
+        tested_at: { type: [string, 'null'], format: date-time }
     AdminExperienceInput:
       type: object
       description: Same fields as schemas/experience.v1.json#/$defs/experience. On PUT the id in the path wins.
@@ -836,7 +1121,7 @@ components:
         id: { type: integer }
         at: { type: string, format: date-time }
         staff_email: { type: string }
-        action: { type: string, description: "order.advance, pricing.publish, material.update, catalog.update, template.live, family.create, family.update, hardware.create, hardware.update, experience.create, experience.update, review.decide, content_term.create, content_term.update" }
-        target: { type: string, description: "Order number, policy version, material id, slug, template id, family id, hardware sku, experience id, review id or content term" }
+        action: { type: string, description: "order.advance, pricing.publish, material.update, catalog.update, template.live, family.create, family.update, hardware.create, hardware.update, base.create, base.update, base.stock, base.preview, fit_test.create, fit_test.update, experience.create, experience.update, review.decide, content_term.create, content_term.update" }
+        target: { type: string, description: "Order number, policy version, material id, slug, template id, family id, hardware sku, base sku, fit test id, experience id, review id or content term" }
         before: { type: [object, 'null'], additionalProperties: true }
         after: { type: [object, 'null'], additionalProperties: true }

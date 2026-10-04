@@ -115,7 +115,7 @@ export interface paths {
                             orders_today: number;
                             revenue_today_paise: number;
                             revenue_month_paise: number;
-                            /** @description Orders in queued, finishing or qc that need a staff step */
+                            /** @description Orders in queued, finishing, assembling or qc that need a staff step */
                             awaiting_action: number;
                         };
                     };
@@ -227,7 +227,7 @@ export interface paths {
         put?: never;
         /**
          * Move the order to its next status
-         * @description Allowed transitions: confirmed→queued→slicing→printing→finishing→qc→packed→shipped→delivered; any active status→on_hold and back to the previous status; qc→reprint→printing; any status before shipped→cancelled. Packed creates the shipment; shipped adds the carrier event. Invalid moves answer 409 invalid_transition.
+         * @description Allowed transitions: confirmed→queued→slicing→printing→finishing→(assembling→)qc→packed→shipped→delivered; assembling is offered only for an order with a base (a Jod) and may be skipped; any active status→on_hold and back to the previous status; qc→reprint→printing; any status before shipped→cancelled. Payment reserves each item's base stock, packed consumes it, cancelled releases it. Packed creates the shipment; shipped adds the carrier event. Invalid moves answer 409 invalid_transition.
          */
         post: {
             parameters: {
@@ -281,7 +281,7 @@ export interface paths {
         };
         /**
          * Everything the outsourced printer needs, as one zip
-         * @description Per item: model.3mf and model.stl (from the version's assets), plus print-sheet.txt (order number, item, material and filament, quantity, finish class, dimensions, mass, estimated time, notes). Printing is outsourced for now (ADR-0004).
+         * @description Per item: model.3mf and model.stl (from the version's assets), plus print-sheet.txt (order number, item, material and filament, quantity, finish class, dimensions, mass, estimated time, notes; base and Kadi for a Jod) and, for an item with a base, assembly-sheet.txt (base, adapter, Kadi, the passing fit test, the seating steps); packing-list.txt totals the bases to pull from stock. Printing is outsourced for now (ADR-0004).
          */
         get: {
             parameters: {
@@ -534,8 +534,10 @@ export interface paths {
                         material: string;
                         extruded_volume_cm3: number;
                         print_seconds: number;
-                        /** @description Applies the family's hardware default, setup fee and minimum */
+                        /** @description Applies the family's hardware default, setup fee, assembly and minimum */
                         family_id?: string;
+                        /** @description Adds the base line and its weight (a hybrid family's base; its default when the family is given and this is not) */
+                        base_sku?: string;
                     };
                 };
             };
@@ -1021,6 +1023,453 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/api/bases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bought-in bases (Buniyaad), available or not, with stock and fit-test state */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Bases */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminBase"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Create a base (owner only, audited as base.create)
+         * @description 409 `base_exists` for a taken sku. 422 `validation_failed` for a schema violation or an `interface.adapter_sku` that is
+         *     not a hardware item. `stock_qty` in the body is the opening stock (a `receipt` movement is recorded for it).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AdminBaseInput"];
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminBase"];
+                    };
+                };
+                403: components["responses"]["Problem"];
+                /** @description base_exists */
+                409: components["responses"]["Problem"];
+                422: components["responses"]["Problem"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/api/bases/{sku}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    sku: components["parameters"]["BaseSku"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Base */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminBase"];
+                    };
+                };
+                /** @description unknown_base */
+                404: components["responses"]["Problem"];
+            };
+        };
+        /**
+         * Update a base's copy, classification, cost, interface, mount frame, preview shape, finish or availability (owner only, audited as base.update)
+         * @description The sku in the path wins over the body. Stock is never set here; post a movement instead. 404 `unknown_base`; 422 as on create.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    sku: components["parameters"]["BaseSku"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AdminBaseInput"];
+                };
+            };
+            responses: {
+                /** @description Updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminBase"];
+                    };
+                };
+                403: components["responses"]["Problem"];
+                /** @description unknown_base */
+                404: components["responses"]["Problem"];
+                422: components["responses"]["Problem"];
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/api/bases/{sku}/stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The base's stock ledger, newest first */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    sku: components["parameters"]["BaseSku"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Movements */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StockMovement"][];
+                    };
+                };
+                404: components["responses"]["Problem"];
+            };
+        };
+        put?: never;
+        /**
+         * Receive stock or adjust it after a count (studio or owner, audited as base.stock)
+         * @description `receipt` adds `qty` (positive); `adjust` sets the counted stock to `qty` and records the difference. Reservations,
+         *     releases and consumption are written by the order lifecycle, never here. 422 `validation_failed` when an adjustment
+         *     would leave less stock than is reserved.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    sku: components["parameters"]["BaseSku"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["StockMovementInput"];
+                };
+            };
+            responses: {
+                /** @description Base after the movement */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminBase"];
+                    };
+                };
+                404: components["responses"]["Problem"];
+                422: components["responses"]["Problem"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/api/bases/{sku}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload the base's preview model (a GLB, owner only, audited as base.preview)
+         * @description `multipart/form-data` with `file` (glb, up to 15 MB). Replaces a generated preview; the mount frame is left as it is.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    sku: components["parameters"]["BaseSku"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "multipart/form-data": {
+                        /** Format: binary */
+                        file: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Base with its preview URL */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminBase"];
+                    };
+                };
+                403: components["responses"]["Problem"];
+                404: components["responses"]["Problem"];
+                /** @description Larger than 15 MB (payload_too_large) */
+                413: components["responses"]["Problem"];
+                /** @description Not a GLB (unsupported_format) */
+                415: components["responses"]["Problem"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/api/bases/{sku}/preview/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Render the preview model from the base's preview shape (owner only, audited as base.preview)
+         * @description Asks the geometry service (`POST /v1/bases/preview`) for a schematic GLB of `preview_shape`, stores it and, when the
+         *     body says so, takes the shape's mount frame. 422 `validation_failed` when the base has no preview shape; 503
+         *     `geometry_unavailable` when the service is down.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    sku: components["parameters"]["BaseSku"];
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Replace the base's mount frame with the one the shape computes
+                         * @default true
+                         */
+                        take_mount_frame?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Base with its preview URL */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminBase"];
+                    };
+                };
+                403: components["responses"]["Problem"];
+                404: components["responses"]["Problem"];
+                422: components["responses"]["Problem"];
+                /** @description geometry_unavailable */
+                503: components["responses"]["Problem"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/api/bases/{sku}/fit-tests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fit tests of this base, newest first
+         * @description One row per coupon built for a base × finish; a row with `passed: true` turns `fit_tested` on for every new design of that pair.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    sku: components["parameters"]["BaseSku"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Fit tests */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FitTest"][];
+                    };
+                };
+                404: components["responses"]["Problem"];
+            };
+        };
+        put?: never;
+        /**
+         * Build a fit coupon for a finish (studio or owner, audited as fit_test.create)
+         * @description Asks the geometry service (`POST /v1/coupons`) for the coupon of this base's Kadi in `material_id` at `wall_mm`,
+         *     stores the STL and the service's report (modelled dims, as-printed targets, connector_fit) on a new fit test row,
+         *     and returns it with `coupon_url` to download and print. 422 `validation_failed` for an unknown finish or a finish
+         *     this Kadi refuses (a rim clip in PLA); 503 `geometry_unavailable`.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    sku: components["parameters"]["BaseSku"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["FitTestInput"];
+                };
+            };
+            responses: {
+                /** @description Fit test with its coupon */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FitTest"];
+                    };
+                };
+                404: components["responses"]["Problem"];
+                422: components["responses"]["Problem"];
+                /** @description geometry_unavailable */
+                503: components["responses"]["Problem"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/api/fit-tests/{fitTestId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Record what the printed coupon measured and whether it passed (studio or owner, audited as fit_test.update) */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    fitTestId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["FitTestResult"];
+                };
+            };
+            responses: {
+                /** @description Fit test */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FitTest"];
+                    };
+                };
+                /** @description fit_test_not_found */
+                404: components["responses"]["Problem"];
+                422: components["responses"]["Problem"];
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/api/experiences": {
         parameters: {
             query?: never;
@@ -1470,6 +1919,8 @@ export interface paths {
                             features_supported?: ("emboss_text" | "motif" | "relief_image" | "hero_mesh")[];
                             /** @description Bought-in parts the template is cut for */
                             hardware?: components["schemas"]["HardwareRef"][];
+                            /** @description Hybrid templates: the Kadi cut into the piece */
+                            connector?: components["schemas"]["connector"] | null;
                         }[];
                     };
                 };
@@ -1660,7 +2111,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            kind: "qc_photo" | "packaging_card" | "other";
+            kind: "qc_photo" | "packaging_card" | "base_preview" | "fit_coupon" | "other";
             url: string;
             content_type: string;
             bytes: number;
@@ -1683,6 +2134,17 @@ export interface components {
             shipping_label: string;
             /** @description Applied to bought-in hardware unit costs; 0 when absent */
             hardware_markup_pct?: number;
+            /** @description Applied to a base item's unit cost when it has no retail price; the base line is added after margin, rounding and the minimum; 0 when absent */
+            base_markup_pct?: number;
+            /** @description Prices a hybrid family's assembly_minutes when its rule names no assembly fee; 0 when absent */
+            labour_rate_paise_per_minute?: number;
+            /** @description Extra packaging for a piece shipped with a base (a bigger box), folded into the packaging line; 0 when absent */
+            base_packaging_fee_paise?: number;
+            /** @description Weight tiers read against the breakdown's shipping_weight_g (the cart sums it); the first tier whose max_g is not exceeded applies, heavier than every tier takes the last; empty keeps shipping_flat_paise. free_shipping_above_paise still wins. */
+            shipping_tiers?: {
+                max_g: number;
+                paise: number;
+            }[];
             /** @description Per-outcome rules keyed by family id */
             family_rules?: {
                 [key: string]: {
@@ -1690,6 +2152,8 @@ export interface components {
                     minimum_subtotal_paise?: number;
                     /** @description Studio setup line, e.g. repair and orientation labour for raw prints */
                     setup_fee_paise?: number;
+                    /** @description A fixed assembly line for a hybrid family, instead of assembly_minutes × the labour rate */
+                    assembly_fee_paise?: number;
                     qty_breaks?: {
                         min_qty: number;
                         discount_pct: number;
@@ -1787,6 +2251,18 @@ export interface components {
                 hero_volume?: boolean;
                 max_text_chars?: number;
             };
+            /** @description Hybrid families: the Kadi their templates cut; required when kind is hybrid (422 validation_failed otherwise), null for the other kinds */
+            connector?: components["schemas"]["Connector"] | null;
+            /** @description Hybrid families: base skus in display order, exactly one default; each base's interface must match the connector (422 incompatible_base), 404 unknown_base */
+            bases?: {
+                sku: string;
+                /** @default false */
+                default: boolean;
+            }[];
+            assembly_minutes?: number | null;
+            /** @description The other form of the same idea; 422 unknown_family when not a family */
+            pair_family_id?: string | null;
+            typical_print_minutes?: number | null;
             available: boolean;
             /** @default 100 */
             sort_order: number;
@@ -1812,6 +2288,147 @@ export interface components {
         AdminHardware: components["schemas"]["AdminHardwareInput"] & {
             /** Format: date-time */
             updated_at?: string;
+        };
+        /** @description Same fields as schemas/template-family.v1.json#/$defs/base_item. On PUT the sku in the path wins; stock_qty is read on create only (it becomes the opening receipt). */
+        AdminBaseInput: {
+            sku: string;
+            name: string;
+            description?: string;
+            /** @enum {string} */
+            category: "desk" | "home" | "lighting" | "auto" | "kids" | "bath" | "plants";
+            base_material: string;
+            dimensions_mm: number[];
+            /** @default 0 */
+            weight_g: number;
+            /** @default 0 */
+            unit_cost_paise: number;
+            retail_price_paise?: number | null;
+            supplier?: string;
+            supplier_sku?: string;
+            url?: string;
+            /** @default 7 */
+            lead_days: number;
+            /** @default false */
+            customer_owned: boolean;
+            /**
+             * @description Opening stock on create; ignored on update
+             * @default 0
+             */
+            stock_qty: number;
+            /** @default 5 */
+            reorder_level: number;
+            interface: components["schemas"]["BaseInterface"];
+            mount_frame: components["schemas"]["MountFrame"];
+            /** @description A schematic the geometry service renders as the preview (see schemas/template-family.v1.json#/$defs/preview_shape for each shape's keys) */
+            preview_shape?: ({
+                /** @enum {string} */
+                shape: "pillar_stand" | "hook_plate" | "lamp_base" | "puck_mount" | "box" | "bottle" | "pot";
+            } & {
+                [key: string]: number;
+            }) | null;
+            photos?: {
+                url: string;
+                alt?: string;
+            }[];
+            finish_pbr: components["schemas"]["pbr"];
+            hsn_code?: string | null;
+            compliance_notes?: string | null;
+            available: boolean;
+            /** @default 100 */
+            sort_order: number;
+        };
+        /** @description The row as stored, with its stock position and what the fit tests say. */
+        AdminBase: components["schemas"]["AdminBaseInput"] & {
+            /** @description On hand */
+            stock_qty: number;
+            /** @description Held by paid orders not yet packed */
+            reserved_qty: number;
+            /** @description stock_qty minus reserved_qty */
+            available_qty: number;
+            /** @description available_qty at or under reorder_level */
+            below_reorder?: boolean;
+            preview_glb_url?: string | null;
+            /**
+             * @description Where the preview came from
+             * @enum {string|null}
+             */
+            preview_source?: "generated" | "uploaded" | null;
+            /** @description Finishes with a passing fit test for this base */
+            fit_tested_materials: string[];
+            /** @description Hybrid families that list this base */
+            families: string[];
+            /** Format: date-time */
+            updated_at: string;
+        };
+        StockMovementInput: {
+            /**
+             * @description receipt adds qty; adjust sets the counted stock to qty
+             * @enum {string}
+             */
+            kind: "receipt" | "adjust";
+            qty: number;
+            note?: string;
+        };
+        StockMovement: {
+            /** Format: uuid */
+            id: string;
+            base_sku: string;
+            /** @enum {string} */
+            kind: "receipt" | "reserve" | "release" | "consume" | "adjust";
+            /** @description Signed change to stock_qty (receipt, consume, adjust) or to reserved_qty (reserve, release) */
+            qty: number;
+            /** Format: uuid */
+            order_id?: string | null;
+            note?: string | null;
+            /** @description Staff email, or system for the order lifecycle */
+            created_by?: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        FitTestInput: {
+            /** @description The finish the coupon is printed in */
+            material_id: string;
+            /**
+             * @description Wall around the connector on the coupon
+             * @default 2.4
+             */
+            wall_mm: number;
+            note?: string;
+        };
+        FitTestResult: {
+            /** @description What the calipers and the pull test said, keyed as the coupon report's expected_printed (bore_d_mm, crest_d_mm, slot_w_mm, insertion_n, pull_off_n …) */
+            measured?: {
+                [key: string]: number;
+            };
+            passed: boolean;
+            note?: string;
+        };
+        FitTest: {
+            /** Format: uuid */
+            id: string;
+            base_sku: string;
+            material_id: string;
+            /** @enum {string} */
+            connector_kind: "socket" | "dovetail" | "magnet" | "thread" | "rim_clip";
+            nominal_mm: number;
+            wall_mm?: number;
+            /** @description The coupon STL to print */
+            coupon_url?: string | null;
+            /** @description What the geometry service returned: modelled dims, expected as-printed numbers, the connector_fit check */
+            coupon_report?: {
+                [key: string]: unknown;
+            } | null;
+            measured?: {
+                [key: string]: unknown;
+            } | null;
+            /** @description null until recorded */
+            passed?: boolean | null;
+            note?: string | null;
+            tested_by?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            tested_at?: string | null;
         };
         /** @description Same fields as schemas/experience.v1.json#/$defs/experience. On PUT the id in the path wins. */
         AdminExperienceInput: {
@@ -1950,9 +2567,9 @@ export interface components {
             /** Format: date-time */
             at: string;
             staff_email: string;
-            /** @description order.advance, pricing.publish, material.update, catalog.update, template.live, family.create, family.update, hardware.create, hardware.update, experience.create, experience.update, review.decide, content_term.create, content_term.update */
+            /** @description order.advance, pricing.publish, material.update, catalog.update, template.live, family.create, family.update, hardware.create, hardware.update, base.create, base.update, base.stock, base.preview, fit_test.create, fit_test.update, experience.create, experience.update, review.decide, content_term.create, content_term.update */
             action: string;
-            /** @description Order number, policy version, material id, slug, template id, family id, hardware sku, experience id, review id or content term */
+            /** @description Order number, policy version, material id, slug, template id, family id, hardware sku, base sku, fit test id, experience id, review id or content term */
             target: string;
             before?: {
                 [key: string]: unknown;
@@ -1962,10 +2579,10 @@ export interface components {
             } | null;
         };
         /**
-         * @description Internal status. The customer stage is derived.
+         * @description Internal status. The customer stage is derived. assembling (the Chhaap seated on its base, an adapter bonded) sits between finishing and qc and is offered only for orders that carry a base.
          * @enum {string}
          */
-        OrderStatus: "pending_payment" | "confirmed" | "queued" | "slicing" | "printing" | "finishing" | "qc" | "packed" | "shipped" | "delivered" | "cancelled" | "on_hold" | "reprint";
+        OrderStatus: "pending_payment" | "confirmed" | "queued" | "slicing" | "printing" | "finishing" | "assembling" | "qc" | "packed" | "shipped" | "delivered" | "cancelled" | "on_hold" | "reprint";
         /**
          * @description Customer-facing collapsed stage (board 06).
          * @enum {string}
@@ -1998,8 +2615,11 @@ export interface components {
             mass_g: number;
             print_seconds: number;
             lines: {
-                /** @enum {string} */
-                code: "material" | "machine_time" | "finishing" | "packaging" | "hardware" | "setup";
+                /**
+                 * @description assembly: the studio's time seating a Chhaap on its base (hybrid families). base: the bought-in base itself, added after margin, rounding and the family minimum, never marked up by them; absent for a customer-owned base.
+                 * @enum {string}
+                 */
+                code: "material" | "machine_time" | "finishing" | "packaging" | "hardware" | "setup" | "assembly" | "base";
                 /** @description Customer-facing, e.g. 'Material · 84 g' or 'Print time · 3 h 40 m'. */
                 label: string;
                 detail?: string;
@@ -2016,6 +2636,10 @@ export interface components {
             family_id?: string;
             /** @description Present when the family's minimum lifted the subtotal above the computed lines. */
             minimum_subtotal_paise?: number;
+            /** @description The bought-in base priced on the base line (hybrid pieces), or the customer-owned class the piece fits. */
+            base_sku?: string;
+            /** @description Print mass plus the base's and the hardware's weight: what the policy's shipping_tiers are read against (the cart sums it over quantities). */
+            shipping_weight_g?: number;
         };
         OrderItem: {
             /** Format: uuid */
@@ -2036,6 +2660,12 @@ export interface components {
             assets?: {
                 [key: string]: unknown;
             };
+            /** @description Hybrid pieces: the base shipped with (or fitted by) this item */
+            base_sku?: string | null;
+            /** @description The base as sold: sku, name, customer_owned, weight_g, the base price line, the adapter sku and the Kadi (kind, nominal_mm), so the print pack and the card never drift */
+            base_snapshot?: {
+                [key: string]: unknown;
+            } | null;
         };
         AddressInput: {
             /** @description Home or Office */
@@ -2159,6 +2789,54 @@ export interface components {
             label: string;
             sort_order: number;
         };
+        /** @description The Kadi a hybrid family (Jod) cuts into its Chhaap. Same fields as schemas/template-family.v1.json#/$defs/connector. */
+        Connector: {
+            /** @enum {string} */
+            kind: "socket" | "dovetail" | "magnet" | "thread" | "rim_clip";
+            nominal_mm: number;
+            /** @enum {string} */
+            fit: "slide" | "press_ribbed" | "snap" | "pocket";
+            /**
+             * @description rim_clip only
+             * @enum {string}
+             */
+            form?: "cap" | "lid" | "rim";
+            /**
+             * @description thread only
+             * @enum {string}
+             */
+            thread?: "unc_1_4" | "m10x1" | "e27" | "e14";
+            /**
+             * @description magnet only
+             * @enum {string}
+             */
+            mode?: "magnets" | "steel_disc";
+            /** @description Bought-in male part packed with the piece when the base has none of its own */
+            adapter_sku?: string;
+        };
+        /** @description What a base presents to the Chhaap, seen from the male side. Same fields as schemas/template-family.v1.json#/$defs/base_interface. */
+        BaseInterface: {
+            /** @enum {string} */
+            kind: "socket" | "dovetail" | "magnet" | "thread" | "rim_clip";
+            nominal_mm: number;
+            /** @enum {string} */
+            tolerance_class?: "machined" | "molded" | "wood" | "ceramic" | "glass" | "steel";
+            /** @description Customer-owned bases: the size class the Chhaap grips */
+            range_mm?: number[];
+            /** @enum {string} */
+            form?: "cap" | "lid" | "rim";
+            /** @enum {string} */
+            thread?: "unc_1_4" | "m10x1" | "e27" | "e14";
+            /** @enum {string} */
+            mode?: "magnets" | "steel_disc";
+            adapter_sku?: string;
+        };
+        /** @description Where the Chhaap's connector mouth sits on the base, in the base's frame (standing on z = 0, centred on the z axis). */
+        MountFrame: {
+            origin_mm: number[];
+            up: number[];
+            forward?: number[];
+        };
         /** @description Page theming of an experience. The cream paper stays; the accent and the hero change. */
         ExperienceSurface: {
             /** @description sRGB hex from the brand palette */
@@ -2234,6 +2912,39 @@ export interface components {
             /** @description Customer-facing hardware name, filled by the API from hardware_items */
             name?: string;
         };
+        /** @description Hybrid (Jod) templates only: the Kadi cut into the piece so it plugs into a bought-in base. The female feature is always on the printed Chhaap (it prints flat, no supports); the male side belongs to the base or to the bought-in adapter adapter_sku. Kadi-S is the ribbed press socket; Kadi-D the dovetail channel (form-free, slide fit); Kadi-T a thread or an E27 / E14 shade collar; Kadi-M the magnet pockets or steel-disc pocket; Kadi-C the compliant rim clip (cap skirt, lid lip or rim jaws), PETG only. */
+        connector: {
+            /** @enum {string} */
+            kind: "socket" | "dovetail" | "magnet" | "thread" | "rim_clip";
+            /** @description The pin (rail, thread, magnet) diameter the base presents, e.g. 12 for a Kadi-S Ø 12. */
+            nominal_mm: number;
+            /**
+             * @description The as-printed condition the connector is modelled for; press_ribbed = three crush ribs take up the pin's variation.
+             * @enum {string}
+             */
+            fit: "slide" | "press_ribbed" | "snap" | "pocket";
+            depth_mm?: number;
+            rib_count?: number;
+            /** @description Diametral clearance between the printed bore wall and the pin (flank clearance for a rail, radial for a thread, pocket clearance for a disc, lip over-travel for a clip). */
+            clearance_mm?: number;
+            /**
+             * @description rim_clip only: a skirt over a cap, a lip inside an opening, or C-jaws over a rim.
+             * @enum {string}
+             */
+            form?: "cap" | "lid" | "rim";
+            /**
+             * @description thread only: the standard; e27 and e14 are collar holes clamped by the holder's shade ring, not threads.
+             * @enum {string}
+             */
+            thread?: "unc_1_4" | "m10x1" | "e27" | "e14";
+            /**
+             * @description magnet only: magnets in pockets, or one steel disc that holds to the base's magnet.
+             * @enum {string}
+             */
+            mode?: "magnets" | "steel_disc";
+            /** @description hardware_items sku of the bought-in male part packed when the base has no pin of its own. */
+            adapter_sku?: string;
+        };
     };
     responses: {
         /** @description Problem Details */
@@ -2254,6 +2965,7 @@ export interface components {
     };
     parameters: {
         OrderId: string;
+        BaseSku: string;
     };
     requestBodies: never;
     headers: never;
