@@ -10,6 +10,7 @@ from .base import Anchor, HardwareRef, Param, Template, TemplateConstraints
 from .desk_nameplate import DeskNameplate
 from .fridge_magnet import FridgeMagnet
 from .hanging_ornament import HangingOrnament
+from .headphone_topper import HeadphoneTopper
 from .jharokha_phone_stand import JharokhaPhoneStand
 from .keycap_mx import KeycapMx
 from .keychain_tag import KeychainTag
@@ -48,6 +49,8 @@ register(PlinthRound)
 register(PetTag)
 register(PhotoFrameStd)
 register(KeycapMx)
+# Hybrid products (Jod), Phase 1: the first Kadi template, switched off in families.json until its fit coupons pass
+register(HeadphoneTopper)
 
 
 def list_templates() -> list[type[Template]]:
@@ -81,6 +84,7 @@ __all__ = [
     "FridgeMagnet",
     "HangingOrnament",
     "HardwareRef",
+    "HeadphoneTopper",
     "JharokhaPhoneStand",
     "KeycapMx",
     "KeychainTag",

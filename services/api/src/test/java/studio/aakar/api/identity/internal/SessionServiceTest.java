@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
@@ -22,7 +23,8 @@ import studio.aakar.api.shared.Identity;
 class SessionServiceTest {
 
     static final String SECRET = "unit-test-secret-that-is-long-enough-for-hs256-0123456789";
-    static final Instant NOW = Instant.parse("2026-09-27T10:00:00Z");
+    // a fixed clock in the past makes every issued token expired for the real-clock parser once that date passes; mint at the current second instead
+    static final Instant NOW = Instant.now().truncatedTo(ChronoUnit.SECONDS);
 
     private final SessionRepository repository = mock(SessionRepository.class);
     private final Map<UUID, SessionEntity> saved = new HashMap<>();

@@ -188,9 +188,11 @@ class PlinthRound(Template):
         return mesh
 
     @classmethod
-    def build(cls, params: Mapping[str, Any], features: Sequence[Mapping[str, Any]] = (), fetcher: Any | None = None) -> trimesh.Trimesh:
+    def build(
+        cls, params: Mapping[str, Any], features: Sequence[Mapping[str, Any]] = (), fetcher: Any | None = None, material: str | None = None
+    ) -> trimesh.Trimesh:
         """The plinth, the form fused on and the name set in; then the stability rule on the whole piece."""
-        mesh = super().build(params, features, fetcher)
+        mesh = super().build(params, features, fetcher, material=material)
         heroes = [i for i, f in enumerate(features or []) if f.get("type") == "hero_mesh"]
         if heroes:
             cls.check_stability(mesh, params, features[heroes[0]], heroes[0])

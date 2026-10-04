@@ -48,7 +48,9 @@ public record FamilyDto(
     public static final String KIND_CARRIER = "carrier";
     public static final String KIND_OBJECT = "object";
     public static final String KIND_RAW = "raw";
-    public static final List<String> KINDS = List.of(KIND_CARRIER, KIND_OBJECT, KIND_RAW);
+    /** A Jod: a printed Chhaap that plugs into a bought-in base through a Kadi connector (docs/research/hybrid-products). */
+    public static final String KIND_HYBRID = "hybrid";
+    public static final List<String> KINDS = List.of(KIND_CARRIER, KIND_OBJECT, KIND_RAW, KIND_HYBRID);
     public static final List<String> TIERS = List.of("launch", "next", "later");
     public static final List<String> SHAPE_TOLERANCES = List.of("any", "constrained", "strict");
     /** The Chhaap feature types ({@code design-spec.v1.json} feature kinds). */

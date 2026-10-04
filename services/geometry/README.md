@@ -35,6 +35,7 @@ in `families.json`.
 | `pet_tag@1` | `keychain` (Saathi) | `shape` bone · disc (bone); `size_mm` 25–35 (30), longest side; `thickness_mm` 3–4 (3.5); the ring hole is 4 mm | `face` (+Z) and `back` (−Z): name first, motif, photo; 23.1 × 10.8 mm | `split_ring_25` ×1 |
 | `photo_frame_std@1` | `photo_frame` (Chaukhat) | `orientation` portrait · landscape (portrait), for a 4 × 6 in photo; `border_mm` 12–25 (18); `stand` easel · hanger (easel) | `border` (the top rail): motif, name; `base_front` (the bottom rail): name; 121.9 × 15 mm; cut in, never raised | `acrylic_4x6` ×1 |
 | `keycap_mx@1` | `keycap` (Kunji) | `stem_slop_mm` 0.3–0.5 (0.4) | `top` (+Z, dished): photo relief or 1–3 letters, at most 0.6 mm; 11.1 × 11.1 mm | — |
+| `headphone_topper@1` | `headphone_topper` (Sur Jod, **hybrid**) | `width_mm` 60–90 (70); `depth_mm` 30–50 (40); `height_mm` 30–50 (38), the crown; `room_mm` 20–50 (30), plate in front for a form | `front` (volume): your form, 67 × 27 × 33 mm; `face` (−Y): name, motif; 67 × 19.7 mm. **Kadi-S Ø 12 socket** underneath | `dowel_nylon_12x30` ×1 |
 
 The first four carriers publish `min_feature_mm` 0.8, constraints min wall 1.2 / overhang 55° / bed 250³,
 and take names and motifs besides photos (`features_supported`: `relief_image`, `emboss_text`,
@@ -198,6 +199,35 @@ the switch needs). Printed stem down as modelled. The `top` anchor sits at the b
 photo relief (an emblem) or 1–3 letters, raised or cut at most 0.6 mm; letters keep 1 mm strokes, so three
 wide letters ("Esc") are refused as too fine. The MX stem is about 0.5 mm thick beyond the cross's tips by
 the standard, under FDM's 0.8 mm: the karigar's note recommends resin and a test fit on a switch.
+
+### `headphone_topper@1` (family `headphone_topper`, Sur Jod): the first hybrid (Jod) template
+
+A hybrid pairs a bought-in base with a printed Chhaap (docs/research/hybrid-products, ADR-0015). The topper is a saddle for a
+ready-made headphone stand: a rounded plate `width_mm` × (`depth_mm` + `room_mm`), 4 mm thick, carrying at the back a block
+topped by a crown (an arc of radius 60 mm along Y whose apex is `height_mm` above the bed) that the headband rests across, and at
+the front `room_mm` of plate where the customer's form stands. The saddle's front face takes a name and a motif; the room is a
+volume anchor whose height is the crown less 1 mm, and a form sized by `longest` that would stand above the saddle is refused in
+those words (`validate_content`). A wide, low saddle that leaves under 8 mm of face is refused (`validate_combination`).
+
+Underneath, at the saddle's centre, a **Kadi-S socket** (`connectors/socket.py`): a Ø 12 mm press socket, 15 mm deep, with three
+crush ribs 120° apart and a 45° lead-in at the mouth, cut into the body after `build_body` and before the content
+(`Template.apply_connector`). It presses onto the stand's tube top or onto the nylon dowel packed with it (`dowel_nylon_12x30`).
+The socket is modelled from its as-printed targets with the chosen finish's compensation (`connectors/compensation.py`: holes print
+0.2 mm small in PLA, 0.3 % shrinkage, a 0.3 mm elephant foot; PETG and resin rows for later), so the material reaches `build`
+(`material=`) only for templates with a connector. The template reports its socket (`connector_report`) and the inspect service's
+`connector_fit` check works the fit out: the printed bore must clear the pin, the fattest pin in tolerance must not crush the ribs
+flat, the wall round the socket must be at least 1.6 mm, the socket must point straight down and open on the bed; a pair of base and
+finish without a recorded fit test only reaches `warn`. The family is `available: false` until the fit coupons pass on real prints.
+
+```sh
+uv run aakar-geometry build ../../packages/contracts/examples/headphone-topper.spec.json --out ../../out/topper
+uv run aakar-geometry coupon --all --out ../../out/coupons        # every Kadi size × finish, with connector_fit verdicts
+uv run aakar-geometry coupon --nominal 12 --material basic_white --wall 1.4 --out ../../out/thin   # fails: wall under 1.6 mm
+```
+
+The coupon (`templates/kadi_coupon.py`, never registered) is a flange with the socket only; the command prints the modelled bore
+and rib-crest diameters, what they should print as, the rib angles read back off the mesh, and the `connector_fit` verdict, and
+writes `coupons.json` beside the STLs for the bench to measure against.
 
 ## Pipeline (`build_design`)
 
@@ -384,6 +414,7 @@ every template to it).
 | `anchor_frame(anchor_id, params)` | a right-handed `AnchorFrame` (u = the viewer's right, v = up the picture, normal out of the body; origin on the skin, or the bottom centre of a volume) |
 | `lithophane(...)` | only for templates whose plate *is* the photo (`lithophane_plate`: the heightmap becomes the plate) |
 | `build(...)` override | a rule on the finished piece after the content is fused (`plinth_round`: stability with the customer's form) |
+| `connector` / `connector_for(params)` / `connector_frame(params)` | hybrid (Jod) templates: the Kadi cut into the piece (`connectors.Connector`), where its mouth is and which way it runs; `apply_connector` cuts it with the material's compensation, `connector_report` hands it to inspect's `connector_fit` |
 | `karigar_note_for(...)` override | a note that depends on the content (`plinth_round`: a line on the form only when there is one); end it with `join_note(note, features, style)` |
 | `karigar_note(params)` | one or two lines in the craft register (the pipeline's `karigar_note_for(params, features, style)` appends the names and motifs set into the piece, then the style's sentence) |
 

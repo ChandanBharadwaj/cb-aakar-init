@@ -44,6 +44,8 @@ class InspectRequest(BaseModel):
     mesh: MeshRef
     constraints: ConstraintsIn = Field(default_factory=ConstraintsIn)
     slicing: SlicingIn = Field(default_factory=SlicingIn)
+    # the Kadi block a hybrid template reports (bore, ribs, compensation, pin): adds the connector_fit check
+    connector: dict[str, Any] | None = None
 
 
 app = FastAPI(title="Aakar Inspect Service", version="1.0.0-phase0")
@@ -67,5 +69,5 @@ def inspect(req: InspectRequest) -> Any:
         mesh = load_mesh(path=req.mesh.path, url=req.mesh.url, file_type=req.mesh.format)
     except MeshLoadError as exc:
         return JSONResponse(status_code=422, content={"error": str(exc), "code": "mesh_load_failed"})
-    report, estimate = inspect_mesh(mesh, constraints, slicing)
+    report, estimate = inspect_mesh(mesh, constraints, slicing, connector=req.connector)
     return {"printability": report, "print_estimate": estimate}

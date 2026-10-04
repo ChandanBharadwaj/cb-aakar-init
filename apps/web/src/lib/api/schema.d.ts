@@ -170,7 +170,7 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
-                    kind?: "carrier" | "object" | "raw";
+                    kind?: "carrier" | "object" | "raw" | "hybrid";
                 };
                 header?: never;
                 path?: never;
@@ -2271,7 +2271,7 @@ export interface components {
             tagline?: string;
             description?: string;
             /** @enum {string} */
-            kind: "carrier" | "object" | "raw";
+            kind: "carrier" | "object" | "raw" | "hybrid";
             /** @enum {string} */
             tier: "launch" | "next" | "later";
             shelf: string;
@@ -2613,6 +2613,24 @@ export interface components {
             }[];
             /** @description Smallest printable stroke or detail (0.8 mm for a 0.4 mm nozzle); text and silhouette checks use it. */
             min_feature_mm?: number;
+            /** @description Hybrid (Jod) templates only: the Kadi cut into the piece so it plugs into a bought-in base. The female feature is always on the printed Chhaap (it prints flat, no supports); the male side belongs to the base or to the bought-in adapter adapter_sku. Phase 1 builds the ribbed press socket (Kadi-S). */
+            connector?: {
+                /** @enum {string} */
+                kind: "socket" | "dovetail" | "magnet" | "thread" | "rim_clip";
+                /** @description The pin (rail, thread, magnet) diameter the base presents, e.g. 12 for a Kadi-S Ø 12. */
+                nominal_mm: number;
+                /**
+                 * @description The as-printed condition the connector is modelled for; press_ribbed = three crush ribs take up the pin's variation.
+                 * @enum {string}
+                 */
+                fit: "slide" | "press_ribbed" | "snap" | "pocket";
+                depth_mm?: number;
+                rib_count?: number;
+                /** @description Diametral clearance between the printed bore wall and the pin. */
+                clearance_mm?: number;
+                /** @description hardware_items sku of the bought-in male part packed when the base has no pin of its own. */
+                adapter_sku?: string;
+            };
             $defs: {
                 param: {
                     /** @enum {string} */
@@ -2980,6 +2998,8 @@ export interface components {
                 tipping_margin: components["schemas"]["check"];
                 overhangs?: components["schemas"]["check"];
                 load_capacity?: components["schemas"]["check"];
+                /** @description Hybrid (Jod) pieces only: does the Kadi socket fit its base's pin as printed, and does it print clean (points straight down, opens on the bed, enough wall round it)? Absent for pieces without a connector. */
+                connector_fit?: components["schemas"]["check"];
             };
             check_duration_ms: number;
             $defs: {

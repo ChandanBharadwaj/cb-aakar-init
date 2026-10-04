@@ -26,6 +26,7 @@ const examples = [
   ["examples/jharokha-phone-stand.spec.json", "https://aakar.studio/schemas/design-spec.v1.json"],
   ["examples/keychain-photo.spec.json", "https://aakar.studio/schemas/design-spec.v1.json"],
   ["examples/raw-print.spec.json", "https://aakar.studio/schemas/design-spec.v1.json"],
+  ["examples/headphone-topper.spec.json", "https://aakar.studio/schemas/design-spec.v1.json"],
   ["examples/design.completed.example.json", "https://aakar.studio/schemas/events/design.completed.v1.json"],
   // The families seed in design-tokens is a contract instance too (Flyway V9 seeds from it; a drift test guards both).
   ["../design-tokens/families.json", "https://aakar.studio/schemas/template-family.v1.json"],

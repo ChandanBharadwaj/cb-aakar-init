@@ -97,6 +97,10 @@ BUILTIN_FAMILIES: list[dict[str, Any]] = [
          max_text_chars=3, shape_tolerance="strict", available=False, envelope=(18, 20)),
     _row("phone_stand", "object", "jharokha_phone_stand", ["emboss_text", "motif"], ["side_left", "side_right", "back"],
          max_text_chars=16, shape_tolerance="strict", envelope=(80, 160)),
+    # hybrid (Jod), Phase 1: the Sur Jod headphone topper on a bought-in stand; off until its fit coupons pass
+    _row("headphone_topper", "hybrid", "headphone_topper", ["hero_mesh", "emboss_text", "motif"], ["front", "face"],
+         hero_volume=True, max_text_chars=16, hardware=[{"sku": "dowel_nylon_12x30", "qty": 1}], shape_tolerance="strict",
+         available=False, envelope=(60, 100)),
 ]
 
 BUILTIN_HARDWARE: list[dict[str, Any]] = [
@@ -107,6 +111,7 @@ BUILTIN_HARDWARE: list[dict[str, Any]] = [
     {"sku": "acrylic_4x6", "name": "Acrylic pane 4 × 6 in", "unit_cost_paise": 4000},
     {"sku": "nameplate_screws", "name": "Wall screws and anchors, pair", "unit_cost_paise": 600},
     {"sku": "adhesive_pads", "name": "Foam adhesive pads, pair", "unit_cost_paise": 300},
+    {"sku": "dowel_nylon_12x30", "name": "Nylon dowel 12 × 30 mm", "unit_cost_paise": 800},
 ]
 
 

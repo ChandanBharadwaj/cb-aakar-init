@@ -25,16 +25,17 @@ class Inspector(Protocol):
         slicing: Mapping[str, Any],
         assets: Mapping[str, AssetRecord],
         storage: Storage,
+        connector: Mapping[str, Any] | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]: ...
 
 
 class InProcessInspector:
     mode = "in-process"
 
-    def inspect(self, mesh, constraints, slicing, assets, storage):
+    def inspect(self, mesh, constraints, slicing, assets, storage, connector=None):
         from aakar_inspect import Constraints, SlicingSettings, inspect_mesh
 
-        return inspect_mesh(mesh, Constraints.from_dict(constraints), SlicingSettings.from_dict(slicing))
+        return inspect_mesh(mesh, Constraints.from_dict(constraints), SlicingSettings.from_dict(slicing), connector=connector)
 
 
 class HttpInspector:
@@ -47,7 +48,7 @@ class HttpInspector:
         self.timeout_s = timeout_s
         self._client = client
 
-    def inspect(self, mesh, constraints, slicing, assets, storage):
+    def inspect(self, mesh, constraints, slicing, assets, storage, connector=None):
         stl = assets.get("stl")
         if stl is None:
             raise GeometryError("HTTP inspection needs the STL output", {"outputs": sorted(assets)})
@@ -56,6 +57,8 @@ class HttpInspector:
         else:
             mesh_ref = {"url": stl.url, "format": "stl"}
         body = {"mesh": mesh_ref, "constraints": dict(constraints), "slicing": dict(slicing)}
+        if connector:
+            body["connector"] = dict(connector)
         try:
             if self._client is not None:
                 resp = self._client.post(f"{self.base_url}/v1/inspect", json=body, timeout=self.timeout_s)

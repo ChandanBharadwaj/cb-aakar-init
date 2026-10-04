@@ -20,6 +20,7 @@ export const FAMILY_KINDS: readonly { id: FamilyKind; label: string; hint: strin
   { id: "carrier", label: "Avatar (carrier)", hint: "Carries the customer's idea: keychain, magnet, ornament, plaque" },
   { id: "object", label: "Object", hint: "A parametric object family (phone stand, planter) with content on its anchors" },
   { id: "raw", label: "Raw (Swaroop)", hint: "Prints the customer's own model as it is; only raw_print" },
+  { id: "hybrid", label: "Jod (hybrid)", hint: "A printed Chhaap that plugs into a bought-in base through a Kadi connector; only the top is printed" },
 ];
 
 export const FAMILY_TIERS: readonly { id: FamilyTier; label: string }[] = [
@@ -34,7 +35,7 @@ export const SHAPE_TOLERANCES: readonly { id: ShapeTolerance; label: string; hin
   { id: "strict", label: "Strict", hint: "The functional body is parametric; content only decorates it" },
 ];
 
-export const KIND_TONE: Record<FamilyKind, Tone> = { carrier: "accent", object: "info", raw: "warning" };
+export const KIND_TONE: Record<FamilyKind, Tone> = { carrier: "accent", object: "info", raw: "warning", hybrid: "success" };
 export const TIER_TONE: Record<FamilyTier, Tone> = { launch: "success", next: "info", later: "neutral" };
 
 /** "Saathi · Keychain & bag charm": the codename always paired with the plain descriptor. */

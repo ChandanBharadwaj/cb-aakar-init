@@ -14,8 +14,8 @@ def test_cli_templates(capsys):
     assert main(["templates"]) == 0
     descriptors = json.loads(capsys.readouterr().out)
     assert [d["id"] for d in descriptors] == [
-        "desk_nameplate", "fridge_magnet", "hanging_ornament", "jharokha_phone_stand", "keycap_mx", "keychain_tag",
-        "lithophane_plate", "pet_tag", "photo_frame_std", "plinth_round", "raw_print",
+        "desk_nameplate", "fridge_magnet", "hanging_ornament", "headphone_topper", "jharokha_phone_stand", "keycap_mx",
+        "keychain_tag", "lithophane_plate", "pet_tag", "photo_frame_std", "plinth_round", "raw_print",
     ]
     for descriptor in descriptors:
         validate("template-descriptor", descriptor)

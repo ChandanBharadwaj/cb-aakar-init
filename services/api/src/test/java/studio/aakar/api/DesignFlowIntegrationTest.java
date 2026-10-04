@@ -66,10 +66,11 @@ class DesignFlowIntegrationTest extends AbstractIntegrationTest {
     @Test
     void templatesComeFromTheGeometryService() {
         JsonNode all = body(get("/api/templates"));
-        // the stub publishes the Jharokha stand, the four planar carriers, the raw-print template and the five PR 8 keepsakes
-        // (fixtures/templates.json order)
+        // the stub publishes the Jharokha stand, the four planar carriers, the raw-print template, the five PR 8 keepsakes and the
+        // Sur Jod headphone topper (fixtures/templates.json order)
         assertThat(all).extracting(d -> d.get("id").asText()).containsExactly("jharokha_phone_stand", "keychain_tag", "fridge_magnet",
-                "hanging_ornament", "desk_nameplate", "raw_print", "keycap_mx", "lithophane_plate", "pet_tag", "photo_frame_std", "plinth_round");
+                "hanging_ornament", "desk_nameplate", "raw_print", "keycap_mx", "lithophane_plate", "pet_tag", "photo_frame_std", "plinth_round",
+                "headphone_topper");
         JsonNode d = all.get(0);
         assertThat(d.get("params").get("width_mm").get("default").asInt()).isEqualTo(92);
         assertThat(d.get("anchors")).hasSize(3);

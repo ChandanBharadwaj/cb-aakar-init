@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Mapping
 
 import numpy as np
 import trimesh
@@ -25,6 +25,9 @@ WALL_SAMPLES = 3000
 WALL_PERCENTILE = 5.0
 WALL_WARN_FACTOR = 1.2  # warn when within 20 % above the minimum
 SELF_HIT_MM = 0.05  # ray hits closer than this are numerical self-intersections
+CONNECTOR_AXIS_TOLERANCE_DEG = 5.0  # a Kadi socket must point straight down to print without supports
+CONNECTOR_MOUTH_TOLERANCE_MM = 0.3  # ... and open on the bed
+CONNECTOR_WALL_BAND_MM = 4.0  # the wall round the socket is measured within this band of its bore
 
 
 def _fmt(value: float, digits: int = 1) -> str:
@@ -129,28 +132,30 @@ def fits_bed(mesh: trimesh.Trimesh, constraints: Constraints) -> dict[str, Any]:
 
 
 def wall_thickness_samples(
-    mesh: trimesh.Trimesh, samples: int = WALL_SAMPLES, seed: int = 0
+    mesh: trimesh.Trimesh, samples: int = WALL_SAMPLES, seed: int = 0, faces: np.ndarray | None = None
 ) -> np.ndarray:
     """Cast rays inward from area-weighted sampled face centroids; return through-distances (mm).
 
     Each ray starts just inside the surface and travels along the inverted face normal; the
     distance to the first exit is the local wall thickness. Rays that never exit (open meshes)
-    and numerical self-hits are dropped.
+    and numerical self-hits are dropped. ``faces`` restricts the sampling to those face indices
+    (the wall round a Kadi socket); None samples the whole mesh.
     """
-    n_faces = len(mesh.faces)
+    candidates = np.arange(len(mesh.faces)) if faces is None else np.asarray(faces, dtype=int)
+    n_faces = int(candidates.size)
     if n_faces == 0:
         return np.empty(0)
     rng = np.random.default_rng(seed)
-    weights = np.asarray(mesh.area_faces, dtype=float)
+    weights = np.asarray(mesh.area_faces, dtype=float)[candidates]
     total = weights.sum()
     if total <= 0:
         return np.empty(0)
     if n_faces <= samples:
         # Small meshes: use every face, repeated in proportion to its area for the percentile.
         reps = np.maximum(1, np.round(weights / total * samples).astype(int))
-        idx = np.repeat(np.arange(n_faces), reps)
+        idx = np.repeat(candidates, reps)
     else:
-        idx = rng.choice(n_faces, size=samples, p=weights / total)
+        idx = rng.choice(candidates, size=samples, p=weights / total)
     normals = np.asarray(mesh.face_normals)[idx]
     origins = np.asarray(mesh.triangles_center)[idx] - normals * SELF_HIT_MM * 0.2
     directions = -normals
@@ -194,6 +199,114 @@ def thinnest_wall(mesh: trimesh.Trimesh, constraints: Constraints, samples: int 
         # No wall thinner than 40 % of the smallest dimension: effectively a solid body.
         return check("pass", f"Solid · {_fmt(thinnest)} mm", value=value, unit="mm", threshold=threshold, detail=detail)
     return check("pass", f"{_fmt(thinnest)} mm · safe", value=value, unit="mm", threshold=threshold, detail=detail)
+
+
+# --------------------------------------------------------------------------- connector_fit
+
+
+def _unit(vec: Any) -> np.ndarray:
+    arr = np.asarray(vec, dtype=float).reshape(3)
+    norm = float(np.linalg.norm(arr))
+    if not np.isfinite(norm) or norm < 1e-12:
+        raise ValueError("axis must be a non-zero vector")
+    return arr / norm
+
+
+def connector_fit(mesh: trimesh.Trimesh, connector: Mapping[str, Any], constraints: Constraints, samples: int = WALL_SAMPLES) -> dict[str, Any]:
+    """Does the Kadi this piece was cut for fit its base and print clean? (hybrid products, plan §1.4)
+
+    ``connector`` is the block the geometry service reports for a Kadi-S socket: the modelled bore and rib-crest
+    diameters, the compensation they were modelled with, the pin the base presents (nominal ± a tolerance by the
+    base's tolerance class), the mouth and axis in mesh coordinates. The check works the as-printed fit out itself:
+      * the socket must point straight down (within ``CONNECTOR_AXIS_TOLERANCE_DEG``) and open on the bed
+        (``CONNECTOR_MOUTH_TOLERANCE_MM``), so it prints without supports;
+      * the printed bore must clear the pin and the ribs must still stand (fail otherwise), and the fattest pin in
+        tolerance must not crush the ribs flat, or it would bear on the wall (fail);
+      * the wall round the socket (faces within ``CONNECTOR_WALL_BAND_MM`` of the bore, down its depth) must be at
+        least the connector's own minimum, 1.6 mm in PLA, measured by the same inward ray casting as
+        ``thinnest_wall`` (fail);
+      * the thinnest pin in tolerance should still bite the ribs by ``min_grip_mm`` (warn), and a pair of base and
+        finish without a recorded fit test only ever reaches warn.
+    Kinds other than ``socket`` are skipped until their checks exist.
+    """
+    kind = connector.get("kind")
+    if kind != "socket":
+        return check("skipped", f"No fit check for a {kind or 'unknown'} Kadi yet", detail={"kind": kind})
+    try:
+        axis = _unit(connector["axis"])
+        mouth = np.asarray(connector["mouth_mm"], dtype=float).reshape(3)
+        depth = float(connector["depth_mm"])
+        bore_d = float(connector["bore_d_mm"])
+        crest_d = float(connector["crest_d_mm"])
+        pin = float(connector.get("pin_d_mm", connector.get("nominal_mm")))
+        tol = float(connector.get("pin_tolerance_mm", 0.1))
+        comp = connector.get("compensation") or {}
+        hole_comp = float(comp.get("xy_hole_comp_mm", 0.0))
+        shrink = 1.0 + float(comp.get("shrink_pct", 0.0)) / 100.0
+        min_wall = float(connector.get("min_wall_mm") or comp.get("connector_min_wall_mm") or constraints.min_wall_mm)
+        min_grip = float(connector.get("min_grip_mm", 0.05))
+        nominal = float(connector.get("nominal_mm", pin))
+        fit_tested = bool(connector.get("fit_tested", False))
+    except (KeyError, TypeError, ValueError) as exc:
+        return check("fail", "Kadi socket details are incomplete", value=None, detail={"error": str(exc), "keys": sorted(connector)})
+
+    bore_printed = (bore_d - hole_comp) / shrink
+    crest_printed = (crest_d - hole_comp) / shrink
+    clearance = bore_printed - pin
+    rib_height = (bore_printed - crest_printed) / 2.0
+    bite_min = (pin - tol - crest_printed) / 2.0
+    bite_max = (pin + tol - crest_printed) / 2.0
+    crush_max = bite_max / rib_height if rib_height > 1e-9 else math.inf
+    angle = math.degrees(math.acos(float(np.clip(np.dot(axis, [0.0, 0.0, 1.0]), -1.0, 1.0))))
+    detail: dict[str, Any] = {
+        "kind": kind,
+        "nominal_mm": nominal,
+        "pin_d_mm": pin,
+        "pin_tolerance_mm": tol,
+        "bore_printed_mm": round(bore_printed, 3),
+        "crest_printed_mm": round(crest_printed, 3),
+        "clearance_mm": round(clearance, 3),
+        "rib_height_mm": round(rib_height, 3),
+        "rib_bite_mm": [round(bite_min, 3), round(bite_max, 3)],
+        "crush_fraction_max": round(crush_max, 3) if math.isfinite(crush_max) else None,
+        "axis_tilt_deg": round(angle, 2),
+        "min_wall_mm": min_wall,
+        "fit_tested": fit_tested,
+        "material_id": connector.get("material_id"),
+        "method": "as-printed fit from the modelled socket and its compensation; inward ray casting round the bore",
+    }
+    label = f"{_fmt(nominal)} mm Kadi"
+    if angle > CONNECTOR_AXIS_TOLERANCE_DEG:
+        return check("fail", f"{label} · leans {_fmt(angle, 0)}°, must point straight down", value=round(angle, 2), unit="deg",
+                     threshold=CONNECTOR_AXIS_TOLERANCE_DEG, detail=detail)
+    if clearance <= 0 or rib_height <= 0.02:
+        return check("fail", f"{label} · pin would not enter", value=round(clearance, 3), unit="mm", threshold=0.0, detail=detail)
+    if crush_max > 1.0:
+        return check("fail", f"{label} · ribs would crush flat on a thick pin", value=round(crush_max, 3), unit="", threshold=1.0, detail=detail)
+
+    centroids = np.asarray(mesh.triangles_center, dtype=float) - mouth
+    along = centroids @ axis
+    radial = np.linalg.norm(centroids - np.outer(along, axis), axis=1)
+    band = bore_d / 2.0 + max(CONNECTOR_WALL_BAND_MM, 3.0 * min_wall)
+    faces = np.flatnonzero((along >= -0.5) & (along <= depth + 0.5) & (radial <= band))
+    dist = wall_thickness_samples(mesh, samples=samples, faces=faces)
+    if dist.size == 0:
+        detail["socket_faces"] = int(faces.size)
+        return check("fail", f"{label} · could not measure the socket wall", value=None, unit="mm", threshold=min_wall, detail=detail)
+    wall = float(np.percentile(dist, WALL_PERCENTILE))
+    detail.update({"socket_faces": int(faces.size), "wall_samples": int(dist.size), "wall_p05_mm": round(wall, 3), "wall_min_mm": round(float(dist.min()), 3)})
+    if wall < min_wall:
+        return check("fail", f"Socket wall {_fmt(wall)} mm · too thin (min {_fmt(min_wall)} mm)", value=round(wall, 2), unit="mm", threshold=min_wall, detail=detail)
+
+    lift = float(mouth[2] - mesh.bounds[0][2])
+    detail["mouth_lift_mm"] = round(lift, 3)
+    if lift > CONNECTOR_MOUTH_TOLERANCE_MM:
+        return check("warn", f"{label} · mouth {_fmt(lift)} mm above the bed, needs supports", value=round(wall, 2), unit="mm", threshold=min_wall, detail=detail)
+    if bite_min < min_grip:
+        return check("warn", f"{label} · may sit loose on a thin pin", value=round(wall, 2), unit="mm", threshold=min_wall, detail=detail)
+    if not fit_tested:
+        return check("warn", f"Fits its base · {label} (fit test pending)", value=round(wall, 2), unit="mm", threshold=min_wall, detail=detail)
+    return check("pass", f"Fits its base · {label}", value=round(wall, 2), unit="mm", threshold=min_wall, detail=detail)
 
 
 # --------------------------------------------------------------------------- stability

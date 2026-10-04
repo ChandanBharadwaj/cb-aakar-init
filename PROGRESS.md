@@ -4,7 +4,7 @@ Living status of the plan in [PLAN.md](PLAN.md). Update this file with every mer
 
 | | |
 |---|---|
-| Last updated | 2026-10-04 (hybrid products (Jod): research, plan and ADR-0015 committed; Phase 0 done, Phase 1 proof of concept next) |
+| Last updated | 2026-10-04 (hybrid products (Jod): Phase 1 software done, the Kadi-S socket, `headphone_topper@1`, `connector_fit` and the fit coupons; the bench steps 1.4–1.5 wait for real prints) |
 | Current phase | **Phase 1** — the loop is complete locally (ADR-0013); outcome categories (Avatars) + Swaroop done; next **hybrid products (Jod)** per `docs/research/hybrid-products/implementation-plan.md` |
 | Completed | Phase 0 — Foundations |
 | Roadmap position | ~2 of 28 scheduled weeks (5 phases; 1 done) |
@@ -139,7 +139,7 @@ Plan: [`docs/research/hybrid-products/implementation-plan.md`](docs/research/hyb
 | Phase | Scope | Status | Evidence / resume pointer |
 |---|---|---|---|
 | 0 | Research report, implementation plan, ADR-0015 | ✅ Done | `docs/research/hybrid-products/`, `docs/adr/0015-hybrid-products-kadi.md` |
-| 1 | Proof of concept: geometry `connectors/` (Kadi-S socket, compensation, fit coupon), `headphone_topper@1`, inspect `connector_fit`, bench fit tests on sourced stands | ⬜ Not started | Start at plan step 1.1 |
+| 1 | Proof of concept: geometry `connectors/` (Kadi-S socket, compensation, fit coupon), `headphone_topper@1`, inspect `connector_fit`, bench fit tests on sourced stands | 🟨 Software done (steps 1.1–1.3); bench 1.4–1.5 pending | `services/geometry/aakar_geometry/connectors/`, `templates/headphone_topper.py`, `aakar-geometry coupon`, `aakar_inspect.checks.connector_fit`, `V15`; next: print the coupons (`make coupons`), measure, record in `docs/research/hybrid-products/fit-tests.md`, then Phase 2 |
 | 2 | Core platform: contracts, `V15` (`base_items`, `family_bases`, `fit_tests`, stock), catalog module, pricing (base + assembly lines, shipping tiers), order `assembling` stage, portal Bases page | ⬜ Not started | PR 2.1 contracts first |
 | 3 | UX rollout: `HybridModel` viewer, Jod picker and compare, base pages, Duniya promotion (Ghar, Safar), cart and share; 3.5 hardening tests; 3.6 launch | ⬜ Not started | PR 3.1 |
 | 4 | Scale: Kadi-D/T/C templates, PETG finish, more bases, stock ledger, kids compliance | ⬜ Not started | after launch |
@@ -168,14 +168,15 @@ Plan: [`docs/research/hybrid-products/implementation-plan.md`](docs/research/hyb
 
 | Suite | Count | Last run |
 |---|---|---|
-| `services/inspect` pytest | 21 passed | 2026-10-03 |
-| `services/geometry` pytest | 665 passed | 2026-10-03 |
-| `services/api` Gradle test | 224 passed | 2026-10-03 |
+| `services/inspect` pytest | 21 passed | 2026-10-04 |
+| `services/geometry` pytest | 667 passed | 2026-10-04 |
+| `services/api` Gradle test | 224 passed | 2026-10-04 (local Postgres 16; `SessionServiceTest` now mints at the current second instead of a fixed past date) |
 | Avatar order smoke, live (`make smoke-avatars`: photo keychain + Swaroop raw print → cart → OTP → checkout → mock pay → print pack) | passed | 2026-10-03 |
 | Katha and keepsakes smoke, live (`make smoke-katha`: hero names refused, look-alikes allowed, hero-named upload held for review, comic Katha keychain, night light, plinth, photo frame still off) | passed | 2026-10-03 |
 | `/duniya/katha` and a comic design's studio in Chromium against the live API (rooftop backdrop, toon shading, ink outline) | passed, no page errors | 2026-10-03 |
-| `apps/web` typecheck · lint · build | clean | 2026-10-03 |
-| `apps/admin` typecheck · lint · build | clean | 2026-10-03 |
+| `apps/web` typecheck · lint · build | clean | 2026-10-04 |
+| `apps/admin` typecheck · lint · build | clean | 2026-10-04 |
+| Jod Phase 1 smoke (CLI): `headphone-topper.spec.json` builds watertight with `connector_fit` warn "fit test pending"; a 60 mm `longest` form is refused with the saddle sentence; a contained form fuses; `make coupons` writes 18 coupons, wall 1.4 mm fails `connector_fit`; descriptors and the API fixture carry no drift | passed | 2026-10-04 |
 | End-to-end slice (live services) | passed | 2026-09-26 |
 | Customer loop, live (guest design → cart → OTP → checkout → mock pay fail/retry/succeed → order queued → SSE) | passed, 1 finding (duplicate checkout) | 2026-09-27 |
 | Customer loop in the browser (sign-in → cart → checkout → mock pay → tracking) | passed, no page errors | 2026-09-27 |

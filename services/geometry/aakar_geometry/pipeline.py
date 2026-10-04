@@ -143,12 +143,16 @@ def _build_with_timeout(
     timeout_s: float,
     features: Sequence[Mapping[str, Any]] = (),
     fetcher: ContentFetcher | None = None,
+    material: str | None = None,
 ) -> trimesh.Trimesh:
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="aakar-cad")
+    # only a template with a Kadi needs the material (its socket is modelled with that material's compensation);
+    # every other template gets the exact call it always got
+    extra: dict[str, Any] = {"material": material} if material and getattr(template, "connector", None) is not None else {}
     if features:
-        future = executor.submit(template.build, params, features=list(features), fetcher=fetcher)
+        future = executor.submit(template.build, params, features=list(features), fetcher=fetcher, **extra)
     else:  # no content: identical call to the pre-features pipeline
-        future = executor.submit(template.build, params)
+        future = executor.submit(template.build, params, **extra)
     try:
         return future.result(timeout=timeout_s)
     except concurrent.futures.TimeoutError as exc:
@@ -215,7 +219,8 @@ def build_design(
 
         sink.emit("design.progress", progress_payload("understanding", 10))
         sink.emit("design.progress", progress_payload("sculpting", 35))
-        mesh = _build_with_timeout(template, params, timeout_s, normalised["features"], fetcher)
+        material = normalised.get("material")
+        mesh = _build_with_timeout(template, params, timeout_s, normalised["features"], fetcher, material)
         if not isinstance(mesh, trimesh.Trimesh) or mesh.is_empty or len(mesh.faces) == 0:
             raise GeometryError(
                 "Something went wrong while shaping this design: it came out empty",
@@ -230,8 +235,11 @@ def build_design(
             assets[kind] = storage.put(asset_key(normalised_design_id, version_no, kind), file.data, file.content_type)
 
         sink.emit("design.progress", progress_payload("checking", 70))
+        # a Kadi template reports its socket so inspect can run connector_fit; others keep the five-argument call
+        connector = template.connector_report(params, material) if getattr(template, "connector", None) is not None else None
+        inspect_kwargs: dict[str, Any] = {"connector": connector} if connector else {}
         try:
-            report, estimate = inspector.inspect(mesh, normalised["constraints"], slicing, assets, storage)
+            report, estimate = inspector.inspect(mesh, normalised["constraints"], slicing, assets, storage, **inspect_kwargs)
         except BuildError:
             raise
         except Exception as exc:

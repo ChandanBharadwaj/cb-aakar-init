@@ -16,7 +16,7 @@ from shapely.geometry import Polygon
 log = logging.getLogger("aakar.geometry.cad")
 
 try:  # build123d (OCCT) - the preferred kernel (PLAN §7.1)
-    from build123d import Axis, Face, Location, Part, Plane, Polyline, extrude, make_face
+    from build123d import Align, Axis, Cone, Face, Location, Part, Plane, Polyline, extrude, make_face
 
     KERNEL = "build123d"
     logging.getLogger("build123d").setLevel(logging.WARNING)  # it logs every extrude at INFO
@@ -54,6 +54,12 @@ def face_from_polygon(polygon: Polygon, plane: "Plane | None" = None) -> "Face":
 def prism(polygon: Polygon, thickness: float, plane: "Plane | None" = None) -> "Part":
     """Extrude a polygon on ``plane`` along the plane normal by ``thickness`` (mm)."""
     return extrude(face_from_polygon(polygon, plane), amount=float(thickness))
+
+
+def frustum(r_bottom: float, r_top: float, height: float) -> "Part":
+    """A cone frustum standing on the XY plane: radius ``r_bottom`` at z = 0, ``r_top`` at z = ``height`` (mm)."""
+    _require_kernel()
+    return Cone(float(r_bottom), float(r_top), float(height), align=(Align.CENTER, Align.CENTER, Align.MIN))
 
 
 def rotate_x(part: "Part", degrees: float) -> "Part":

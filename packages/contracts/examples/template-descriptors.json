@@ -369,6 +369,137 @@
     "min_feature_mm": 0.8
   },
   {
+    "id": "headphone_topper",
+    "version": 1,
+    "family": "headphone_topper",
+    "name": "Sur Jod headphone topper",
+    "description": "A saddle that plugs onto a ready-made headphone stand through a 12 mm Kadi socket. Your own form stands in front of it and your name runs along its face; the headphones rest their band across the crown.",
+    "environment": "desk_oak",
+    "params": {
+      "width_mm": {
+        "type": "number",
+        "label": "Width",
+        "default": 70.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "Across the saddle; the headband rests along it.",
+        "min": 60,
+        "max": 90,
+        "step": 1,
+        "group": "Size"
+      },
+      "depth_mm": {
+        "type": "number",
+        "label": "Depth",
+        "default": 40.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "Front to back of the saddle.",
+        "min": 30,
+        "max": 50,
+        "step": 1,
+        "group": "Size"
+      },
+      "height_mm": {
+        "type": "number",
+        "label": "Height",
+        "default": 38.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "The crown's apex above the stand's tube top.",
+        "min": 30,
+        "max": 50,
+        "step": 1,
+        "group": "Size"
+      },
+      "room_mm": {
+        "type": "number",
+        "label": "Room in front",
+        "default": 30.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "Plate in front of the saddle where your form stands.",
+        "min": 20,
+        "max": 50,
+        "step": 1,
+        "group": "Shape"
+      }
+    },
+    "anchors": [
+      {
+        "id": "front",
+        "label": "Room in front of the saddle",
+        "kind": "volume",
+        "projection": "planar",
+        "bounds_mm": [
+          67.0,
+          27.0,
+          33.0
+        ],
+        "accepts": [
+          "hero_mesh"
+        ]
+      },
+      {
+        "id": "face",
+        "label": "Front of the saddle",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          67.0,
+          19.7
+        ],
+        "bleed_mm": 0.5,
+        "accepts": [
+          "emboss_text",
+          "motif"
+        ],
+        "max_relief_mm": 1.5
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 1.2,
+      "max_overhang_deg": 55,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "basic_white",
+      "terracotta_matte",
+      "terracotta_silk",
+      "polished_brass",
+      "sandalwood_silk",
+      "indigo_matte"
+    ],
+    "style_variants": [
+      "comic_pop"
+    ],
+    "features_supported": [
+      "hero_mesh",
+      "emboss_text",
+      "motif"
+    ],
+    "hardware": [
+      {
+        "sku": "dowel_nylon_12x30",
+        "qty": 1
+      }
+    ],
+    "min_feature_mm": 0.8,
+    "connector": {
+      "kind": "socket",
+      "nominal_mm": 12.0,
+      "fit": "press_ribbed",
+      "depth_mm": 15.0,
+      "rib_count": 3,
+      "clearance_mm": 0.3,
+      "adapter_sku": "dowel_nylon_12x30"
+    }
+  },
+  {
     "id": "jharokha_phone_stand",
     "version": 1,
     "family": "phone_stand",

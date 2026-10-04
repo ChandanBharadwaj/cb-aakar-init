@@ -34,8 +34,8 @@ def test_descriptor_validates_and_matches_plan():
 
 def test_registry_lookup():
     assert [t.ref() for t in list_templates()] == [
-        "desk_nameplate@1", "fridge_magnet@1", "hanging_ornament@1", "jharokha_phone_stand@1", "keycap_mx@1", "keychain_tag@1",
-        "lithophane_plate@1", "pet_tag@1", "photo_frame_std@1", "plinth_round@1", "raw_print@1",
+        "desk_nameplate@1", "fridge_magnet@1", "hanging_ornament@1", "headphone_topper@1", "jharokha_phone_stand@1", "keycap_mx@1",
+        "keychain_tag@1", "lithophane_plate@1", "pet_tag@1", "photo_frame_std@1", "plinth_round@1", "raw_print@1",
     ]
     assert get_template("jharokha_phone_stand@1") is JharokhaPhoneStand
     assert parse_ref("jharokha_phone_stand@1") == ("jharokha_phone_stand", 1)

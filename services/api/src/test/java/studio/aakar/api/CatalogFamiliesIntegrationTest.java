@@ -188,7 +188,7 @@ class CatalogFamiliesIntegrationTest extends AbstractIntegrationTest {
         // the old fixture still loads beside the new descriptors, and old anchors stay as they were
         JsonNode templates = body(get("/api/templates"));
         assertThat(ids(templates)).containsExactly("jharokha_phone_stand", "keychain_tag", "fridge_magnet", "hanging_ornament", "desk_nameplate",
-                "raw_print", "keycap_mx", "lithophane_plate", "pet_tag", "photo_frame_std", "plinth_round");
+                "raw_print", "keycap_mx", "lithophane_plate", "pet_tag", "photo_frame_std", "plinth_round", "headphone_topper");
         JsonNode jharokhaAnchor = templates.get(0).get("anchors").get(0);
         assertThat(jharokhaAnchor.get("id").asText()).isEqualTo("side_left");
         assertThat(jharokhaAnchor.has("kind")).isFalse();

@@ -21,7 +21,7 @@ public record FamilyInput(
         @NotBlank(message = "name is required") @Size(max = 80, message = "name must be at most 80 characters") String name,
         @Size(max = 120, message = "tagline must be at most 120 characters") String tagline,
         @Size(max = 500, message = "description must be at most 500 characters") String description,
-        @NotBlank(message = "kind is required") @Pattern(regexp = "^(carrier|object|raw)$", message = "kind must be carrier, object or raw") String kind,
+        @NotBlank(message = "kind is required") @Pattern(regexp = "^(carrier|object|raw|hybrid)$", message = "kind must be carrier, object, raw or hybrid") String kind,
         @NotBlank(message = "tier is required") @Pattern(regexp = "^(launch|next|later)$", message = "tier must be launch, next or later") String tier,
         @NotBlank(message = "shelf is required") @Size(max = 40, message = "shelf must be at most 40 characters") String shelf,
         @Min(value = 1, message = "demand_rank must be at least 1") Integer demandRank,

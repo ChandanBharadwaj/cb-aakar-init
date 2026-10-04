@@ -155,7 +155,7 @@ const templates = JSON.parse(readFileSync(path.join(root, "packages/contracts/ex
 // Shelves, hardware and outcome families (Avatars) seeded from packages/design-tokens/families.json.
 // POST/PUT mutate these arrays in memory; a restart reloads the seed.
 // ---------------------------------------------------------------------------------------------------------
-const FAMILY_KINDS = ["carrier", "object", "raw"];
+const FAMILY_KINDS = ["carrier", "object", "raw", "hybrid"];
 const FAMILY_TIERS = ["launch", "next", "later"];
 const SHAPE_TOLERANCES = ["any", "constrained", "strict"];
 const FEATURE_TYPES = ["emboss_text", "motif", "relief_image", "hero_mesh"];

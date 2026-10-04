@@ -8,6 +8,7 @@ from typing import Any, ClassVar, Mapping, Sequence
 
 import trimesh
 
+from ..connectors.base import Connector
 from ..contracts import validate
 from ..errors import InvalidSpec, ParamOutOfRange, UnsupportedFeature
 from ..features.frames import AnchorFrame
@@ -186,6 +187,8 @@ class Template:
     features_supported: ClassVar[tuple[str, ...]] = ()
     hardware: ClassVar[tuple[HardwareRef, ...]] = ()
     min_feature_mm: ClassVar[float | None] = None
+    # Hybrid (Jod) templates: the Kadi cut into the piece so it plugs into a bought-in base (connectors/)
+    connector: ClassVar[Connector | None] = None
 
     @classmethod
     def ref(cls) -> str:
@@ -218,6 +221,8 @@ class Template:
         }
         if cls.min_feature_mm is not None:
             doc["min_feature_mm"] = float(cls.min_feature_mm)
+        if cls.connector is not None:
+            doc["connector"] = cls.connector.descriptor()
         validate("template-descriptor", doc)
         return doc
 
@@ -306,6 +311,39 @@ class Template:
         raise NotImplementedError(f"{cls.ref()} does not place anchor {anchor_id!r}")
 
     @classmethod
+    def connector_for(cls, params: Mapping[str, Any]) -> Connector | None:
+        """The Kadi this piece is cut for at these params (``connector`` unless a parameter picks the size)."""
+        return cls.connector
+
+    @classmethod
+    def connector_frame(cls, params: Mapping[str, Any]) -> AnchorFrame:
+        """Where the Kadi is cut: origin at the mouth (on the bed for a socket), normal pointing into the body."""
+        raise NotImplementedError(f"{cls.ref()} declares a connector but does not place it (connector_frame)")
+
+    @classmethod
+    def apply_connector(cls, body: trimesh.Trimesh, params: Mapping[str, Any], material: str | None) -> trimesh.Trimesh:
+        """Cut the Kadi into the body, modelled with the material's print compensation (``connectors.compensation``);
+        a template without a connector returns the body untouched."""
+        connector = cls.connector_for(params)
+        if connector is None or body is None or body.is_empty:
+            return body
+        from ..connectors import compensation
+        from ..features.booleans import difference
+
+        tool = connector.tool(cls.connector_frame(params), compensation.for_material(material))
+        return difference(body, tool)
+
+    @classmethod
+    def connector_report(cls, params: Mapping[str, Any], material: str | None, **base: Any) -> dict[str, Any] | None:
+        """The ``connector`` block the inspect service's ``connector_fit`` check reads, or None without a Kadi."""
+        connector = cls.connector_for(params)
+        if connector is None:
+            return None
+        from ..connectors import compensation
+
+        return connector.report(cls.connector_frame(params), compensation.for_material(material), material, **base)
+
+    @classmethod
     def build_body(cls, params: Mapping[str, Any]) -> trimesh.Trimesh:
         """Validated params -> watertight trimesh in mm, Z up, sitting on Z = 0, before any content is added.
         A template whose whole geometry is a customer's form (``raw_print``) returns an empty ``trimesh.Trimesh()``."""
@@ -317,8 +355,12 @@ class Template:
         params: Mapping[str, Any],
         features: Sequence[Mapping[str, Any]] = (),
         fetcher: Any | None = None,
+        material: str | None = None,
     ) -> trimesh.Trimesh:
-        """``validate_content`` → ``build_body`` → ``features.apply_features``.
+        """``validate_content`` → ``build_body`` → ``apply_connector`` → ``features.apply_features``.
+
+        ``material`` only matters to a template with a Kadi: its socket is modelled with that material's print
+        compensation (PLA when unknown). Everything else ignores it.
 
         ``validate_content`` runs even without features (a raw print with no model is refused here, not
         exported as nothing). With no features the body is returned untouched. Content on the underside
@@ -329,7 +371,7 @@ class Template:
 
         normalised = check_features(cls, features)
         cls.validate_content(params, normalised)
-        body = cls.build_body(params)
+        body = cls.apply_connector(cls.build_body(params), params, material)
         if not normalised:
             return body
         from ..features import apply_features

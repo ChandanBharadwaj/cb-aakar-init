@@ -30,8 +30,8 @@ def test_templates_endpoints(client):
     assert resp.status_code == 200
     descriptors = resp.json()
     assert [d["id"] for d in descriptors] == [
-        "desk_nameplate", "fridge_magnet", "hanging_ornament", "jharokha_phone_stand", "keycap_mx", "keychain_tag",
-        "lithophane_plate", "pet_tag", "photo_frame_std", "plinth_round", "raw_print",
+        "desk_nameplate", "fridge_magnet", "hanging_ornament", "headphone_topper", "jharokha_phone_stand", "keycap_mx",
+        "keychain_tag", "lithophane_plate", "pet_tag", "photo_frame_std", "plinth_round", "raw_print",
     ]
     for d in descriptors:
         validate("template-descriptor", d)

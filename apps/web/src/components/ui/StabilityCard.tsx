@@ -8,10 +8,11 @@ const LABELS: Record<PrintabilityCheckId, string> = {
   fits_bed: "Fits the printer",
   overhangs: "Overhangs",
   load_capacity: "Load",
+  connector_fit: "Fits its base",
 };
 
-/** Order from the Checkout board: balance first, then walls, then the rest. */
-const ORDER: PrintabilityCheckId[] = ["centre_of_gravity", "thinnest_wall", "tipping_margin", "manifold", "fits_bed", "overhangs", "load_capacity"];
+/** Order from the Checkout board: balance first, then walls, then the rest; a Jod's Kadi fit (hybrid pieces only) sits with the balance checks. */
+const ORDER: PrintabilityCheckId[] = ["centre_of_gravity", "thinnest_wall", "tipping_margin", "connector_fit", "manifold", "fits_bed", "overhangs", "load_capacity"];
 
 const STATUS_STYLE: Record<PrintabilityCheck["status"], { dot: string; text: string; label: string }> = {
   pass: { dot: "bg-success", text: "", label: "Pass" },

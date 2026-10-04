@@ -31,7 +31,8 @@
         "centre_of_gravity": { "$ref": "#/$defs/check" },
         "tipping_margin": { "$ref": "#/$defs/check" },
         "overhangs": { "$ref": "#/$defs/check" },
-        "load_capacity": { "$ref": "#/$defs/check" }
+        "load_capacity": { "$ref": "#/$defs/check" },
+        "connector_fit": { "$ref": "#/$defs/check", "description": "Hybrid (Jod) pieces only: does the Kadi socket fit its base's pin as printed, and does it print clean (points straight down, opens on the bed, enough wall round it)? Absent for pieces without a connector." }
       }
     },
     "check_duration_ms": { "type": "integer", "minimum": 0 }

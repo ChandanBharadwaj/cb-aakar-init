@@ -95,9 +95,10 @@ export function priceFromLabel(family: Pick<Family, "price_from_paise">, formatP
   return typeof family.price_from_paise === "number" ? `from ${formatPaise(family.price_from_paise)}` : undefined;
 }
 
-const KIND_RANK: Record<Family["kind"], number> = { carrier: 0, object: 1, raw: 2 };
+// A Jod (hybrid: a plug-in Chhaap on a bought-in base) comes first: the faster, lighter-on-the-pocket form (docs/research/hybrid-products §2.3).
+const KIND_RANK: Record<Family["kind"], number> = { hybrid: -1, carrier: 0, object: 1, raw: 2 };
 
-/** Picker order: Avatars (carriers), then object families, then Swaroop last; `sort_order` within each. */
+/** Picker order: Jod first, then Avatars (carriers), then object families, then Swaroop last; `sort_order` within each. */
 export function sortFamilies(families: readonly Family[]): Family[] {
   return [...families].sort(
     (a, b) => KIND_RANK[a.kind] - KIND_RANK[b.kind] || (a.sort_order ?? 100) - (b.sort_order ?? 100) || a.name.localeCompare(b.name),

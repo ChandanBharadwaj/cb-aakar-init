@@ -96,7 +96,7 @@
         "name": { "type": "string", "maxLength": 80, "description": "Plain descriptor always shown with the codename, e.g. 'Keychain & bag charm'." },
         "tagline": { "type": "string", "maxLength": 120 },
         "description": { "type": "string", "maxLength": 500 },
-        "kind": { "type": "string", "enum": ["carrier", "object", "raw"], "description": "carrier = an Avatar that carries the customer's idea; object = a parametric object family (PLAN §7.3); raw = the single 'print as it is' family." },
+        "kind": { "type": "string", "enum": ["carrier", "object", "raw", "hybrid"], "description": "carrier = an Avatar that carries the customer's idea; object = a parametric object family (PLAN §7.3); raw = the single 'print as it is' family; hybrid = a Jod, a printed Chhaap that plugs into a bought-in base through a Kadi connector (docs/research/hybrid-products)." },
         "tier": { "type": "string", "enum": ["launch", "next", "later"], "description": "Roadmap slot from the market research; `available` is the staff switch." },
         "shelf": { "$ref": "#/$defs/id", "description": "Shop shelf (catalog category) this family sits on." },
         "demand_rank": { "type": "integer", "minimum": 1 },

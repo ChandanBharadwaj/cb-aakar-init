@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any
+from typing import Any, Mapping
 
 import trimesh
 
@@ -34,11 +34,13 @@ def inspect_mesh(
     backend: SlicerBackend | None = None,
     *,
     validate_contracts: bool = True,
+    connector: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Return ``(printability_report, print_estimate)`` for a mm, Z-up mesh.
 
     The mesh is not mutated; if a repair makes it watertight the repaired copy feeds the other checks.
-    Both dicts are validated against the contracts before being returned.
+    Both dicts are validated against the contracts before being returned. ``connector`` (the Kadi block a
+    hybrid template reports) adds the ``connector_fit`` check; without it the report is as before.
     """
     constraints = constraints or Constraints()
     slicing = slicing or SlicingSettings()
@@ -63,6 +65,8 @@ def inspect_mesh(
         "overhangs": checks.overhangs_skipped(),
         "load_capacity": checks.load_capacity_skipped(),
     }
+    if connector:
+        report_checks["connector_fit"] = checks.connector_fit(working, connector, constraints)
 
     try:
         estimate = backend.estimate(working, slicing, constraints)

@@ -1758,7 +1758,7 @@ export interface components {
             tagline?: string;
             description?: string;
             /** @enum {string} */
-            kind: "carrier" | "object" | "raw";
+            kind: "carrier" | "object" | "raw" | "hybrid";
             /** @enum {string} */
             tier: "launch" | "next" | "later";
             shelf: string;

@@ -71,7 +71,7 @@ paths:
         descriptors of that family. The raw family (`kind: raw`, Swaroop) is included; Shop shelves never list it.
       tags: [families]
       parameters:
-        - { name: kind, in: query, schema: { type: string, enum: [carrier, object, raw] } }
+        - { name: kind, in: query, schema: { type: string, enum: [carrier, object, raw, hybrid] } }
       responses:
         '200':
           description: Families
@@ -928,7 +928,7 @@ components:
         name: { type: string, description: "Plain descriptor always shown with the codename, e.g. Keychain & bag charm" }
         tagline: { type: string }
         description: { type: string }
-        kind: { type: string, enum: [carrier, object, raw] }
+        kind: { type: string, enum: [carrier, object, raw, hybrid] }
         tier: { type: string, enum: [launch, next, later] }
         shelf: { type: string }
         demand_rank: { type: integer }

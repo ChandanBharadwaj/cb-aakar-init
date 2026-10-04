@@ -24,6 +24,7 @@ Both dicts validate against `packages/contracts/schemas/printability-report.v1.j
 | `tipping_margin` | signed distance from the projection to the nearest hull edge | fail if negative · warn below `min_tipping_margin_mm` (default 5) |
 | `overhangs` | — | `skipped` "Overhang analysis arrives in Phase 2" |
 | `load_capacity` | — | `skipped` "Load estimate arrives in Phase 3" |
+| `connector_fit` | hybrid (Jod) pieces only, when the request carries the `connector` block a Kadi template reports: the as-printed fit of the socket from its modelled bore, rib crests and compensation (clearance to the pin, rib crush on the fattest pin in tolerance, grip on the thinnest), the wall round the socket by the same inward ray casting restricted to the bore's band, the socket pointing straight down and opening on the bed | fail when the pin would not enter, the ribs would crush flat, the wall is under the connector's minimum (1.6 mm in PLA) or the socket leans more than 5° · warn when the mouth is off the bed, the thinnest pin may sit loose, or no fit test is recorded yet · absent for pieces without a connector |
 
 `passed` is true when no check has status `fail`. Summaries are customer-facing in the checkout
 board's register: "Inside base · 3 mm", "3.2 mm · safe", "Fits 250 × 250 × 250 mm bed",
@@ -76,3 +77,4 @@ meant for the in-cluster geometry service, not for the public internet.
   hint, wall thickness being a 5th-percentile sample (very small thin spots under ~5 % of the
   surface can slip through), and the vertex-centroid COG fallback for open meshes.
 * Stubbed until later phases: `overhangs` (Phase 2), `load_capacity` (Phase 3).
+* `connector_fit` runs only when `inspect_mesh(..., connector=)` (or the `/v1/inspect` body) carries a Kadi block; see `docs/research/hybrid-products`.
