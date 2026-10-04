@@ -4,6 +4,13 @@ All notable changes to Aakar. Format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added — hybrid products (Jod): research and implementation plan
+- **Research and plan**: `docs/research/hybrid-products/` — why large everyday items should pair a bought-in base with a small printed Chhaap; four standard Kadi connectors (ribbed socket, dovetail slide, magnetic register, thread; PETG-only rim clip for variable bases) with the rule that the Chhaap is always the socket side and prints flat; per-material compensation, a `connector_fit` printability check and a fit-coupon calibration loop; viewer separation of the fixed base and the editable Chhaap, three discovery patterns, Duniya placement; the data model (`base_items`, `family_bases`, `fit_tests`, stock), the pricing flow (base and assembly lines, weight-tiered shipping) and a four-phase roadmap (proof of concept → core platform → UX rollout → scale), resumable from git.
+- **Testing policy for the feature**: no new tests while the phases are moving; CLI builds, contract validation, typecheck · lint · build, existing suites and live smoke walks verify each phase, with one hardening pass before launch.
+
+### Decisions
+- ADR-0015 proposed: a third family kind `hybrid` (Jod) pairs a bought-in base item with a printed Chhaap through a standard Kadi connector; bases are catalogue data with stock and a declared interface; fit is calibrated by coupons; the price shows base and assembly as their own lines.
+
 ### Added — outcome categories (Avatars), the Swaroop raw-print path, Duniya experiences and Katha
 - **Research**: `docs/research/outcome-categories/` — market report on how a customer's model becomes an orderable object (fixed carriers with 2–3 parameters are the pattern that survived; demand ranking; per-category engineering specs; raw-print partners; unit economics), five sourced notes, and the phased implementation plan (`implementation-plan.md`, resumable from git).
 - **Naming**: Avatar (carrier family), Chhaap (content slot: Naam text, Buti motif, Chhavi photo relief, Roop own 3D form), Duniya (experience), Swaroop (print as it is), Mahaul (backdrop). Code ids stay snake_case English; codenames are portal data.

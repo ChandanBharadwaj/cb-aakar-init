@@ -4,8 +4,8 @@ Living status of the plan in [PLAN.md](PLAN.md). Update this file with every mer
 
 | | |
 |---|---|
-| Last updated | 2026-10-03 (outcome categories: all seven phases done; Roshni, Pratima and Katha open; photo frame and keycap wait for fit tests) |
-| Current phase | **Phase 1** — the loop is complete locally (ADR-0013); now building **outcome categories (Avatars) + Swaroop** per `docs/research/outcome-categories/implementation-plan.md` |
+| Last updated | 2026-10-04 (hybrid products (Jod): research, plan and ADR-0015 committed; Phase 0 done, Phase 1 proof of concept next) |
+| Current phase | **Phase 1** — the loop is complete locally (ADR-0013); outcome categories (Avatars) + Swaroop done; next **hybrid products (Jod)** per `docs/research/hybrid-products/implementation-plan.md` |
 | Completed | Phase 0 — Foundations |
 | Roadmap position | ~2 of 28 scheduled weeks (5 phases; 1 done) |
 
@@ -130,6 +130,20 @@ Plan: [`docs/research/outcome-categories/implementation-plan.md`](docs/research/
 | 6 | PR 8 lithophane plate + night light, plinth, pet tag, photo frame, keycap | ✅ Done (geometry `9aa7ac8`; fixtures `907653e`; ranges `V12` `d3d6fc1`; anchor modes `cccb468`; opened in `V14` `c926b36`) | Roshni and Pratima orderable with placeholder minimums ₹599 / ₹699; photo_frame and keycap stay switched off until fit tests on real prints |
 | 7 | PRs 9–12 Duniya experiences + Katha | ✅ Done (PRs 9–11; 12a `869c9fd`, API 224; 12b `4d7317f`, geometry 665; Katha opened in `V14`) | `make smoke-katha` passed live; `/duniya/katha` and a comic studio render in Chromium without page errors |
 
+## Hybrid products (Jod) — Phase 0 done
+
+Plan: [`docs/research/hybrid-products/implementation-plan.md`](docs/research/hybrid-products/implementation-plan.md) (research in `report.md` beside it; decision ADR-0015). A hybrid pairs a bought-in base item (steel headphone stand, key-hook plate, LED lamp base, …) with a small printed Chhaap that plugs in through a standard Kadi connector. Every phase ends with a commit on `ccr-2ba8e715-ihp5b0` and a pointer here; a new session resumes from this table and the plan's "Resume state".
+
+**Testing policy (owner, 4 Oct 2026):** no new unit or integration tests while Phases 1–3 are moving; each phase is verified by CLI builds, `make contracts`, `make descriptors`, typecheck · lint · build, the existing suites staying green, and live smoke walks. The feature's tests land in one hardening pass (Phase 3.5).
+
+| Phase | Scope | Status | Evidence / resume pointer |
+|---|---|---|---|
+| 0 | Research report, implementation plan, ADR-0015 | ✅ Done | `docs/research/hybrid-products/`, `docs/adr/0015-hybrid-products-kadi.md` |
+| 1 | Proof of concept: geometry `connectors/` (Kadi-S socket, compensation, fit coupon), `headphone_topper@1`, inspect `connector_fit`, bench fit tests on sourced stands | ⬜ Not started | Start at plan step 1.1 |
+| 2 | Core platform: contracts, `V15` (`base_items`, `family_bases`, `fit_tests`, stock), catalog module, pricing (base + assembly lines, shipping tiers), order `assembling` stage, portal Bases page | ⬜ Not started | PR 2.1 contracts first |
+| 3 | UX rollout: `HybridModel` viewer, Jod picker and compare, base pages, Duniya promotion (Ghar, Safar), cart and share; 3.5 hardening tests; 3.6 launch | ⬜ Not started | PR 3.1 |
+| 4 | Scale: Kadi-D/T/C templates, PETG finish, more bases, stock ledger, kids compliance | ⬜ Not started | after launch |
+
 ## Decisions
 
 | ADR | Decision | Status |
@@ -147,6 +161,8 @@ Plan: [`docs/research/outcome-categories/implementation-plan.md`](docs/research/
 | 0011 | Contract-first schemas | Accepted |
 | 0012 | Separate management portal `apps/admin` | Accepted 2026-09-27 |
 | 0013 | Complete the loop with mocked external providers | Accepted 2026-09-27 |
+| 0014 | One raw print family (Swaroop) carries customer geometry as the body | Proposed 2026-09-27 |
+| 0015 | Hybrid products (Jod): bought-in bases with a standard Kadi connector | Proposed 2026-10-04 |
 
 ## Verification snapshot
 

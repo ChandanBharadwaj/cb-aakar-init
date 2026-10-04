@@ -18,5 +18,6 @@ One file per decision, numbered, never edited after acceptance (supersede instea
 | [0012](0012-management-portal.md) | A separate management portal (`apps/admin`) owns operational configuration and fulfilment ops | Accepted |
 | [0013](0013-mock-external-providers.md) | Complete the customer loop with external providers mocked behind adapters and placeholder pages | Accepted |
 | [0014](0014-raw-print-path.md) | One raw print family (Swaroop) may carry customer geometry as the body; same spec, same gate, same pricing | Proposed |
+| [0015](0015-hybrid-products-kadi.md) | Hybrid products (Jod): bought-in base items with a standard Kadi connector on the printed Chhaap; base and assembly price lines; fit calibrated by coupons | Proposed |
 
 Template: [0000-template.md](0000-template.md).
