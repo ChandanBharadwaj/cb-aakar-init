@@ -98,7 +98,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["origin_mm", "up"],
-      "description": "Where the Chhaap's connector mouth sits on the base, in the base's own frame (the base stands on z = 0 with its centre on the z axis). The storefront places the printed part's mouth at origin_mm, its connector axis along up and its front along forward.",
+      "description": "Where the Chhaap's connector seat sits on the base, in the base's own frame (the base stands on z = 0 with its centre on the z axis). The storefront places the printed part's seat at origin_mm, its body along up (the connector axis, from the seat into the printed body: +z for a topper on a stand, -z for a shade hanging from a lamp's holder) and its front along forward.",
       "properties": {
         "origin_mm": { "$ref": "#/$defs/vector_mm" },
         "up": { "$ref": "#/$defs/vector_mm" },

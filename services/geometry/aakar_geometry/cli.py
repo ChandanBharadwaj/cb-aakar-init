@@ -1,4 +1,5 @@
-"""``aakar-geometry`` console script: templates | build | coupon | serve | worker."""
+"""``aakar-geometry`` console script: templates | build | serve | worker. Fit coupons and base previews are built from the
+portal over HTTP (``POST /v1/coupons``, ``POST /v1/bases/preview``), not from here."""
 
 from __future__ import annotations
 
@@ -89,59 +90,6 @@ def _cmd_build(args: argparse.Namespace) -> int:
     return 0
 
 
-def _cmd_coupon(args: argparse.Namespace) -> int:
-    """Build Kadi fit coupons: a flange with the socket only, one STL per size × finish, each run through inspect's
-    ``connector_fit`` and measured back off the mesh (bore and crest as modelled, rib angles). Prints one line per
-    coupon and writes ``coupons.json`` beside the STLs; the bench measures the prints against these numbers."""
-    from aakar_inspect import Constraints, inspect_mesh
-
-    from .connectors import compensation, socket
-    from .exports import export_all
-    from .materials import material_ids
-    from .templates.kadi_coupon import KadiCoupon
-
-    out_dir = Path(args.out)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    nominals = list(socket.NOMINALS_MM) if args.all else [float(args.nominal)]
-    materials = material_ids() if args.all or not args.material else [args.material]
-    rows: list[dict] = []
-    worst = "pass"
-    for nominal in nominals:
-        for material in materials:
-            params = KadiCoupon.validate({"nominal_mm": f"{nominal:g}", "wall_mm": args.wall})
-            mesh = KadiCoupon.build(params, material=material)
-            comp = compensation.for_material(material)
-            dims = KadiCoupon.connector_for(params).dims(comp)
-            frame = KadiCoupon.connector_frame(params)
-            report = KadiCoupon.connector_report(params, material)
-            printability, _ = inspect_mesh(mesh, Constraints.from_dict(KadiCoupon.constraints.descriptor()), connector=report)
-            fit = printability["checks"]["connector_fit"]
-            measured = socket.measure(mesh, frame, dims)
-            name = f"kadi_coupon_s{nominal:g}_{material}_w{args.wall:g}"
-            (out_dir / f"{name}.stl").write_bytes(export_all(mesh, ["stl"], name=name)["stl"].data)
-            rows.append({
-                "file": f"{name}.stl", "nominal_mm": nominal, "material": material, "process": comp.process, "wall_mm": args.wall,
-                "modelled": {"bore_d_mm": round(dims.bore_d_model_mm, 3), "crest_d_mm": round(dims.crest_d_model_mm, 3), "depth_mm": dims.depth_mm},
-                "expected_printed": {"bore_d_mm": round(dims.bore_d_printed_mm, 3), "crest_d_mm": round(dims.crest_d_printed_mm, 3),
-                                     "clearance_mm": round(dims.clearance_printed_mm, 3), "rib_bite_mm": round(dims.interference_printed_mm, 3),
-                                     "crush_fraction": round(dims.crush_fraction, 3)},
-                "measured_from_mesh": measured, "connector_fit": fit, "watertight": bool(mesh.is_watertight),
-            })
-            if fit["status"] == "fail" or (fit["status"] == "warn" and worst == "pass"):
-                worst = fit["status"]
-            print(
-                f"Ø{nominal:g} {material} ({comp.process}) wall {args.wall:g}: bore modelled {dims.bore_d_model_mm:.2f} "
-                f"(prints ≈{dims.bore_d_printed_mm:.2f}, pin {nominal:g}, clearance {dims.clearance_printed_mm:.2f}) · "
-                f"{socket.RIB_COUNT} ribs crest {dims.crest_d_model_mm:.2f} (≈{dims.crest_d_printed_mm:.2f}, bite "
-                f"{dims.interference_printed_mm:.2f}/rib, crush {dims.crush_fraction:.2f}) · mesh reads bore {measured.get('bore_d_mm')} "
-                f"crest {measured.get('crest_d_mm')} ribs at {measured.get('rib_spacing_deg')}° · "
-                f"{'watertight' if mesh.is_watertight else 'NOT watertight'} · connector_fit {fit['status']}: {fit['summary']}"
-            )
-    (out_dir / "coupons.json").write_text(json.dumps(rows, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"wrote {len(rows)} coupon(s) + coupons.json to {out_dir}")
-    return 1 if worst == "fail" else 0
-
-
 def _cmd_serve(args: argparse.Namespace) -> int:
     import uvicorn
 
@@ -175,14 +123,6 @@ def main(argv: list[str] | None = None) -> int:
         help="folder holding the photos / model files named in the spec's content sources (their URLs resolve by file name here)",
     )
     build.set_defaults(fn=_cmd_build)
-
-    coupon = sub.add_parser("coupon", help="build Kadi fit coupons (STL per size × finish) with their connector_fit verdicts")
-    coupon.add_argument("--out", required=True, help="output directory")
-    coupon.add_argument("--nominal", type=float, default=12.0, help="Kadi-S pin diameter: 8, 12 or 16 (default 12)")
-    coupon.add_argument("--material", default=None, help="one finish id (default: every finish)")
-    coupon.add_argument("--wall", type=float, default=3.0, help="plastic round the socket in mm (default 3; 1.4 shows a connector_fit failure)")
-    coupon.add_argument("--all", action="store_true", help="every size in every finish")
-    coupon.set_defaults(fn=_cmd_coupon)
 
     serve = sub.add_parser("serve", help="run the HTTP API (uvicorn)")
     serve.add_argument("--host", default="0.0.0.0")

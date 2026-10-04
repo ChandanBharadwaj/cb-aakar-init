@@ -221,13 +221,39 @@ finish without a recorded fit test only reaches `warn`. The family is `available
 
 ```sh
 uv run aakar-geometry build ../../packages/contracts/examples/headphone-topper.spec.json --out ../../out/topper
-uv run aakar-geometry coupon --all --out ../../out/coupons        # every Kadi size × finish, with connector_fit verdicts
-uv run aakar-geometry coupon --nominal 12 --material basic_white --wall 1.4 --out ../../out/thin   # fails: wall under 1.6 mm
 ```
 
-The coupon (`templates/kadi_coupon.py`, never registered) is a flange with the socket only; the command prints the modelled bore
-and rib-crest diameters, what they should print as, the rib angles read back off the mesh, and the `connector_fit` verdict, and
-writes `coupons.json` beside the STLs for the bench to measure against.
+**Fit coupons** are built from the portal, not the command line: the Bases page posts `POST /v1/coupons` (`connectors/coupon.py`)
+with a connector, a finish and a wall, and the service returns the coupon's STL (stored under `coupons/`), the modelled dimensions,
+what a good print should measure (`expected_printed`), the connector read back off the mesh and the `connector_fit` verdict. One
+coupon body per Kadi: a flanged socket (S), a rail block (D), a collar washer or threaded block (T), a disc plate (M), the clip
+itself (C). A coupon in a finish the Kadi refuses (a rim clip in PLA) answers 422 `invalid_spec`.
+
+### The other four Kadi and their templates (Phase 4)
+
+`connectors/` carries all five standards behind one `Connector` (kind, nominal, fit, depth, adapter, and the rim clip's `form`, the
+thread's `thread`, the magnet register's `mode`); each kind's module models it from as-printed targets with the finish's compensation
+and reports it for inspect's `connector_fit`:
+
+| Kadi | Module | Template | What it is |
+|---|---|---|---|
+| S socket | `socket.py` | `headphone_topper@1` | the ribbed press socket (above) |
+| D dovetail | `dovetail.py` | `hook_plaque@1` (Pehchaan Jod) | a channel across the plaque's back, 12.4 mm at the mouth widening to 15.4 at the floor, 4.15 deep, a 0.4 mm detent at the centre; a bonded PETG rail (`rail_petg_40`) slides in from the side |
+| T thread | `thread.py` | `lamp_shade_e27@1` (Deepak Jod) | `e27` / `e14`: a 3 mm lip with the collar hole the holder's shade ring clamps; `unc_1_4` / `m10x1`: a 60° female thread swept along a helix, 0.3 mm radial clearance, at least 4 turns, with a heat-set-insert bore as the fallback when the kernel refuses a size |
+| M magnet | `magnet_register.py` | `dash_idol@1` (Safar Jod) | `steel_disc`: one Ø 40.4 × 1.2 pocket for a glued steel disc; `magnets`: 10.2 × 3.2 pockets on the base's magnet pattern |
+| C rim clip | `rim_clip.py` | `drain_lid@1` (Saaf Jod, `lid`), `bottle_cap_cover@1` (Botal Jod, `cap`), `planter_rim@1` (Gamla Jod, `rim`) | compliant 1.6 mm tabs with lips sized so the smallest base of the class still grips and the largest stays under the finish's `max_strain_pct`; built into the body by the template (`body_uses_material`), PETG only: a `creep_class: high` finish is refused naming the finishes that hold |
+
+`pillar_headphone_stand@1` (Sur, family `headphone_stand`) is the fully printed sibling of the topper, sharing its crown
+(`templates/saddle.py`), so the storefront's "Whole or plug-in?" card compares two real forms.
+
+A spec may carry `spec.base` (filled by the API from the base item): the pipeline refuses a base whose Kadi, size, form, thread or mode
+is not the template's (`incompatible_base`, 422), models the connector for that base's pin and tolerance class, reports `fit_tested`
+to `connector_fit` and echoes the base, with the connector cut for it, in `design.completed`. A Kadi template with no material in its
+spec is modelled for its family's first finish.
+
+**Base previews**: `POST /v1/bases/preview` (`bases/shapes.py`) renders a schematic GLB of a bought-in base from its `preview_shape`
+(`pillar_stand`, `hook_plate`, `lamp_base`, `puck_mount`, `box`, `bottle`, `pot`) under `bases/<sku>/preview.glb` and returns the mount
+frame (where a Chhaap's seat sits, the axis its body runs along, its front) for the storefront's two-model viewer.
 
 ## Pipeline (`build_design`)
 

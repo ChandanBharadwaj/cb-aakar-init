@@ -1,5 +1,213 @@
 [
   {
+    "id": "bottle_cap_cover",
+    "version": 1,
+    "family": "bottle_cap_cover",
+    "name": "Botal Jod bottle cap cover",
+    "description": "A cover that snaps over the cap of a steel school bottle (caps 40 to 44 mm across) with a name and a motif on top. The bottle is the one they already own; only the cover is printed, in PETG.",
+    "environment": "balcony_daylight",
+    "params": {
+      "top_t_mm": {
+        "type": "number",
+        "label": "Top",
+        "default": 3.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "The top plate's thickness.",
+        "min": 2.4,
+        "max": 4.0,
+        "step": 0.1,
+        "group": "Size"
+      },
+      "skirt_h_mm": {
+        "type": "number",
+        "label": "Skirt",
+        "default": 20.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "How far the cover reaches down the cap.",
+        "min": 18,
+        "max": 26,
+        "step": 1,
+        "group": "Size"
+      },
+      "brim_mm": {
+        "type": "number",
+        "label": "Brim",
+        "default": 2.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "A brim round the top to grip when opening.",
+        "min": 0,
+        "max": 6,
+        "step": 0.5,
+        "group": "Shape"
+      }
+    },
+    "anchors": [
+      {
+        "id": "top",
+        "label": "Top of the cover",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          32.4,
+          33.1
+        ],
+        "bleed_mm": 0.5,
+        "accepts": [
+          "emboss_text",
+          "motif",
+          "relief_image"
+        ],
+        "max_relief_mm": 1.2,
+        "modes": [
+          "deboss"
+        ]
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 1.2,
+      "max_overhang_deg": 55,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "petg_slate"
+    ],
+    "style_variants": [],
+    "features_supported": [
+      "emboss_text",
+      "motif",
+      "relief_image"
+    ],
+    "hardware": [],
+    "min_feature_mm": 0.8,
+    "connector": {
+      "kind": "rim_clip",
+      "nominal_mm": 42.0,
+      "fit": "snap",
+      "depth_mm": 16.0,
+      "clearance_mm": 0.6,
+      "form": "cap"
+    }
+  },
+  {
+    "id": "dash_idol",
+    "version": 1,
+    "family": "dash_idol",
+    "name": "Safar Jod dashboard idol",
+    "description": "A small plinth for your own form that holds to a magnetic dashboard mount through a steel disc set in its underside. The mount is bought in; the plinth and your form are printed in a heat-safe finish.",
+    "environment": "dashboard",
+    "params": {
+      "width_mm": {
+        "type": "number",
+        "label": "Width",
+        "default": 55.0,
+        "handle": true,
+        "unit": "mm",
+        "min": 45,
+        "max": 70,
+        "step": 1,
+        "group": "Size"
+      },
+      "depth_mm": {
+        "type": "number",
+        "label": "Depth",
+        "default": 50.0,
+        "handle": false,
+        "unit": "mm",
+        "min": 45,
+        "max": 60,
+        "step": 1,
+        "group": "Size"
+      },
+      "height_mm": {
+        "type": "number",
+        "label": "Height",
+        "default": 10.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "Of the plinth; the disc pocket takes 1.2 mm.",
+        "min": 8,
+        "max": 14,
+        "step": 0.5,
+        "group": "Size"
+      }
+    },
+    "anchors": [
+      {
+        "id": "top",
+        "label": "Top of the plinth",
+        "kind": "volume",
+        "projection": "planar",
+        "bounds_mm": [
+          52.0,
+          47.0,
+          60.0
+        ],
+        "accepts": [
+          "hero_mesh"
+        ]
+      },
+      {
+        "id": "face",
+        "label": "Front of the plinth",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          43.0,
+          9.0
+        ],
+        "bleed_mm": 0.5,
+        "accepts": [
+          "emboss_text",
+          "motif"
+        ],
+        "max_relief_mm": 1.0
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 1.2,
+      "max_overhang_deg": 55,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "petg_slate"
+    ],
+    "style_variants": [
+      "comic_pop"
+    ],
+    "features_supported": [
+      "hero_mesh",
+      "emboss_text",
+      "motif"
+    ],
+    "hardware": [
+      {
+        "sku": "steel_disc_40",
+        "qty": 1
+      }
+    ],
+    "min_feature_mm": 0.8,
+    "connector": {
+      "kind": "magnet",
+      "nominal_mm": 40.0,
+      "fit": "pocket",
+      "depth_mm": 1.2,
+      "clearance_mm": 0.4,
+      "mode": "steel_disc",
+      "adapter_sku": "steel_disc_40"
+    }
+  },
+  {
     "id": "desk_nameplate",
     "version": 1,
     "family": "nameplate",
@@ -117,7 +325,8 @@
       "terracotta_silk",
       "polished_brass",
       "sandalwood_silk",
-      "indigo_matte"
+      "indigo_matte",
+      "petg_slate"
     ],
     "style_variants": [
       "comic_pop"
@@ -134,6 +343,111 @@
       }
     ],
     "min_feature_mm": 0.8
+  },
+  {
+    "id": "drain_lid",
+    "version": 1,
+    "family": "drain_lid",
+    "name": "Saaf Jod soap box lid",
+    "description": "A slotted lid that snaps into a ready-made acrylic soap box. The box is bought in; the lid with your motif is printed in PETG so it shrugs off water.",
+    "environment": "kitchen_marble",
+    "params": {
+      "opening_w_mm": {
+        "type": "number",
+        "label": "Opening width",
+        "default": 118.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "The box's inside length; the lip is sized to it.",
+        "min": 100,
+        "max": 130,
+        "step": 0.5,
+        "group": "Fit"
+      },
+      "opening_d_mm": {
+        "type": "number",
+        "label": "Opening depth",
+        "default": 78.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "The box's inside width.",
+        "min": 60,
+        "max": 90,
+        "step": 0.5,
+        "group": "Fit"
+      },
+      "thickness_mm": {
+        "type": "number",
+        "label": "Thickness",
+        "default": 3.0,
+        "handle": false,
+        "unit": "mm",
+        "min": 2.4,
+        "max": 4.0,
+        "step": 0.1,
+        "group": "Size"
+      },
+      "slots": {
+        "type": "integer",
+        "label": "Drain slots",
+        "default": 6,
+        "handle": false,
+        "unit": "count",
+        "description": "In two groups beside the centre band.",
+        "min": 4,
+        "max": 10,
+        "step": 2,
+        "group": "Details"
+      }
+    },
+    "anchors": [
+      {
+        "id": "face",
+        "label": "Top of the lid",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          36.0,
+          74.0
+        ],
+        "bleed_mm": 0.5,
+        "accepts": [
+          "motif",
+          "emboss_text"
+        ],
+        "max_relief_mm": 1.2,
+        "modes": [
+          "deboss"
+        ]
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 1.2,
+      "max_overhang_deg": 55,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "petg_slate"
+    ],
+    "style_variants": [],
+    "features_supported": [
+      "motif",
+      "emboss_text"
+    ],
+    "hardware": [],
+    "min_feature_mm": 0.8,
+    "connector": {
+      "kind": "rim_clip",
+      "nominal_mm": 118.0,
+      "fit": "snap",
+      "depth_mm": 8.0,
+      "clearance_mm": 0.5,
+      "form": "lid"
+    }
   },
   {
     "id": "fridge_magnet",
@@ -225,7 +539,8 @@
       "terracotta_silk",
       "polished_brass",
       "sandalwood_silk",
-      "indigo_matte"
+      "indigo_matte",
+      "petg_slate"
     ],
     "style_variants": [
       "comic_pop"
@@ -350,7 +665,8 @@
       "terracotta_silk",
       "polished_brass",
       "sandalwood_silk",
-      "indigo_matte"
+      "indigo_matte",
+      "petg_slate"
     ],
     "style_variants": [
       "comic_pop"
@@ -472,7 +788,8 @@
       "terracotta_silk",
       "polished_brass",
       "sandalwood_silk",
-      "indigo_matte"
+      "indigo_matte",
+      "petg_slate"
     ],
     "style_variants": [
       "comic_pop"
@@ -497,6 +814,115 @@
       "rib_count": 3,
       "clearance_mm": 0.3,
       "adapter_sku": "dowel_nylon_12x30"
+    }
+  },
+  {
+    "id": "hook_plaque",
+    "version": 1,
+    "family": "hook_plaque",
+    "name": "Pehchaan Jod key-hook nameplate",
+    "description": "A plaque that slides onto a steel four-hook plate through a dovetail rail. The plate is bought in and screwed to the wall; your name, a motif or a photo relief are printed on the plaque.",
+    "environment": "studio",
+    "params": {
+      "width_mm": {
+        "type": "number",
+        "label": "Width",
+        "default": 220.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "Across the plaque; the plate is 260 mm.",
+        "min": 160,
+        "max": 260,
+        "step": 5,
+        "group": "Size"
+      },
+      "height_mm": {
+        "type": "number",
+        "label": "Height",
+        "default": 55.0,
+        "handle": true,
+        "unit": "mm",
+        "min": 40,
+        "max": 70,
+        "step": 1,
+        "group": "Size"
+      },
+      "thickness_mm": {
+        "type": "number",
+        "label": "Thickness",
+        "default": 8.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "The rail channel takes 4.15 mm of it.",
+        "min": 6,
+        "max": 10,
+        "step": 0.5,
+        "group": "Size"
+      }
+    },
+    "anchors": [
+      {
+        "id": "face",
+        "label": "Face",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          216.0,
+          51.0
+        ],
+        "bleed_mm": 0.5,
+        "accepts": [
+          "emboss_text",
+          "motif",
+          "relief_image"
+        ],
+        "max_relief_mm": 1.5
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 1.2,
+      "max_overhang_deg": 55,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "basic_white",
+      "terracotta_matte",
+      "terracotta_silk",
+      "polished_brass",
+      "sandalwood_silk",
+      "indigo_matte",
+      "petg_slate"
+    ],
+    "style_variants": [
+      "comic_pop"
+    ],
+    "features_supported": [
+      "emboss_text",
+      "motif",
+      "relief_image"
+    ],
+    "hardware": [
+      {
+        "sku": "rail_petg_40",
+        "qty": 1
+      },
+      {
+        "sku": "vhb_pad_25x40",
+        "qty": 1
+      }
+    ],
+    "min_feature_mm": 0.8,
+    "connector": {
+      "kind": "dovetail",
+      "nominal_mm": 12.0,
+      "fit": "slide",
+      "depth_mm": 4.15,
+      "clearance_mm": 0.4,
+      "adapter_sku": "rail_petg_40"
     }
   },
   {
@@ -655,7 +1081,8 @@
       "terracotta_silk",
       "polished_brass",
       "sandalwood_silk",
-      "indigo_matte"
+      "indigo_matte",
+      "petg_slate"
     ],
     "style_variants": [],
     "features_supported": [
@@ -720,7 +1147,8 @@
       "terracotta_silk",
       "polished_brass",
       "sandalwood_silk",
-      "indigo_matte"
+      "indigo_matte",
+      "petg_slate"
     ],
     "style_variants": [
       "comic_pop"
@@ -839,7 +1267,8 @@
       "terracotta_silk",
       "polished_brass",
       "sandalwood_silk",
-      "indigo_matte"
+      "indigo_matte",
+      "petg_slate"
     ],
     "style_variants": [
       "comic_pop"
@@ -856,6 +1285,116 @@
       }
     ],
     "min_feature_mm": 0.8
+  },
+  {
+    "id": "lamp_shade_e27",
+    "version": 1,
+    "family": "lamp_shade_e27",
+    "name": "Deepak Jod lantern shade",
+    "description": "An eight-sided lantern shade that clamps onto a ready-made E27 lamp base with the holder's shade ring. Your motif or photo sits on the front facet; the base, cord and LED bulb are bought in.",
+    "environment": "teak_table_candlelight",
+    "params": {
+      "height_mm": {
+        "type": "number",
+        "label": "Height",
+        "default": 160.0,
+        "handle": true,
+        "unit": "mm",
+        "min": 120,
+        "max": 220,
+        "step": 5,
+        "group": "Size"
+      },
+      "top_w_mm": {
+        "type": "number",
+        "label": "Top width",
+        "default": 70.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "Across the flats at the collar.",
+        "min": 60,
+        "max": 90,
+        "step": 2,
+        "group": "Shape"
+      },
+      "bottom_w_mm": {
+        "type": "number",
+        "label": "Bottom width",
+        "default": 150.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "Across the flats at the open end.",
+        "min": 120,
+        "max": 200,
+        "step": 5,
+        "group": "Shape"
+      },
+      "wall_mm": {
+        "type": "number",
+        "label": "Wall",
+        "default": 2.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "The shell's thickness; light glows through a thin wall.",
+        "min": 1.6,
+        "max": 2.4,
+        "step": 0.1,
+        "group": "Details"
+      }
+    },
+    "anchors": [
+      {
+        "id": "band",
+        "label": "Front facet",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          34.2,
+          86.8
+        ],
+        "bleed_mm": 1.0,
+        "accepts": [
+          "motif",
+          "relief_image",
+          "emboss_text"
+        ],
+        "max_relief_mm": 1.0
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 1.2,
+      "max_overhang_deg": 55,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "basic_white",
+      "terracotta_matte",
+      "terracotta_silk",
+      "polished_brass",
+      "sandalwood_silk",
+      "indigo_matte",
+      "petg_slate"
+    ],
+    "style_variants": [],
+    "features_supported": [
+      "motif",
+      "relief_image",
+      "emboss_text"
+    ],
+    "hardware": [],
+    "min_feature_mm": 0.8,
+    "connector": {
+      "kind": "thread",
+      "nominal_mm": 40.5,
+      "fit": "slide",
+      "depth_mm": 3.0,
+      "clearance_mm": 0.5,
+      "thread": "e27"
+    }
   },
   {
     "id": "lithophane_plate",
@@ -1052,7 +1591,8 @@
       "terracotta_silk",
       "polished_brass",
       "sandalwood_silk",
-      "indigo_matte"
+      "indigo_matte",
+      "petg_slate"
     ],
     "style_variants": [
       "comic_pop"
@@ -1171,7 +1711,8 @@
       "terracotta_silk",
       "polished_brass",
       "sandalwood_silk",
-      "indigo_matte"
+      "indigo_matte",
+      "petg_slate"
     ],
     "style_variants": [],
     "features_supported": [
@@ -1185,6 +1726,225 @@
       }
     ],
     "min_feature_mm": 0.8
+  },
+  {
+    "id": "pillar_headphone_stand",
+    "version": 1,
+    "family": "headphone_stand",
+    "name": "Sur pillar headphone stand",
+    "description": "A fully printed headphone stand: a D-shaped foot, a slim pillar and the same crown as the Sur Jod topper. A name runs up the pillar or sits on the foot's front.",
+    "environment": "desk_oak",
+    "params": {
+      "height_mm": {
+        "type": "number",
+        "label": "Height",
+        "default": 240.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "To the crown's apex; the bed is 250 mm.",
+        "min": 200,
+        "max": 250,
+        "step": 5,
+        "group": "Size"
+      },
+      "foot_d_mm": {
+        "type": "number",
+        "label": "Foot",
+        "default": 120.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "Across the foot.",
+        "min": 100,
+        "max": 140,
+        "step": 5,
+        "group": "Size"
+      },
+      "saddle_width_mm": {
+        "type": "number",
+        "label": "Saddle width",
+        "default": 70.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "Across the saddle; the headband rests along it.",
+        "min": 60,
+        "max": 90,
+        "step": 1,
+        "group": "Shape"
+      },
+      "saddle_depth_mm": {
+        "type": "number",
+        "label": "Saddle depth",
+        "default": 40.0,
+        "handle": false,
+        "unit": "mm",
+        "min": 30,
+        "max": 50,
+        "step": 1,
+        "group": "Shape"
+      }
+    },
+    "anchors": [
+      {
+        "id": "base_front",
+        "label": "Front of the foot",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          69.0,
+          7.0
+        ],
+        "bleed_mm": 0.5,
+        "accepts": [
+          "emboss_text",
+          "motif"
+        ],
+        "max_relief_mm": 1.5
+      },
+      {
+        "id": "pillar",
+        "label": "Up the pillar",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          184.0,
+          17.0
+        ],
+        "bleed_mm": 0.5,
+        "accepts": [
+          "emboss_text",
+          "motif"
+        ],
+        "max_relief_mm": 1.5
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 1.2,
+      "max_overhang_deg": 55,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "basic_white",
+      "terracotta_matte",
+      "terracotta_silk",
+      "polished_brass",
+      "sandalwood_silk",
+      "indigo_matte",
+      "petg_slate"
+    ],
+    "style_variants": [
+      "comic_pop"
+    ],
+    "features_supported": [
+      "emboss_text",
+      "motif"
+    ],
+    "hardware": [],
+    "min_feature_mm": 0.8
+  },
+  {
+    "id": "planter_rim",
+    "version": 1,
+    "family": "planter_rim",
+    "name": "Gamla Jod planter band",
+    "description": "A band that clips over the rim of a terracotta pot (rims 7 to 10 mm thick) and carries a motif and the plant's name on a tag. The pot is yours; the band is printed in PETG for the balcony.",
+    "environment": "balcony_daylight",
+    "params": {
+      "pot_d_mm": {
+        "type": "number",
+        "label": "Pot",
+        "default": 110.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "Across the pot at its rim.",
+        "min": 80,
+        "max": 140,
+        "step": 5,
+        "group": "Fit"
+      },
+      "arc_deg": {
+        "type": "number",
+        "label": "Reach",
+        "default": 70.0,
+        "handle": false,
+        "unit": "deg",
+        "description": "How far round the rim the band reaches.",
+        "min": 45,
+        "max": 120,
+        "step": 5,
+        "group": "Shape"
+      },
+      "tag_w_mm": {
+        "type": "number",
+        "label": "Tag width",
+        "default": 40.0,
+        "handle": false,
+        "unit": "mm",
+        "min": 30,
+        "max": 60,
+        "step": 1,
+        "group": "Shape"
+      },
+      "tag_h_mm": {
+        "type": "number",
+        "label": "Tag height",
+        "default": 16.0,
+        "handle": false,
+        "unit": "mm",
+        "min": 12,
+        "max": 24,
+        "step": 1,
+        "group": "Shape"
+      }
+    },
+    "anchors": [
+      {
+        "id": "band",
+        "label": "Name tag",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          36.0,
+          12.0
+        ],
+        "bleed_mm": 0.5,
+        "accepts": [
+          "motif",
+          "emboss_text"
+        ],
+        "max_relief_mm": 1.0
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 1.2,
+      "max_overhang_deg": 55,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "petg_slate"
+    ],
+    "style_variants": [],
+    "features_supported": [
+      "motif",
+      "emboss_text"
+    ],
+    "hardware": [],
+    "min_feature_mm": 0.8,
+    "connector": {
+      "kind": "rim_clip",
+      "nominal_mm": 8.0,
+      "fit": "snap",
+      "depth_mm": 18.0,
+      "clearance_mm": 0.3,
+      "form": "rim"
+    }
   },
   {
     "id": "plinth_round",
@@ -1277,7 +2037,8 @@
       "terracotta_silk",
       "polished_brass",
       "sandalwood_silk",
-      "indigo_matte"
+      "indigo_matte",
+      "petg_slate"
     ],
     "style_variants": [
       "comic_pop"
@@ -1328,7 +2089,8 @@
       "terracotta_silk",
       "polished_brass",
       "sandalwood_silk",
-      "indigo_matte"
+      "indigo_matte",
+      "petg_slate"
     ],
     "style_variants": [],
     "features_supported": [

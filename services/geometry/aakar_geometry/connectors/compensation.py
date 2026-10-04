@@ -4,8 +4,9 @@ A socket is modelled from its **as-printed** targets: FDM holes print small (seg
 squeeze), outer walls print fat, the first layer squishes out (elephant foot) and the part shrinks a little as it
 cools. The values live here as defaults per process (PLA, PETG, resin) and may be overridden per material by a
 ``compensation`` block on the material row (``materials.json``; the ``materials`` table gets the columns in Phase 2).
-Every launch finish is PLA. These are proposals until the Phase 1 fit coupons are measured; the coupon loop
-(``aakar-geometry coupon``) is how the numbers get corrected.
+The six launch finishes are PLA; PETG Slate (the rim-clip families' finish) carries its own block. These are proposals
+until the fit coupons are measured; the coupon loop (``POST /v1/coupons`` from the portal's Bases page) is how the
+numbers get corrected.
 """
 
 from __future__ import annotations

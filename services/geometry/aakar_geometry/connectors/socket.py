@@ -8,7 +8,7 @@ chamfer at the mouth swallows the elephant foot and guides the pin.
 
 Modelled from as-printed targets (``compensation``): the bore and the rib crests face inward like a hole wall, so
 both grow by ``xy_hole_comp_mm`` and by the material's shrinkage. All dimensions mm. Numbers are proposals until
-the fit coupons (``aakar-geometry coupon``) are measured.
+the fit coupons (built from the portal through ``POST /v1/coupons``) are measured.
 """
 
 from __future__ import annotations
@@ -42,8 +42,17 @@ MIN_GRIP_MM = 0.05  # the smallest radial bite per rib that still holds
 PIN_TOLERANCE_MM = {"machined": 0.10, "molded": 0.15, "wood": 0.50}  # ± on the pin's diameter by base tolerance class
 
 
-def default_depth(nominal_mm: float) -> float:
-    return DEPTH_BY_NOMINAL.get(float(nominal_mm), round(1.25 * float(nominal_mm), 1))
+def default_depth(connector: "Connector | float") -> float:
+    nominal = float(getattr(connector, "nominal_mm", connector))
+    return DEPTH_BY_NOMINAL.get(nominal, round(1.25 * nominal, 1))
+
+
+def descriptor_extras(connector: "Connector") -> dict[str, Any]:
+    return {"rib_count": RIB_COUNT, "clearance_mm": CLEARANCE_MM}
+
+
+def label(connector: "Connector") -> str:
+    return f"{connector.nominal_mm:g} mm Kadi socket"
 
 
 @dataclass(frozen=True)
@@ -150,6 +159,7 @@ def report(
     tolerance_class: str = "machined",
     pin_d_mm: float | None = None,
     fit_tested: bool = False,
+    **_: Any,
 ) -> dict[str, Any]:
     """The ``connector`` block the inspect service's ``connector_fit`` check reads (modelled numbers, never as-printed:
     inspect works the fit out itself from the compensation)."""
@@ -177,10 +187,40 @@ def report(
     }
 
 
+def expected_printed(d: SocketDims) -> dict[str, float]:
+    """What a good print should measure: the coupon's bench numbers."""
+    return {
+        "bore_d_mm": round(d.bore_d_printed_mm, 3),
+        "crest_d_mm": round(d.crest_d_printed_mm, 3),
+        "depth_mm": round(d.depth_mm, 3),
+        "clearance_mm": round(d.clearance_printed_mm, 3),
+        "rib_bite_mm": round(d.interference_printed_mm, 3),
+        "crush_fraction": round(d.crush_fraction, 3),
+    }
+
+
+COUPON_FLOOR_MM = 3.0
+
+
+def coupon_part(connector: "Connector", d: SocketDims, wall_mm: float) -> "cad.Part":
+    """A flange with the socket only: ``wall_mm`` of plastic round the bore, ``COUPON_FLOOR_MM`` under its floor."""
+    from ..templates import plates
+
+    outer_d = d.bore_d_model_mm + 2.0 * float(wall_mm)
+    flange = cad.prism(plates.disc(0.0, 0.0, outer_d / 2.0), d.depth_mm + COUPON_FLOOR_MM)
+    return cad.cut(flange, [tool_part(d)])
+
+
+def coupon_frame(d: SocketDims) -> "AnchorFrame":
+    from ..features.frames import AnchorFrame
+
+    return AnchorFrame(np.array([0.0, 0.0, 0.0]), [1, 0, 0], [0, 1, 0], [0, 0, 1])
+
+
 def measure(mesh: trimesh.Trimesh, frame: "AnchorFrame", d: SocketDims) -> dict[str, Any]:
     """Read the socket back off a built mesh: bore and crest diameters as modelled and the rib angles, from the ring of
     vertices where the bore's walls meet its floor (straight walls carry no vertices between their ends; the floor's
-    outline is the bore polygon itself). What the coupon CLI prints."""
+    outline is the bore polygon itself). The coupon report's self-check."""
     local = frame.to_local(mesh.vertices)
     z = local[:, 2]
     r = np.hypot(local[:, 0], local[:, 1])
@@ -222,8 +262,13 @@ __all__ = [
     "RIB_INTERFERENCE_MM",
     "SocketDims",
     "bore_polygon",
+    "coupon_frame",
+    "coupon_part",
     "default_depth",
+    "descriptor_extras",
     "dims",
+    "expected_printed",
+    "label",
     "measure",
     "report",
     "rib_angles_deg",

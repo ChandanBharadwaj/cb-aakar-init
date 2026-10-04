@@ -53,6 +53,9 @@ PUBLISHED = {
     ("photo_frame_std", "border"): (["deboss"], None),
     ("photo_frame_std", "base_front"): (["deboss"], None),
     ("lithophane_plate", "plate"): (["lithophane"], True),
+    # the Kadi-C lid and cap cover print face down, so their faces only cut in
+    ("drain_lid", "face"): (["deboss"], None),
+    ("bottle_cap_cover", "top"): (["deboss"], None),
 }
 
 

@@ -2,7 +2,7 @@
 
 Loaded from ``AAKAR_MATERIALS_FILE`` when set (the Dockerfile copies the file to
 ``/design-tokens/materials.json``), else the repo-relative path, else the built-in copy of the
-six launch ids so descriptors stay correct even when the tokens are not mounted.
+six launch ids and PETG Slate so descriptors stay correct even when the tokens are not mounted.
 """
 
 from __future__ import annotations
@@ -20,6 +20,8 @@ LAUNCH_MATERIALS: list[dict[str, Any]] = [
     {"id": "polished_brass", "name": "Polished Brass", "density_g_cm3": 1.24, "finish_class": "silk", "heat_safe": False},
     {"id": "sandalwood_silk", "name": "Sandalwood Silk", "density_g_cm3": 1.26, "finish_class": "silk", "heat_safe": False},
     {"id": "indigo_matte", "name": "Indigo Matte", "density_g_cm3": 1.24, "finish_class": "matte", "heat_safe": False},
+    {"id": "petg_slate", "name": "PETG Slate", "filament": "PETG, slate grey", "density_g_cm3": 1.27, "finish_class": "matte", "heat_safe": True,
+     "compensation": {"process": "petg"}},
 ]
 
 

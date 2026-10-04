@@ -18,6 +18,9 @@ from aakar_geometry.templates import (
     FridgeMagnet,
     HangingOrnament,
     HeadphoneTopper,
+    HookPlaque,
+    DashIdol,
+    PillarHeadphoneStand,
     JharokhaPhoneStand,
     KeycapMx,
     KeychainTag,
@@ -33,7 +36,7 @@ from aakar_geometry.templates.base import Anchor, Template
 from carrier_checks import relief
 from conftest import DESIGN_ID, JOB_ID, content_source
 
-COMIC = [KeychainTag, PetTag, FridgeMagnet, HangingOrnament, DeskNameplate, KeycapMx, PlinthRound, HeadphoneTopper]
+COMIC = [KeychainTag, PetTag, FridgeMagnet, HangingOrnament, DeskNameplate, KeycapMx, PlinthRound, HeadphoneTopper, PillarHeadphoneStand, HookPlaque, DashIdol]
 # every spot of a comic carrier that takes a name or a motif
 MARKS = [
     (t, a, ftype)

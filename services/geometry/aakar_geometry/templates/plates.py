@@ -49,6 +49,14 @@ def hole(cx: float, cy: float, d: float, segments: int = CIRCLE_SEGMENTS) -> Pol
     return disc(cx, cy, (d / 2.0) / math.cos(math.pi / segments), segments)
 
 
+def ring_sector(r_in: float, r_out: float, a0_deg: float, a1_deg: float, segments: int = 48) -> Polygon:
+    """The part of an annulus between radii ``r_in`` and ``r_out`` from ``a0_deg`` to ``a1_deg`` (counter-clockwise)."""
+    a = np.radians(np.linspace(a0_deg, a1_deg, segments + 1))
+    outer = np.column_stack([r_out * np.cos(a), r_out * np.sin(a)])
+    inner = np.column_stack([r_in * np.cos(a[::-1]), r_in * np.sin(a[::-1])])
+    return Polygon(np.vstack([outer, inner]))
+
+
 def rounded_rect(w: float, h: float, r: float, quad_segs: int = 16) -> Polygon:
     """``w`` × ``h`` rectangle centred on the origin with corner radius ``r`` (0 = sharp corners)."""
     r = max(0.0, min(float(r), w / 2.0, h / 2.0))
@@ -286,6 +294,7 @@ __all__ = [
     "heart_unit",
     "hole",
     "largest_polygon",
+    "ring_sector",
     "rounded_rect",
     "soften",
     "star_unit",

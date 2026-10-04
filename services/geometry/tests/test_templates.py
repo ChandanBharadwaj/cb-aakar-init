@@ -20,7 +20,7 @@ def test_descriptor_validates_and_matches_plan():
     assert desc["features_supported"] == ["emboss_text", "motif"]
     assert all(a["accepts"] == ["emboss_text", "motif"] for a in desc["anchors"])
     assert set(desc["materials"]) == {
-        "basic_white", "terracotta_matte", "terracotta_silk", "polished_brass", "sandalwood_silk", "indigo_matte",
+        "basic_white", "terracotta_matte", "terracotta_silk", "polished_brass", "sandalwood_silk", "indigo_matte", "petg_slate",
     }
     p = desc["params"]
     assert (p["width_mm"]["min"], p["width_mm"]["max"], p["width_mm"]["default"], p["width_mm"]["handle"]) == (70, 110, 92, True)
@@ -34,8 +34,10 @@ def test_descriptor_validates_and_matches_plan():
 
 def test_registry_lookup():
     assert [t.ref() for t in list_templates()] == [
-        "desk_nameplate@1", "fridge_magnet@1", "hanging_ornament@1", "headphone_topper@1", "jharokha_phone_stand@1", "keycap_mx@1",
-        "keychain_tag@1", "lithophane_plate@1", "pet_tag@1", "photo_frame_std@1", "plinth_round@1", "raw_print@1",
+        "bottle_cap_cover@1", "dash_idol@1", "desk_nameplate@1", "drain_lid@1", "fridge_magnet@1", "hanging_ornament@1",
+        "headphone_topper@1", "hook_plaque@1", "jharokha_phone_stand@1", "keycap_mx@1", "keychain_tag@1", "lamp_shade_e27@1",
+        "lithophane_plate@1", "pet_tag@1", "photo_frame_std@1", "pillar_headphone_stand@1", "planter_rim@1", "plinth_round@1",
+        "raw_print@1",
     ]
     assert get_template("jharokha_phone_stand@1") is JharokhaPhoneStand
     assert parse_ref("jharokha_phone_stand@1") == ("jharokha_phone_stand", 1)

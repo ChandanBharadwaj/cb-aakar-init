@@ -75,7 +75,7 @@ def test_template_materials_respect_the_family_rules():
     class Coaster(Template):
         id = "rules_coaster"
         version = 1
-        family = "coaster"  # heat_safe_only, and no launch material is heat safe
+        family = "coaster"  # heat_safe_only: only the PETG finish is heat safe
         name = "Rules coaster"
 
     class Stray(Template):
@@ -85,8 +85,7 @@ def test_template_materials_respect_the_family_rules():
         name = "Stray"
 
     assert Lamp.materials() == ["basic_white"]
-    with pytest.raises(families.FamilyConfigError):
-        Coaster.materials()
+    assert Coaster.materials() == ["petg_slate"]  # heat_safe_only leaves the PETG finish and nothing else
     assert Stray.materials() == [m["id"] for m in load_materials()]  # unknown family (never registrable): no rules
 
 

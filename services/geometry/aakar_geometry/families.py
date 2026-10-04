@@ -49,6 +49,9 @@ def _row(
     shape_tolerance: str = "any",
     available: bool = True,
     envelope: tuple[float, float] | None = None,
+    connector: dict[str, Any] | None = None,
+    bases: list[str] | None = None,
+    pair: str | None = None,
 ) -> dict[str, Any]:
     slot: dict[str, Any] = {"accepts": list(accepts), "anchors": list(anchors), "hero_volume": hero_volume}
     if max_text_chars is not None:
@@ -69,6 +72,11 @@ def _row(
     }
     if envelope is not None:
         row["size_envelope_mm"] = {"min_longest_mm": envelope[0], "max_longest_mm": envelope[1]}
+    if connector is not None:  # a hybrid (Jod): its Kadi and the bases it fits, the first the default
+        row["connector"] = dict(connector)
+        row["bases"] = [{"sku": sku, "default": i == 0} for i, sku in enumerate(bases or [])]
+    if pair is not None:
+        row["pair_family_id"] = pair
     return row
 
 
@@ -97,10 +105,34 @@ BUILTIN_FAMILIES: list[dict[str, Any]] = [
          max_text_chars=3, shape_tolerance="strict", available=False, envelope=(18, 20)),
     _row("phone_stand", "object", "jharokha_phone_stand", ["emboss_text", "motif"], ["side_left", "side_right", "back"],
          max_text_chars=16, shape_tolerance="strict", envelope=(80, 160)),
-    # hybrid (Jod), Phase 1: the Sur Jod headphone topper on a bought-in stand; off until its fit coupons pass
+    _row("headphone_stand", "object", "pillar_headphone_stand", ["emboss_text", "motif"], ["base_front", "pillar"],
+         max_text_chars=16, shape_tolerance="strict", envelope=(200, 300), pair="headphone_topper"),
+    # hybrid (Jod): a printed Chhaap on a bought-in base through a Kadi (docs/research/hybrid-products)
     _row("headphone_topper", "hybrid", "headphone_topper", ["hero_mesh", "emboss_text", "motif"], ["front", "face"],
          hero_volume=True, max_text_chars=16, hardware=[{"sku": "dowel_nylon_12x30", "qty": 1}], shape_tolerance="strict",
-         available=False, envelope=(60, 100)),
+         envelope=(60, 100), connector={"kind": "socket", "nominal_mm": 12, "fit": "press_ribbed", "adapter_sku": "dowel_nylon_12x30"},
+         bases=["headphone_stand_steel_12"], pair="headphone_stand"),
+    _row("hook_plaque", "hybrid", "hook_plaque", ["emboss_text", "motif", "relief_image"], ["face"],
+         max_text_chars=24, hardware=[{"sku": "rail_petg_40", "qty": 1}, {"sku": "vhb_pad_25x40", "qty": 1}], shape_tolerance="strict",
+         envelope=(160, 260), connector={"kind": "dovetail", "nominal_mm": 12, "fit": "slide", "adapter_sku": "rail_petg_40"},
+         bases=["hook_plate_steel_4"], pair="nameplate"),
+    _row("lamp_shade_e27", "hybrid", "lamp_shade_e27", ["motif", "relief_image", "emboss_text"], ["band"],
+         max_text_chars=16, shape_tolerance="constrained", envelope=(120, 220),
+         connector={"kind": "thread", "nominal_mm": 40.5, "fit": "slide", "thread": "e27"}, bases=["led_lamp_base_e27"]),
+    _row("dash_idol", "hybrid", "dash_idol", ["hero_mesh", "emboss_text", "motif"], ["top", "face"],
+         hero_volume=True, max_text_chars=12, hardware=[{"sku": "steel_disc_40", "qty": 1}], heat_safe_only=True,
+         shape_tolerance="strict", available=False, envelope=(40, 80),
+         connector={"kind": "magnet", "nominal_mm": 40, "fit": "pocket", "mode": "steel_disc", "adapter_sku": "steel_disc_40"},
+         bases=["dash_mount_magnetic"]),
+    _row("drain_lid", "hybrid", "drain_lid", ["motif", "emboss_text"], ["face"], max_text_chars=12, allowed=["petg_slate"],
+         shape_tolerance="strict", envelope=(100, 130), connector={"kind": "rim_clip", "nominal_mm": 118, "fit": "snap", "form": "lid"},
+         bases=["soap_box_acrylic_120x80"]),
+    _row("bottle_cap_cover", "hybrid", "bottle_cap_cover", ["emboss_text", "motif", "relief_image"], ["top"], max_text_chars=12,
+         allowed=["petg_slate"], shape_tolerance="strict", envelope=(40, 60),
+         connector={"kind": "rim_clip", "nominal_mm": 42, "fit": "snap", "form": "cap"}, bases=["bottle_cap_class_40"]),
+    _row("planter_rim", "hybrid", "planter_rim", ["motif", "emboss_text"], ["band"], max_text_chars=16, allowed=["petg_slate"],
+         shape_tolerance="strict", envelope=(80, 140), connector={"kind": "rim_clip", "nominal_mm": 8, "fit": "snap", "form": "rim"},
+         bases=["planter_rim_class_8"], pair="planter"),
 ]
 
 BUILTIN_HARDWARE: list[dict[str, Any]] = [
@@ -112,6 +144,10 @@ BUILTIN_HARDWARE: list[dict[str, Any]] = [
     {"sku": "nameplate_screws", "name": "Wall screws and anchors, pair", "unit_cost_paise": 600},
     {"sku": "adhesive_pads", "name": "Foam adhesive pads, pair", "unit_cost_paise": 300},
     {"sku": "dowel_nylon_12x30", "name": "Nylon dowel 12 × 30 mm", "unit_cost_paise": 800},
+    {"sku": "rail_petg_40", "name": "PETG dovetail rail 40 mm", "unit_cost_paise": 1200},
+    {"sku": "vhb_pad_25x40", "name": "VHB foam pad 25 × 40 mm", "unit_cost_paise": 400},
+    {"sku": "steel_disc_40", "name": "Steel disc 40 × 1 mm", "unit_cost_paise": 900},
+    {"sku": "insert_brass_1420", "name": "Brass heat-set insert 1/4-20", "unit_cost_paise": 1500},
 ]
 
 
@@ -136,8 +172,9 @@ def load_families_doc() -> dict[str, Any]:
         if doc.get("families"):
             return {"source": str(path), "shelves": list(doc.get("shelves") or []),
                     "hardware_items": [dict(h) for h in doc.get("hardware_items") or []],
+                    "base_items": [dict(b) for b in doc.get("base_items") or []],
                     "families": [dict(f) for f in doc["families"]]}
-    return {"source": "builtin", "shelves": [], "hardware_items": [dict(h) for h in BUILTIN_HARDWARE],
+    return {"source": "builtin", "shelves": [], "hardware_items": [dict(h) for h in BUILTIN_HARDWARE], "base_items": [],
             "families": [json.loads(json.dumps(f)) for f in BUILTIN_FAMILIES]}
 
 
@@ -196,6 +233,16 @@ def hardware_items() -> dict[str, dict[str, Any]]:
     return {h["sku"]: h for h in load_families_doc()["hardware_items"]}
 
 
+def base_items() -> dict[str, dict[str, Any]]:
+    """Bought-in bases (Buniyaad) keyed by sku, from the seed (none in the built-in copy)."""
+    return {b["sku"]: b for b in load_families_doc().get("base_items") or []}
+
+
+def connector(family_id: str) -> dict[str, Any] | None:
+    """A hybrid family's Kadi as the seed declares it (``connector``), None for the other kinds."""
+    return family(family_id).get("connector")
+
+
 def apply_material_rules(rules: Mapping[str, Any], materials: list[Mapping[str, Any]]) -> list[str]:
     """Filter material rows (``id``, ``finish_class``, ``heat_safe``) by a family's rules; returns ids in input order."""
     allowed = rules.get("allowed")
@@ -238,6 +285,8 @@ __all__ = [
     "UnknownFamily",
     "allowed_material_ids",
     "apply_material_rules",
+    "base_items",
+    "connector",
     "content_slot",
     "default_hardware",
     "families_file",

@@ -189,6 +189,9 @@ class Template:
     min_feature_mm: ClassVar[float | None] = None
     # Hybrid (Jod) templates: the Kadi cut into the piece so it plugs into a bought-in base (connectors/)
     connector: ClassVar[Connector | None] = None
+    # True when build_body(params, material) needs the material (a rim clip's compliant walls are sized with the
+    # finish's compensation); every other template keeps build_body(params)
+    body_uses_material: ClassVar[bool] = False
 
     @classmethod
     def ref(cls) -> str:
@@ -317,20 +320,25 @@ class Template:
 
     @classmethod
     def connector_frame(cls, params: Mapping[str, Any]) -> AnchorFrame:
-        """Where the Kadi is cut: origin at the mouth (on the bed for a socket), normal pointing into the body."""
+        """Where the Kadi is cut: origin at the mouth (on the bed for a socket) or the seat (a rim clip), normal pointing
+        into the body."""
         raise NotImplementedError(f"{cls.ref()} declares a connector but does not place it (connector_frame)")
 
     @classmethod
     def apply_connector(cls, body: trimesh.Trimesh, params: Mapping[str, Any], material: str | None) -> trimesh.Trimesh:
         """Cut the Kadi into the body, modelled with the material's print compensation (``connectors.compensation``);
-        a template without a connector returns the body untouched."""
+        a template without a connector, or whose Kadi is built into the body (a rim clip), returns the body untouched."""
         connector = cls.connector_for(params)
         if connector is None or body is None or body.is_empty:
             return body
         from ..connectors import compensation
         from ..features.booleans import difference
 
-        tool = connector.tool(cls.connector_frame(params), compensation.for_material(material))
+        comp = compensation.for_material(material)
+        connector.check_material(comp, material)
+        tool = connector.tool(cls.connector_frame(params), comp)
+        if tool is None:
+            return body
         return difference(body, tool)
 
     @classmethod
@@ -371,7 +379,13 @@ class Template:
 
         normalised = check_features(cls, features)
         cls.validate_content(params, normalised)
-        body = cls.apply_connector(cls.build_body(params), params, material)
+        connector = cls.connector_for(params)
+        if connector is not None:  # a Kadi the finish cannot carry is refused before any CAD
+            from ..connectors import compensation
+
+            connector.check_material(compensation.for_material(material), material)
+        body = cls.build_body(params, material) if cls.body_uses_material else cls.build_body(params)  # type: ignore[call-arg]
+        body = cls.apply_connector(body, params, material)
         if not normalised:
             return body
         from ..features import apply_features

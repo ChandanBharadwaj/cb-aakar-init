@@ -27,12 +27,11 @@ Anchors
          wide, low saddle leaves no face for a name and is refused (``validate_combination``).
 
 Hardware: ``dowel_nylon_12x30`` ×1, the adapter pin for a stand whose tube the dowel fits; a stand with a 12 mm pin
-of its own needs none (the base item decides, Phase 2).
+of its own needs none (the base item's ``interface.adapter_sku`` decides).
 """
 
 from __future__ import annotations
 
-import math
 from typing import Any, Mapping, Sequence
 
 import numpy as np
@@ -45,19 +44,17 @@ from ..errors import ParamOutOfRange
 from ..features.frames import AnchorFrame
 from . import plates
 from .base import Anchor, HardwareRef, Param, Template, TemplateConstraints
+from .saddle import CROWN_R_MM, OVERLAP_MM, Saddle  # noqa: F401  (CROWN_R_MM, OVERLAP_MM kept for readers of this module)
 
 DOWEL_SKU = "dowel_nylon_12x30"
 KADI = Connector("socket", 12.0, adapter_sku=DOWEL_SKU)
 PLATE_MM = 4.0  # the plate everything stands on
-CROWN_R_MM = 60.0  # the crown's radius: a headband's inner curve is shallower, so it seats on the apex
 CORNER_MM = 6.0  # plate corner radius
 MARGIN_MM = 1.5  # content kept inside the edges of the face and the room
 FACE_BLEED_MM = 0.5
 MAX_RELIEF_MM = 1.5
 ROOM_CLEAR_MM = 1.0  # the form stays this far under the crown's apex
 MIN_FACE_MM = plates.MIN_PRINTABLE_MM  # the face must be at least this tall to carry a name
-ARC_STEPS = 48
-OVERLAP_MM = 0.5  # the saddle starts this far inside the plate so the union has volume in common
 
 
 class Layout:
@@ -69,8 +66,9 @@ class Layout:
         self.H = float(p["height_mm"])
         self.room = float(p["room_mm"])
         self.L = self.D + self.room
-        self.rise = CROWN_R_MM - math.sqrt(CROWN_R_MM**2 - (self.W / 2.0) ** 2)
-        self.shoulder_z = self.H - self.rise  # where the crown's arc meets the vertical sides
+        self.saddle = Saddle(self.W, self.D, self.H, base_z=PLATE_MM)  # the crown shared with the fully printed stand
+        self.rise = self.saddle.rise
+        self.shoulder_z = self.saddle.shoulder_z  # where the crown's arc meets the vertical sides
         self.y_saddle_front = self.L / 2.0 - self.D  # the saddle's front face (the back wall of the room)
         self.y_socket = self.L / 2.0 - self.D / 2.0  # the stand's axis, under the saddle's centre
         self.y_room = -self.L / 2.0 + self.room / 2.0
@@ -95,16 +93,8 @@ class Layout:
         return (self.W - 2.0 * MARGIN_MM, self.room - 2.0 * MARGIN_MM, self.room_height)
 
     def crown_profile(self) -> Polygon:
-        """The saddle's cross-section in (x, height): a block topped by the crown's arc."""
-        zc = self.H - CROWN_R_MM
-        a0 = math.atan2(self.shoulder_z - zc, self.W / 2.0)
-        a1 = math.pi - a0
-        pts = [(-self.W / 2.0, PLATE_MM - OVERLAP_MM), (self.W / 2.0, PLATE_MM - OVERLAP_MM), (self.W / 2.0, self.shoulder_z)]
-        for i in range(1, ARC_STEPS):
-            a = a0 + (a1 - a0) * i / ARC_STEPS
-            pts.append((CROWN_R_MM * math.cos(a), zc + CROWN_R_MM * math.sin(a)))
-        pts.append((-self.W / 2.0, self.shoulder_z))
-        return Polygon(pts)
+        """The saddle's cross-section in (x, height): a block on the plate topped by the crown's arc (``saddle.Saddle``)."""
+        return self.saddle.crown_profile()
 
     def anchor_frames(self) -> dict[str, AnchorFrame]:
         return {
@@ -192,7 +182,7 @@ class HeadphoneTopper(Template):
         L = Layout(params)
         plate = cad.prism(L.outline, PLATE_MM)
         # the saddle's profile is drawn in (x, height), extruded along +Z by its depth, stood up (+Y → +Z) and moved to the back
-        saddle = cad.translate(cad.rotate_x(cad.prism(L.crown_profile(), L.D), 90.0), dy=L.L / 2.0)
+        saddle = L.saddle.part(L.L / 2.0)
         return cad.union([plate, saddle])
 
     @classmethod

@@ -65,6 +65,13 @@ class NotPrintable(BuildError):
     http_status = 422
 
 
+class IncompatibleBase(BuildError):
+    """The base the spec names presents a different Kadi (kind, size, form) from the one this template cuts."""
+
+    code = "incompatible_base"
+    http_status = 422
+
+
 class GeometryError(BuildError):
     code = "build_error"
     http_status = 500

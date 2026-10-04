@@ -27,6 +27,7 @@ from .errors import (
     BuildError,
     BuildTimeout,
     GeometryError,
+    IncompatibleBase,
     InvalidSpec,
     NotPrintable,
     UnsupportedFeature,
@@ -52,6 +53,7 @@ HTTP_STATUS_BY_CODE = {
     "param_out_of_range": 422,
     "content_unusable": 422,
     "not_printable": 422,
+    "incompatible_base": 422,
     "build_error": 500,
     "storage_error": 500,
     "timeout": 500,
@@ -104,8 +106,40 @@ def normalise_spec(template: type[Template], spec: Mapping[str, Any], params: Ma
     }
     if spec.get("material"):
         out["material"] = spec["material"]
+    if spec.get("base"):  # a hybrid piece's base, filled by the API; read here, never changed
+        out["base"] = dict(spec["base"])
     validate("design-spec", out)
     return out
+
+
+BASE_REPORT_KEYS = ("tolerance_class", "pin_d_mm", "fit_tested", "range_mm")
+
+
+def _check_base(template: type[Template], params: Mapping[str, Any], spec: Mapping[str, Any]) -> None:
+    """``spec.base`` must present the Kadi this template cuts: same kind and size, and the same form, thread or mode when
+    both name one. A base on a template without a Kadi is refused too."""
+    base = spec.get("base")
+    if not base:
+        return
+    sku = base.get("sku", "the base")
+    connector = template.connector_for(params)
+    if connector is None:
+        raise IncompatibleBase(f"{template.name} has no Kadi to plug into {sku}", {"base": sku, "template": template.ref()})
+    problems: dict[str, Any] = {}
+    if base.get("kind") and base["kind"] != connector.kind:
+        problems["kind"] = {"base": base["kind"], "template": connector.kind}
+    if base.get("nominal_mm") is not None and abs(float(base["nominal_mm"]) - connector.nominal_mm) > 1e-6:
+        problems["nominal_mm"] = {"base": float(base["nominal_mm"]), "template": connector.nominal_mm}
+    for key in ("form", "thread", "mode"):
+        if base.get(key) and getattr(connector, key) and base[key] != getattr(connector, key):
+            problems[key] = {"base": base[key], "template": getattr(connector, key)}
+    if problems:
+        presents = " ".join(str(base.get(k)) for k in ("kind", "form", "thread", "mode") if base.get(k))
+        raise IncompatibleBase(
+            f"{sku} presents a {presents or 'different'} {float(base.get('nominal_mm') or connector.nominal_mm):g} mm Kadi; "
+            f"{template.name} is cut for a {connector.label()}",
+            {"base": sku, "template": template.ref(), "connector": connector.descriptor(), "problems": problems},
+        )
 
 
 def _check_spec_against_template(template: type[Template], spec: Mapping[str, Any]) -> None:
@@ -202,6 +236,7 @@ def build_design(
         template = get_template(spec["template"])
         _check_spec_against_template(template, spec)
         params = template.validate(spec.get("params"))
+        _check_base(template, params, spec)
         normalised = normalise_spec(template, spec, params)
         # limits that couple params and content (skin under a cut-in photo, a raw print's model), before any CAD
         template.validate_content(params, normalised["features"])
@@ -220,6 +255,9 @@ def build_design(
         sink.emit("design.progress", progress_payload("understanding", 10))
         sink.emit("design.progress", progress_payload("sculpting", 35))
         material = normalised.get("material")
+        has_connector = template.connector_for(params) is not None
+        if has_connector and not material:  # a Kadi is modelled for a finish: the family's first when the spec names none
+            material = template.materials()[0]
         mesh = _build_with_timeout(template, params, timeout_s, normalised["features"], fetcher, material)
         if not isinstance(mesh, trimesh.Trimesh) or mesh.is_empty or len(mesh.faces) == 0:
             raise GeometryError(
@@ -235,8 +273,11 @@ def build_design(
             assets[kind] = storage.put(asset_key(normalised_design_id, version_no, kind), file.data, file.content_type)
 
         sink.emit("design.progress", progress_payload("checking", 70))
-        # a Kadi template reports its socket so inspect can run connector_fit; others keep the five-argument call
-        connector = template.connector_report(params, material) if getattr(template, "connector", None) is not None else None
+        # a Kadi template reports its connector (for the base the spec names) so inspect can run connector_fit; others keep
+        # the five-argument call
+        base = normalised.get("base") or {}
+        base_kwargs = {k: base[k] for k in BASE_REPORT_KEYS if base.get(k) is not None}
+        connector = template.connector_report(params, material, **base_kwargs) if has_connector else None
         inspect_kwargs: dict[str, Any] = {"connector": connector} if connector else {}
         try:
             report, estimate = inspector.inspect(mesh, normalised["constraints"], slicing, assets, storage, **inspect_kwargs)
@@ -263,6 +304,8 @@ def build_design(
             "karigar_note": template.karigar_note_for(params, normalised["features"], style=normalised["style"]),
             "build_ms": int(round((time.perf_counter() - started) * 1000)),
         }
+        if base and connector:  # echo the base with the connector cut for it, for the API's snapshot
+            payload["base"] = {**base, "connector": connector}
         try:
             validate("design.completed", payload)
         except ContractError as exc:

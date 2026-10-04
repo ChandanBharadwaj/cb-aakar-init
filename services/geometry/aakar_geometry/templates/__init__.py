@@ -7,16 +7,23 @@ import re
 from ..errors import UnknownTemplate
 from ..families import UnknownFamily, family_ids
 from .base import Anchor, HardwareRef, Param, Template, TemplateConstraints
+from .bottle_cap_cover import BottleCapCover
+from .dash_idol import DashIdol
 from .desk_nameplate import DeskNameplate
+from .drain_lid import DrainLid
 from .fridge_magnet import FridgeMagnet
 from .hanging_ornament import HangingOrnament
 from .headphone_topper import HeadphoneTopper
+from .hook_plaque import HookPlaque
 from .jharokha_phone_stand import JharokhaPhoneStand
 from .keycap_mx import KeycapMx
 from .keychain_tag import KeychainTag
+from .lamp_shade_e27 import LampShadeE27
 from .lithophane_plate import LithophanePlate
 from .pet_tag import PetTag
 from .photo_frame_std import PhotoFrameStd
+from .pillar_headphone_stand import PillarHeadphoneStand
+from .planter_rim import PlanterRim
 from .plinth_round import PlinthRound
 from .raw_print import RawPrint
 
@@ -49,8 +56,15 @@ register(PlinthRound)
 register(PetTag)
 register(PhotoFrameStd)
 register(KeycapMx)
-# Hybrid products (Jod), Phase 1: the first Kadi template, switched off in families.json until its fit coupons pass
-register(HeadphoneTopper)
+# Hybrid products (Jod): a printed Chhaap on a bought-in base through a Kadi (docs/research/hybrid-products)
+register(HeadphoneTopper)  # Kadi-S socket
+register(PillarHeadphoneStand)  # the fully printed sibling the compare card pairs it with
+register(HookPlaque)  # Kadi-D dovetail
+register(LampShadeE27)  # Kadi-T E27 collar
+register(DashIdol)  # Kadi-M steel disc
+register(DrainLid)  # Kadi-C lid
+register(BottleCapCover)  # Kadi-C cap
+register(PlanterRim)  # Kadi-C rim
 
 
 def list_templates() -> list[type[Template]]:
@@ -80,18 +94,25 @@ def latest_by_id(template_id: str) -> type[Template] | None:
 
 __all__ = [
     "Anchor",
+    "BottleCapCover",
+    "DashIdol",
     "DeskNameplate",
+    "DrainLid",
     "FridgeMagnet",
     "HangingOrnament",
     "HardwareRef",
     "HeadphoneTopper",
+    "HookPlaque",
     "JharokhaPhoneStand",
     "KeycapMx",
     "KeychainTag",
+    "LampShadeE27",
     "LithophanePlate",
     "Param",
     "PetTag",
     "PhotoFrameStd",
+    "PillarHeadphoneStand",
+    "PlanterRim",
     "PlinthRound",
     "REGISTRY",
     "RawPrint",

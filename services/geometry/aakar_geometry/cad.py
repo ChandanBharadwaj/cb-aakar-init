@@ -16,7 +16,8 @@ from shapely.geometry import Polygon
 log = logging.getLogger("aakar.geometry.cad")
 
 try:  # build123d (OCCT) - the preferred kernel (PLAN §7.1)
-    from build123d import Align, Axis, Cone, Face, Location, Part, Plane, Polyline, extrude, make_face
+    from build123d import Align, Axis, Box, Cone, Cylinder, Face, Location, Part, Plane, Polyline, extrude, make_face
+    from build123d import loft as _loft
 
     KERNEL = "build123d"
     logging.getLogger("build123d").setLevel(logging.WARNING)  # it logs every extrude at INFO
@@ -52,7 +53,10 @@ def face_from_polygon(polygon: Polygon, plane: "Plane | None" = None) -> "Face":
 
 
 def prism(polygon: Polygon, thickness: float, plane: "Plane | None" = None) -> "Part":
-    """Extrude a polygon on ``plane`` along the plane normal by ``thickness`` (mm)."""
+    """Extrude a polygon on ``plane`` along the plane normal by ``thickness`` (mm); a multi-part area extrudes as the union
+    of its parts."""
+    if hasattr(polygon, "geoms"):
+        return union(prism(part, thickness, plane) for part in polygon.geoms if not part.is_empty and part.area > 0)
     return extrude(face_from_polygon(polygon, plane), amount=float(thickness))
 
 
@@ -62,9 +66,33 @@ def frustum(r_bottom: float, r_top: float, height: float) -> "Part":
     return Cone(float(r_bottom), float(r_top), float(height), align=(Align.CENTER, Align.CENTER, Align.MIN))
 
 
+def cylinder(r: float, h: float, cx: float = 0.0, cy: float = 0.0, z0: float = 0.0) -> "Part":
+    """A cylinder of radius ``r`` standing on z = ``z0``, ``h`` tall, centred on (``cx``, ``cy``)."""
+    _require_kernel()
+    return Cylinder(float(r), float(h), align=(Align.CENTER, Align.CENTER, Align.MIN)).moved(Location((float(cx), float(cy), float(z0))))
+
+
+def box(w: float, d: float, h: float, cx: float = 0.0, cy: float = 0.0, z0: float = 0.0) -> "Part":
+    """A box ``w`` × ``d`` × ``h`` standing on z = ``z0``, centred on (``cx``, ``cy``)."""
+    _require_kernel()
+    return Box(float(w), float(d), float(h), align=(Align.CENTER, Align.CENTER, Align.MIN)).moved(Location((float(cx), float(cy), float(z0))))
+
+
+def loft(sections: Sequence[tuple[Polygon, float]]) -> "Part":
+    """A solid lofted through polygons laid flat at the given heights, lowest first (a flaring shell, a tapering plinth)."""
+    _require_kernel()
+    faces = [face_from_polygon(poly, Plane.XY.offset(float(z))) for poly, z in sections]
+    return _loft(faces)
+
+
 def rotate_x(part: "Part", degrees: float) -> "Part":
     """Rotate about the global X axis; positive angles turn +Y towards +Z (right-hand rule)."""
     return part.rotate(Axis.X, float(degrees))
+
+
+def rotate_z(part: "Part", degrees: float) -> "Part":
+    """Rotate about the global Z axis; positive angles turn +X towards +Y."""
+    return part.rotate(Axis.Z, float(degrees))
 
 
 def translate(part: "Part", dx: float = 0.0, dy: float = 0.0, dz: float = 0.0) -> "Part":
@@ -84,6 +112,10 @@ def cut(part: "Part", tools: Iterable["Part"]) -> "Part":
     for tool in tools:
         part = part - tool
     return part
+
+
+def intersect(a: "Part", b: "Part") -> "Part":
+    return a & b
 
 
 def to_trimesh(
