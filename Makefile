@@ -16,7 +16,7 @@ infra-down: ## Stop the Docker infra
 api: ## Run the Spring Boot API (direct profile, port 8080)
 	cd services/api && ./gradlew bootRun
 
-geometry: ## Run the geometry service (port 8081, local asset storage)
+geometry: ## Run the geometry service (port 8081, local asset storage; set AAKAR_SLICER_BIN=prusa-slicer for real slicing)
 	cd services/geometry && uv run aakar-geometry serve
 
 inspect: ## Run the inspect service (port 8082)

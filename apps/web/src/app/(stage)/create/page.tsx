@@ -22,9 +22,12 @@ export default async function CreatePage({ searchParams }: CreatePageProps) {
   const families: Family[] = familiesResult.status === "fulfilled" ? familiesResult.value : [];
   const problem: Problem | undefined = familiesResult.status === "rejected" ? toProblem(familiesResult.reason) : undefined;
   const templates: TemplateDescriptor[] = templatesResult.status === "fulfilled" ? templatesResult.value : [];
-  // Templates no listed Avatar covers keep the direct "start from a template" path.
+  // Templates no listed Avatar covers keep the direct "start from a template" path, but only when their family is one the
+  // public list returns: /api/families omits switched-off families, and the API refuses their templates at design time
+  // (422 family_not_available), so a card here would be a dead end.
   const covered = new Set(families.flatMap((f) => f.templates.map((t) => t.id)));
-  const extraTemplates = templates.filter((t) => !covered.has(t.id));
+  const listedFamilies = new Set(families.map((f) => f.id));
+  const extraTemplates = templates.filter((t) => !covered.has(t.id) && listedFamilies.has(t.family));
 
   return (
     <div className="flex min-h-dvh flex-col">

@@ -48,6 +48,11 @@ cd services/geometry
 uv sync
 uv run pytest -q
 uv run aakar-geometry serve           # local asset storage in ./.aakar-assets, served at /assets
+# Real print-time and filament figures (instead of the heuristic) need PrusaSlicer; the geometry process runs the inspect
+# estimator in-process, so point it at the console binary before `serve`:
+#   Linux/macOS: export AAKAR_SLICER_BIN=prusa-slicer          (apt/brew/AppImage; `prusa-slicer` on PATH)
+#   Windows:     $env:AAKAR_SLICER_BIN='C:\Program Files\Prusa3D\PrusaSlicer\prusa-slicer-console.exe'  (winget install Prusa3D.PrusaSlicer)
+# Without it the service logs nothing and estimates heuristically; `print_estimate.method` in a design payload says which ran.
 ```
 
 Quick check: `curl -s localhost:8081/v1/templates | head -c 400`.
