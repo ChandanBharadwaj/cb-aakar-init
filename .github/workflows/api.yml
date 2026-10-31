@@ -1,10 +1,10 @@
 name: api
 on:
   pull_request:
-    paths: ["services/api/**", "packages/contracts/**", "packages/design-tokens/materials.json", ".github/workflows/api.yml"]
+    paths: ["services/api/**", "packages/contracts/**", "packages/design-tokens/**", ".github/workflows/api.yml"]
   push:
     branches: [main]
-    paths: ["services/api/**", "packages/contracts/**"]
+    paths: ["services/api/**", "packages/contracts/**", "packages/design-tokens/**"]
 jobs:
   build:
     runs-on: ubuntu-latest

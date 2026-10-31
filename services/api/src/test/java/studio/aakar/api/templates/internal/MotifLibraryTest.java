@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import studio.aakar.api.support.Contracts;
@@ -79,7 +80,7 @@ class MotifLibraryTest {
             assertThat(found.endsWith(Paths.get("packages", "design-tokens", "motifs"))).as(String.valueOf(found)).isTrue();
             assertThat(found.resolve("index.json")).isRegularFile();
         }
-        assertThat(MotifLibrary.locate(" /design-tokens/motifs ")).isEqualTo(Paths.get("/design-tokens/motifs"));
+        assertThat(MotifLibrary.locate(" /design-tokens/motifs ")).isEqualTo(Paths.get("/design-tokens/motifs").toAbsolutePath().normalize());
     }
 
     @Test
@@ -114,8 +115,12 @@ class MotifLibraryTest {
             assertThatThrownBy(() -> MotifLibrary.load(library, PUBLIC_URL)).as(file).isInstanceOf(MotifLibrary.LibraryException.class)
                     .hasMessageContaining("lotus");
         }
-        // nor through a symbolic link
-        Files.createSymbolicLink(library.resolve("lotus.svg"), dir.resolve("secret.svg"));
+        // nor through a symbolic link (creating one needs a privilege on Windows; skip the rest there rather than fail)
+        try {
+            Files.createSymbolicLink(library.resolve("lotus.svg"), dir.resolve("secret.svg"));
+        } catch (java.nio.file.FileSystemException | UnsupportedOperationException e) {
+            Assumptions.abort("symbolic links are not available here: " + e.getMessage());
+        }
         Files.writeString(library.resolve("index.json"), JSON.writeValueAsString(Map.of("motifs", List.of(Map.of("id", "lotus")))));
         assertThatThrownBy(() -> MotifLibrary.load(library, PUBLIC_URL)).isInstanceOf(MotifLibrary.LibraryException.class)
                 .hasMessageContaining("outside the library folder");

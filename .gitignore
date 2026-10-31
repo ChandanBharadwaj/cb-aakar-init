@@ -38,6 +38,7 @@ venv/
 /var/
 /tmp/
 **/.aakar-assets/
+**/.aakar-media/
 **/out/slice/
 infra/.data/
 

@@ -287,6 +287,11 @@ class DesignService implements Designs {
         TemplateDescriptor descriptor = templates.byId(request.templateId())
                 .orElseThrow(() -> ApiProblemException.notFound("Template", request.templateId()));
         FamilyDto family = familyFor(descriptor.family()).orElse(null);
+        // a template reached by id is still a family's template: switched off there means switched off here too
+        if (family != null && !family.available()) {
+            throw ApiProblemException.unprocessable(ProblemCodes.FAMILY_NOT_AVAILABLE, "Family not available",
+                    label(family) + " is not available to order right now.");
+        }
         Map<String, Object> params = DesignSpecs.merge(descriptor.defaultParams(), request.params());
         String material = blank(request.material()) ? defaultMaterial(descriptor, family) : request.material();
         return new Draft(descriptor, family, params, material, title(request, descriptor.name()), null);

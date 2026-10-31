@@ -30,19 +30,19 @@ def test_cli_build_writes_files_and_summary(tmp_path, capsys):
     assert "bounds 92 × 78 × 120 mm" in summary and "passed" in summary and "triangles" in summary and " g (" in summary
     for name in ("model.glb", "model.3mf", "model.stl", "result.json"):
         assert (out / name).stat().st_size > 0
-    result = json.loads((out / "result.json").read_text())
+    result = json.loads((out / "result.json").read_text(encoding="utf-8"))
     validate("design.completed", result)
     assert result["design_id"] == "0b8e7c6d-5a4b-4c3d-9e2f-1a0b9c8d7e6f"
 
 
 def test_cli_build_reports_failure(tmp_path, capsys):
-    spec = json.loads(EXAMPLE_SPEC.read_text())
+    spec = json.loads(EXAMPLE_SPEC.read_text(encoding="utf-8"))
     spec["params"]["wall_mm"] = 9
     bad = tmp_path / "bad.json"
     bad.write_text(json.dumps(spec))
     assert main(["build", str(bad), "--out", str(tmp_path / "o")]) == 1
     assert "param_out_of_range" in capsys.readouterr().err
-    assert json.loads((tmp_path / "o" / "result.json").read_text())["code"] == "param_out_of_range"
+    assert json.loads((tmp_path / "o" / "result.json").read_text(encoding="utf-8"))["code"] == "param_out_of_range"
 
 
 def test_console_script_help():
@@ -68,7 +68,7 @@ def test_cli_build_with_content_dir(test_templates, content_dir, tmp_path, capsy
     assert main(["build", str(spec_path), "--out", str(out), "--content-dir", str(content_dir)]) == 0
     summary = capsys.readouterr().out.strip()
     assert "test_plate@1" in summary and "hardware split_ring_25 ×1" in summary
-    result = json.loads((out / "result.json").read_text())
+    result = json.loads((out / "result.json").read_text(encoding="utf-8"))
     validate("design.completed", result)
     assert result["hardware"] == [{"sku": "split_ring_25", "qty": 1}]
     # without --content-dir the pipeline's HttpFetcher is used; a failed fetch is a clean design.failed
@@ -109,7 +109,7 @@ def test_cli_builds_the_keychain_photo_example_end_to_end(tmp_path, capsys):
     assert main(["build", str(example), "--out", str(out), "--content-dir", str(content)]) == 0
     summary = capsys.readouterr().out.strip()
     assert summary.startswith("keychain_tag@1 · bounds 45 × ") and "NOT passed" not in summary and "hardware split_ring_25 ×1" in summary
-    result = json.loads((out / "result.json").read_text())
+    result = json.loads((out / "result.json").read_text(encoding="utf-8"))
     validate("design.completed", result)
     assert result["printability"]["passed"] is True
     assert result["hardware"] == [{"sku": "split_ring_25", "qty": 1}]
@@ -136,6 +136,6 @@ def test_cli_builds_the_raw_print_example_from_a_local_model(tmp_path, capsys):
     example = REPO / "packages/contracts/examples/raw-print.spec.json"
     assert main(["build", str(example), "--out", str(out), "--content-dir", str(content)]) == 0
     assert capsys.readouterr().out.startswith("raw_print@1 · bounds 80 × ")
-    result = json.loads((out / "result.json").read_text())
+    result = json.loads((out / "result.json").read_text(encoding="utf-8"))
     validate("design.completed", result)
     assert result["hardware"] == [] and max(result["printability"]["geometry"]["bounds_mm"]) == pytest.approx(80, abs=1e-3)

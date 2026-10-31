@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 from typing import Any, Mapping, Protocol
 from urllib.parse import unquote, urlparse
+from urllib.request import url2pathname
 
 import httpx
 
@@ -215,7 +216,7 @@ class LocalFileFetcher:
         url = str(source.get("url") or "")
         parsed = urlparse(url)
         if parsed.scheme == "file":
-            return Path(unquote(parsed.path))
+            return Path(url2pathname(parsed.path))  # "/D:/x" on Windows, "/x" elsewhere
         if self.base_dir is None:
             raise InvalidSpec("LocalFileFetcher needs a file:// URL or a base directory", {"url": url})
         name = Path(unquote(parsed.path if parsed.scheme else url)).name

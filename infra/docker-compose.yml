@@ -9,7 +9,8 @@ services:
       POSTGRES_USER: aakar
       POSTGRES_PASSWORD: aakar
       POSTGRES_DB: aakar
-    ports: ["5432:5432"]
+    # Host port; set AAKAR_PG_PORT when 5432 is already taken by a local Postgres (the API then needs the matching JDBC URLs).
+    ports: ["${AAKAR_PG_PORT:-5432}:5432"]
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro

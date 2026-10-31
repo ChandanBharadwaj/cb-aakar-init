@@ -170,7 +170,7 @@ def load_families_doc() -> dict[str, Any]:
         except ContractError as exc:
             raise FamilyConfigError(f"{path} does not match template-family.v1.json: {exc}") from exc
         if doc.get("families"):
-            return {"source": str(path), "shelves": list(doc.get("shelves") or []),
+            return {"source": path.as_posix(), "shelves": list(doc.get("shelves") or []),
                     "hardware_items": [dict(h) for h in doc.get("hardware_items") or []],
                     "base_items": [dict(b) for b in doc.get("base_items") or []],
                     "families": [dict(f) for f in doc["families"]]}

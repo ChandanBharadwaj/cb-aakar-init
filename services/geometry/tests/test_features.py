@@ -242,7 +242,8 @@ def test_hero_orientation_and_yaw():
     assert hero_mesh.prepare(glb, "glb", {"fit": "longest", "longest_mm": 20}, frame).extents == pytest.approx([20, 10, 5], abs=1e-6)
 
 
-@pytest.mark.parametrize("data, fmt", [(soup_stl(), "stl"), (open_sphere_stl(), "stl"), (b"garbage", "stl"), (gradient_png(), "png"), (sphere_stl(), None)])
+@pytest.mark.parametrize("data, fmt", [(soup_stl(), "stl"), (open_sphere_stl(), "stl"), (b"garbage", "stl"), (gradient_png(), "png"), (sphere_stl(), None)],
+                         ids=["soup", "open_sphere", "garbage", "png_as_mesh", "no_format"])
 def test_hero_rejects_unrepairable_or_unreadable_input(data, fmt):
     with pytest.raises(ContentUnusable):
         hero_mesh.prepare(data, fmt, {"fit": "contain"}, top_frame(0, bounds=(40, 40, 40)))

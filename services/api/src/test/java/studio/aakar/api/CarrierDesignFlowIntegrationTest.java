@@ -243,6 +243,11 @@ class CarrierDesignFlowIntegrationTest extends AbstractIntegrationTest {
                 "{\"type\": \"emboss_text\", \"text\": \"Asha\", \"anchor\": \"base_front\", \"mode\": \"deboss\"}"), guest),
                 HttpStatus.UNPROCESSABLE_ENTITY, "family_not_available");
         assertThat(off.get("detail").asText()).isEqualTo("Chaukhat · Photo frame is not available to order right now.");
+        // nor can the same template be reached by its id (the Create page lists every live template)
+        assertProblem(post("/api/designs", "{\"source\": \"create\", \"template_id\": \"photo_frame_std\"}", guest),
+                HttpStatus.UNPROCESSABLE_ENTITY, "family_not_available");
+        assertProblem(post("/api/designs", "{\"source\": \"create\", \"template_id\": \"headphone_topper\"}", guest),
+                HttpStatus.UNPROCESSABLE_ENTITY, "family_not_available");
         assertProblem(post("/api/designs", "{\"source\": \"create\", \"family_id\": \"keychain\", \"template_id\": \"fridge_magnet\"}", guest),
                 HttpStatus.BAD_REQUEST, "validation_failed");
         assertProblem(post("/api/designs", "{\"source\": \"create\", \"family_id\": \"keychain\", \"template_id\": \"nope_tag\"}", guest),

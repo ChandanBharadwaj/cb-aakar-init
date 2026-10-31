@@ -133,6 +133,6 @@ final class PrintSheet {
     }
 
     private static void row(StringBuilder sheet, String label, String value) {
-        sheet.append(String.format(Locale.ROOT, "%-16s%s%n", label + ":", value));
+        sheet.append(String.format(Locale.ROOT, "%-16s%s\n", label + ":", value));
     }
 }
