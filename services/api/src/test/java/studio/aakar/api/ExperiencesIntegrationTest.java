@@ -57,8 +57,8 @@ class ExperiencesIntegrationTest extends AbstractIntegrationTest {
         ResponseEntity<String> response = get("/api/experiences");
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         JsonNode experiences = body(response);
-        // all five, Katha (comics) included since V14 opened it with its comic backdrop
-        assertThat(ids(experiences)).containsExactly("festive", "desk_gaming", "memories", "kids_party", "comics");
+        // all seven: Katha (comics) since V14 opened it with its comic backdrop, Ghar and Safar since V16
+        assertThat(ids(experiences)).containsExactly("festive", "desk_gaming", "memories", "kids_party", "comics", "home_utility", "on_the_road");
 
         JsonNode utsav = experiences.get(0);
         assertThat(utsav.get("codename").asText()).isEqualTo("Utsav");
@@ -81,7 +81,7 @@ class ExperiencesIntegrationTest extends AbstractIntegrationTest {
         // avatars: the orderable families in the experience's order (the second-wave photo frame and keycap stay switched off, and
         // families without a live template are left out)
         assertThat(ids(utsav.get("avatars"))).containsExactly("lithophane", "ornament", "nameplate", "keychain", "fridge_magnet");
-        assertThat(ids(experiences.get(1).get("avatars"))).containsExactly("keychain", "nameplate", "phone_stand");
+        assertThat(ids(experiences.get(1).get("avatars"))).containsExactly("keychain", "nameplate", "phone_stand", "headphone_stand");
         assertThat(ids(experiences.get(2).get("avatars"))).containsExactly("lithophane", "figurine_base", "fridge_magnet");
         assertThat(ids(experiences.get(3).get("avatars"))).containsExactly("keychain", "fridge_magnet", "ornament");
         assertThat(ids(experiences.get(4).get("avatars"))).containsExactly("keychain", "figurine_base", "nameplate", "fridge_magnet", "lithophane");
@@ -179,14 +179,15 @@ class ExperiencesIntegrationTest extends AbstractIntegrationTest {
         try {
             // the rows as stored: every avatar, orderable or not, and item slugs
             JsonNode all = body(get("/admin/api/experiences", owner));
-            assertThat(ids(all)).containsExactly("festive", "desk_gaming", "memories", "kids_party", "comics");
+            assertThat(ids(all)).containsExactly("festive", "desk_gaming", "memories", "kids_party", "comics", "home_utility", "on_the_road");
             JsonNode festive = all.get(0);
-            assertThat(festive.get("avatars")).extracting(JsonNode::asText).containsExactly("lithophane", "ornament", "nameplate", "keychain", "fridge_magnet");
+            assertThat(festive.get("avatars")).extracting(JsonNode::asText)
+                    .containsExactly("lithophane", "lamp_shade_e27", "ornament", "nameplate", "keychain", "fridge_magnet");
             assertThat(festive.get("items")).extracting(JsonNode::asText).containsExactly("kantha-nameplate", "ajrakh-coasters");
             assertThat(festive.get("updated_at").asText()).endsWith("Z");
             JsonNode comics = all.get(4);
             assertThat(comics.get("avatars")).extracting(JsonNode::asText)
-                    .containsExactly("keychain", "keycap", "figurine_base", "nameplate", "fridge_magnet", "lithophane");
+                    .containsExactly("headphone_topper", "keychain", "keycap", "figurine_base", "nameplate", "fridge_magnet", "lithophane");
             assertThat(comics.get("available").asBoolean()).isTrue();
             ObjectNode document = json.createObjectNode();
             document.set("environments", body(get("/admin/api/environments", owner)));
@@ -214,11 +215,11 @@ class ExperiencesIntegrationTest extends AbstractIntegrationTest {
             assertThat(world.get("season").get(1).get("starts_on").asText()).isEqualTo("--12-20");
             assertThat(world.get("style").asText()).isEqualTo("modern_zen");
             assertThat(world.get("sort_order").asInt()).isEqualTo(900);
-            assertThat(body(get("/admin/api/experiences", owner))).hasSize(6);
+            assertThat(body(get("/admin/api/experiences", owner))).hasSize(8);
             JsonNode shop = body(get("/api/experiences"));
-            assertThat(ids(shop)).containsExactly("festive", "desk_gaming", "memories", "kids_party", "comics", id);
-            assertThat(ids(shop.get(5).get("avatars"))).containsExactly("lithophane", "keychain");
-            assertThat(shop.get(5).get("items").findValuesAsText("slug")).containsExactly("jharokha-phone-stand");
+            assertThat(ids(shop)).containsExactly("festive", "desk_gaming", "memories", "kids_party", "comics", "home_utility", "on_the_road", id);
+            assertThat(ids(shop.get(7).get("avatars"))).containsExactly("lithophane", "keychain");
+            assertThat(shop.get(7).get("items").findValuesAsText("slug")).containsExactly("jharokha-phone-stand");
             assertThat(body(get("/api/experiences/" + slug)).get("id").asText()).isEqualTo(id);
 
 
@@ -257,7 +258,7 @@ class ExperiencesIntegrationTest extends AbstractIntegrationTest {
             assertProblem(post("/admin/api/experiences", other.replace("\"#7E9A7B\"", "\"sage\""), owner), HttpStatus.UNPROCESSABLE_ENTITY,
                     "validation_failed");
             assertProblem(post("/admin/api/experiences", "{\"id\": \"x\"}", owner), HttpStatus.UNPROCESSABLE_ENTITY, "validation_failed");
-            assertThat(body(get("/admin/api/experiences", owner))).hasSize(6); // nothing slipped through
+            assertThat(body(get("/admin/api/experiences", owner))).hasSize(8); // nothing slipped through
 
             // update: the path id wins; a new order, a new slug and the switch off take the experience off the Shop
             JsonNode updated = body(put("/admin/api/experiences/" + id, EXPERIENCE.formatted("ignored_body_id", renamed)
@@ -268,7 +269,8 @@ class ExperiencesIntegrationTest extends AbstractIntegrationTest {
             assertThat(updated.get("slug").asText()).isEqualTo(renamed);
             assertThat(updated.get("avatars")).extracting(JsonNode::asText).containsExactly("keychain", "lithophane", "ornament");
             assertThat(updated.get("available").asBoolean()).isFalse();
-            assertThat(ids(body(get("/api/experiences")))).containsExactly("festive", "desk_gaming", "memories", "kids_party", "comics");
+            assertThat(ids(body(get("/api/experiences")))).containsExactly("festive", "desk_gaming", "memories", "kids_party", "comics",
+                    "home_utility", "on_the_road");
             JsonNode off = body(get("/api/experiences/" + renamed));
             assertThat(off.get("available").asBoolean()).isFalse();
             assertThat(ids(off.get("avatars"))).containsExactly("keychain", "lithophane", "ornament");

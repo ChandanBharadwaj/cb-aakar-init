@@ -30,7 +30,7 @@ class TemplateParamValidatorTest {
         ObjectMapper json = Jackson2ObjectMapperBuilder.json().propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE).build();
         try (InputStream in = TemplateParamValidatorTest.class.getResourceAsStream("/fixtures/templates.json")) {
             List<TemplateDescriptor> all = json.readValue(in, new TypeReference<>() { });
-            jharokha = all.get(0);
+            jharokha = all.stream().filter(d -> d.id().equals("jharokha_phone_stand")).findFirst().orElseThrow();
         }
     }
 
@@ -41,10 +41,10 @@ class TemplateParamValidatorTest {
         assertThat(jharokha.family()).isEqualTo("phone_stand");
         assertThat(jharokha.params()).containsKeys("width_mm", "depth_mm", "height_mm", "tilt_deg", "lip_height_mm", "wall_mm", "arch_cusps");
         assertThat(jharokha.params().get("arch_cusps").type()).isEqualTo("integer");
-        assertThat(jharokha.params().get("width_mm").defaultValue()).isEqualTo(92);
+        assertThat(((Number) jharokha.params().get("width_mm").defaultValue()).doubleValue()).isEqualTo(92.0); // the fixture says 92.0
         assertThat(jharokha.defaultParams()).containsEntry("wall_mm", 3.2).containsEntry("arch_cusps", 5);
         assertThat(jharokha.constraints().toSpecConstraints()).containsEntry("min_wall_mm", 1.2).containsEntry("bed_mm", List.of(250.0, 250.0, 250.0));
-        assertThat(jharokha.materials()).hasSize(6).contains("terracotta_silk");
+        assertThat(jharokha.materials()).hasSize(7).contains("terracotta_silk", "petg_slate");
     }
 
     @Test

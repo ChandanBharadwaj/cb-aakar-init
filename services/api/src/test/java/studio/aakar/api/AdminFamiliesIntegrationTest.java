@@ -86,9 +86,9 @@ class AdminFamiliesIntegrationTest extends AbstractIntegrationTest {
             assertProblem(put("/admin/api/hardware/nope_hw", hardwareBody.formatted("nope_hw"), owner), HttpStatus.NOT_FOUND, "not_found");
             assertProblem(put("/admin/api/hardware/" + sku, hardwareBody.formatted("other_sku"), owner), HttpStatus.UNPROCESSABLE_ENTITY, "validation_failed");
 
-            // families: the 25 seeded rows with readiness from the geometry stub
+            // families: the 32 seeded rows (25 Avatars, Swaroop, six Jod) with readiness from the geometry stub
             JsonNode all = body(get("/admin/api/families", owner));
-            assertThat(all).hasSize(26);
+            assertThat(all).hasSize(32);
             JsonNode keychain = find(all, "id", "keychain");
             assertThat(keychain.get("ready").asBoolean()).isTrue();
             assertThat(keychain.get("template_ids")).extracting(JsonNode::asText).containsExactly("keychain_tag", "pet_tag");
@@ -130,7 +130,7 @@ class AdminFamiliesIntegrationTest extends AbstractIntegrationTest {
             assertThat(family.get("content_slot").get("max_text_chars").asInt()).isEqualTo(12);
             assertThat(family.get("available").asBoolean()).isFalse();
             assertThat(family.get("sort_order").asInt()).isEqualTo(500);
-            assertThat(body(get("/admin/api/families", owner))).hasSize(27);
+            assertThat(body(get("/admin/api/families", owner))).hasSize(33);
             assertThat(topLevelIds(body(get("/api/families")))).doesNotContain(familyId);
             assertThat(body(get("/api/families/" + familyId)).get("available").asBoolean()).isFalse();
 
@@ -152,7 +152,7 @@ class AdminFamiliesIntegrationTest extends AbstractIntegrationTest {
             assertProblem(post("/admin/api/families", familyBody.formatted(familyId + "b", sku).replace("\"tier\": \"later\"", "\"tier\": \"someday\""), owner),
                     HttpStatus.UNPROCESSABLE_ENTITY, "validation_failed");
             assertProblem(post("/admin/api/families", "{\"id\": \"x\"}", owner), HttpStatus.UNPROCESSABLE_ENTITY, "validation_failed");
-            assertThat(body(get("/admin/api/families", owner))).hasSize(27); // nothing slipped through
+            assertThat(body(get("/admin/api/families", owner))).hasSize(33); // nothing slipped through
 
             // update: the path id wins over the body id; switching a family on is not enough for the storefront without a live template
             JsonNode updated = body(put("/admin/api/families/" + familyId, familyBody.formatted("ignored_body_id", sku)

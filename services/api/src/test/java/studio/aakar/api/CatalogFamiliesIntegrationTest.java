@@ -35,14 +35,14 @@ class CatalogFamiliesIntegrationTest extends AbstractIntegrationTest {
         ResponseEntity<String> response = get("/api/catalog/shelves");
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         JsonNode shelves = body(response);
-        assertThat(ids(shelves)).containsExactly("home_decor", "nameplates", "kitchen", "desk_tech", "gifting", "keychains_charms");
+        assertThat(ids(shelves)).containsExactly("home_decor", "nameplates", "kitchen", "utility", "desk_tech", "gifting", "keychains_charms");
         assertThat(shelves.get(0).get("label").asText()).isEqualTo("Home & decor");
         assertThat(shelves.get(0).get("sort_order").asInt()).isEqualTo(10);
-        assertThat(shelves.get(5).get("label").asText()).isEqualTo("Keychains & charms");
+        assertThat(shelves.get(6).get("label").asText()).isEqualTo("Keychains & charms");
 
         // the portal reads the same list behind a staff token
         assertProblem(get("/admin/api/catalog/shelves"), HttpStatus.UNAUTHORIZED, "unauthenticated");
-        assertThat(ids(body(get("/admin/api/catalog/shelves", owner())))).hasSize(6).startsWith("home_decor");
+        assertThat(ids(body(get("/admin/api/catalog/shelves", owner())))).hasSize(7).startsWith("home_decor");
     }
 
     @Test
@@ -52,9 +52,10 @@ class CatalogFamiliesIntegrationTest extends AbstractIntegrationTest {
         JsonNode families = body(response);
         // the four planar carriers (keychain_tag + pet_tag, fridge_magnet, hanging_ornament, desk_nameplate), the keepsakes switched on
         // in V14 (lithophane_plate, plinth_round), phone_stand (jharokha_phone_stand@1) and raw_print (raw_print@1) have live templates in
-        // the stub; the second-wave keepsakes (photo_frame, keycap) have one too but stay switched off, so they may not appear.
+        // the stub; the second-wave keepsakes (photo_frame, keycap) have one too but stay switched off, so they may not appear, and so
+        // do the Jod families until Phase 2 prices their base (V16). headphone_stand (pillar_headphone_stand@1) is on since V16.
         assertThat(ids(families)).containsExactly("keychain", "fridge_magnet", "ornament", "nameplate", "lithophane", "figurine_base",
-                "phone_stand", "raw_print");
+                "phone_stand", "headphone_stand", "raw_print");
         assertThat(families).allSatisfy(f -> {
             assertThat(f.get("available").asBoolean()).as("%s available", f.get("id")).isTrue();
             assertThat(f.get("ready").asBoolean()).as("%s ready", f.get("id")).isTrue();
@@ -65,8 +66,8 @@ class CatalogFamiliesIntegrationTest extends AbstractIntegrationTest {
         assertThat(ids(body(get("/api/families?kind=raw")))).containsExactly("raw_print");
         assertThat(ids(body(get("/api/families?kind=carrier")))).containsExactly("keychain", "fridge_magnet", "ornament", "nameplate", "lithophane",
                 "figurine_base");
-        assertThat(ids(body(get("/api/families?kind=object")))).containsExactly("phone_stand");
-        assertThat(ids(body(get("/api/families?kind=")))).hasSize(8);
+        assertThat(ids(body(get("/api/families?kind=object")))).containsExactly("phone_stand", "headphone_stand");
+        assertThat(ids(body(get("/api/families?kind=")))).hasSize(9);
         assertProblem(get("/api/families?kind=gadget"), HttpStatus.BAD_REQUEST, "validation_failed");
 
         // Every family row is a template-family.v1.json family once the read-only state is stripped, and every
@@ -185,16 +186,18 @@ class CatalogFamiliesIntegrationTest extends AbstractIntegrationTest {
 
         assertProblem(get("/api/families/nope"), HttpStatus.NOT_FOUND, "unknown_family");
 
-        // the old fixture still loads beside the new descriptors, and old anchors stay as they were
+        // the fixture is the live export since the Jod branch (make descriptors), so every anchor carries the newer fields
         JsonNode templates = body(get("/api/templates"));
-        assertThat(ids(templates)).containsExactly("jharokha_phone_stand", "keychain_tag", "fridge_magnet", "hanging_ornament", "desk_nameplate",
-                "raw_print", "keycap_mx", "lithophane_plate", "pet_tag", "photo_frame_std", "plinth_round", "headphone_topper");
-        JsonNode jharokhaAnchor = templates.get(0).get("anchors").get(0);
+        assertThat(ids(templates)).containsExactly("bottle_cap_cover", "dash_idol", "desk_nameplate", "drain_lid", "fridge_magnet",
+                "hanging_ornament", "headphone_topper", "hook_plaque", "jharokha_phone_stand", "keycap_mx", "keychain_tag", "lamp_shade_e27",
+                "lithophane_plate", "pet_tag", "photo_frame_std", "pillar_headphone_stand", "planter_rim", "plinth_round", "raw_print");
+        JsonNode jharokha = templates.get(8);
+        JsonNode jharokhaAnchor = jharokha.get("anchors").get(0);
         assertThat(jharokhaAnchor.get("id").asText()).isEqualTo("side_left");
-        assertThat(jharokhaAnchor.has("kind")).isFalse();
-        assertThat(jharokhaAnchor.has("size_mm")).isFalse();
-        assertThat(templates.get(0).get("hardware")).isEmpty();
-        assertThat(templates.get(0).has("min_feature_mm")).isFalse();
+        assertThat(jharokhaAnchor.get("kind").asText()).isEqualTo("surface");
+        assertThat(jharokhaAnchor.get("size_mm")).hasSize(2);
+        assertThat(jharokha.get("hardware")).isEmpty();
+        assertThat(jharokha.get("min_feature_mm").asDouble()).isEqualTo(0.8);
     }
 
     @Test

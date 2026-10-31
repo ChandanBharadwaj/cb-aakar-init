@@ -124,7 +124,7 @@ aakar:
   # the active policy lives in the pricing_policies table. Copied from packages/design-tokens/materials.json →
   # pricing_policy (MaterialsSeedTest fails on drift). Family keys are bracketed so Boot keeps the underscores.
   pricing:
-    version: 2026-10-keepsakes
+    version: 2026-11-jod
     machine-rate-paise-per-hour: 20000
     finishing-fee-paise:
       matte: 8000
@@ -154,6 +154,21 @@ aakar:
       "[raw_print]":
         minimum-subtotal-paise: 34900
         setup-fee-paise: 9900
+      # Jod (hybrid) families, seeded switched off until Phase 2 prices their base and assembly lines (V16).
+      "[headphone_topper]":
+        minimum-subtotal-paise: 29900
+      "[hook_plaque]":
+        minimum-subtotal-paise: 34900
+      "[lamp_shade_e27]":
+        minimum-subtotal-paise: 49900
+      "[dash_idol]":
+        minimum-subtotal-paise: 29900
+      "[drain_lid]":
+        minimum-subtotal-paise: 19900
+      "[bottle_cap_cover]":
+        minimum-subtotal-paise: 19900
+      "[planter_rim]":
+        minimum-subtotal-paise: 24900
 
 logging:
   level:

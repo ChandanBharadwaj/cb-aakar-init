@@ -56,7 +56,7 @@ class DesignFlowIntegrationTest extends AbstractIntegrationTest {
         assertProblem(missing, HttpStatus.NOT_FOUND, "not_found");
 
         JsonNode materials = body(get("/api/catalog/materials"));
-        assertThat(materials).hasSize(6);
+        assertThat(materials).hasSize(7); // six PLA finishes and PETG Slate (V16)
         assertThat(materials.get(2).get("id").asText()).isEqualTo("terracotta_silk");
         assertThat(materials.get(2).get("rate_per_g_paise").asInt()).isEqualTo(463);
         assertThat(materials.get(2).get("pbr").get("sheen_color").asText()).isEqualTo("#E8B48F");
@@ -66,12 +66,13 @@ class DesignFlowIntegrationTest extends AbstractIntegrationTest {
     @Test
     void templatesComeFromTheGeometryService() {
         JsonNode all = body(get("/api/templates"));
-        // the stub publishes the Jharokha stand, the four planar carriers, the raw-print template, the five PR 8 keepsakes and the
-        // Sur Jod headphone topper (fixtures/templates.json order)
-        assertThat(all).extracting(d -> d.get("id").asText()).containsExactly("jharokha_phone_stand", "keychain_tag", "fridge_magnet",
-                "hanging_ornament", "desk_nameplate", "raw_print", "keycap_mx", "lithophane_plate", "pet_tag", "photo_frame_std", "plinth_round",
-                "headphone_topper");
-        JsonNode d = all.get(0);
+        // the stub publishes the Jharokha stand, the four planar carriers, the raw-print template, the five PR 8 keepsakes, the pillar
+        // headphone stand and the seven Jod templates (fixtures/templates.json order)
+        assertThat(all).extracting(d -> d.get("id").asText()).containsExactly("bottle_cap_cover", "dash_idol", "desk_nameplate", "drain_lid",
+                "fridge_magnet", "hanging_ornament", "headphone_topper", "hook_plaque", "jharokha_phone_stand", "keycap_mx", "keychain_tag",
+                "lamp_shade_e27", "lithophane_plate", "pet_tag", "photo_frame_std", "pillar_headphone_stand", "planter_rim", "plinth_round",
+                "raw_print");
+        JsonNode d = all.get(8); // jharokha_phone_stand
         assertThat(d.get("params").get("width_mm").get("default").asInt()).isEqualTo(92);
         assertThat(d.get("anchors")).hasSize(3);
         assertThat(d.get("constraints").get("bed_mm")).hasSize(3);

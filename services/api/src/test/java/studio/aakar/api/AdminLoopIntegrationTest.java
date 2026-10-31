@@ -330,9 +330,9 @@ class AdminLoopIntegrationTest extends AbstractIntegrationTest {
             assertProblem(post("/admin/api/pricing/preview", "{\"policy\": " + policy + ", \"material\": \"terracotta_silk\"}", owner),
                     HttpStatus.UNPROCESSABLE_ENTITY, "validation_failed");
 
-            // materials: all six, pause one, it disappears from the storefront
+            // materials: all seven (PETG Slate since V16), pause one, it disappears from the storefront
             JsonNode materials = body(get("/admin/api/materials", owner));
-            assertThat(materials).hasSize(6);
+            assertThat(materials).hasSize(7);
             assertThat(materials.findValues("available")).allSatisfy(a -> assertThat(a.asBoolean()).isTrue());
             JsonNode indigo = materials.findParents("id").stream().filter(m -> m.get("id").asText().equals("indigo_matte")).findFirst().orElseThrow();
             assertThat(indigo.get("sort_order").asInt()).isEqualTo(6);
@@ -340,8 +340,8 @@ class AdminLoopIntegrationTest extends AbstractIntegrationTest {
             JsonNode paused = body(put("/admin/api/materials/indigo_matte", materialInput(indigo, false), owner));
             assertThat(paused.get("available").asBoolean()).isFalse();
             assertThat(paused.get("rate_per_g_paise").asLong()).isEqualTo(420);
-            assertThat(body(get("/api/catalog/materials")).findValuesAsText("id")).hasSize(5).doesNotContain("indigo_matte");
-            assertThat(body(get("/admin/api/materials", owner))).hasSize(6);
+            assertThat(body(get("/api/catalog/materials")).findValuesAsText("id")).hasSize(6).doesNotContain("indigo_matte");
+            assertThat(body(get("/admin/api/materials", owner))).hasSize(7);
             ResponseEntity<String> createdMaterial = post("/admin/api/materials", """
                     {"id": "%s", "name": "Test Marble", "filament": "Matte PLA, marble", "density_g_cm3": 1.25, "finish_class": "matte",
                      "rate_per_g_paise": 450, "heat_safe": false, "available": true, "sort_order": 50,
@@ -380,8 +380,9 @@ class AdminLoopIntegrationTest extends AbstractIntegrationTest {
 
             // templates: live by default; switched off it leaves the storefront and blocks new designs
             JsonNode templates = body(get("/admin/api/templates", owner));
-            // jharokha_phone_stand, the four planar carriers, raw_print and the five PR 8 keepsakes (fixtures/templates.json)
-            assertThat(templates).hasSize(12);
+            // jharokha_phone_stand, the four planar carriers, raw_print, the five PR 8 keepsakes, the pillar stand and the seven Jod
+            // templates (fixtures/templates.json)
+            assertThat(templates).hasSize(19);
             JsonNode jharokhaRow = templates.findParents("id").stream().filter(t -> t.get("id").asText().equals("jharokha_phone_stand")).findFirst().orElseThrow();
             assertThat(jharokhaRow.get("version").asInt()).isEqualTo(1);
             assertThat(jharokhaRow.get("family").asText()).isEqualTo("phone_stand");
@@ -395,8 +396,10 @@ class AdminLoopIntegrationTest extends AbstractIntegrationTest {
             assertThat(keychainRow.get("hardware").get(0).get("qty").asInt()).isEqualTo(1);
             JsonNode hidden = body(put("/admin/api/templates/jharokha_phone_stand", "{\"live\": false}", owner));
             assertThat(hidden.get("live").asBoolean()).isFalse();
-            assertThat(body(get("/api/templates"))).extracting(d -> d.get("id").asText()).containsExactly("keychain_tag", "fridge_magnet",
-                    "hanging_ornament", "desk_nameplate", "raw_print", "keycap_mx", "lithophane_plate", "pet_tag", "photo_frame_std", "plinth_round", "headphone_topper");
+            assertThat(body(get("/api/templates"))).extracting(d -> d.get("id").asText()).containsExactly("bottle_cap_cover", "dash_idol",
+                    "desk_nameplate", "drain_lid", "fridge_magnet", "hanging_ornament", "headphone_topper", "hook_plaque", "keycap_mx", "keychain_tag",
+                    "lamp_shade_e27", "lithophane_plate", "pet_tag", "photo_frame_std", "pillar_headphone_stand", "planter_rim", "plinth_round",
+                    "raw_print");
             assertThat(get("/api/templates/jharokha_phone_stand").getStatusCode()).isEqualTo(HttpStatus.OK); // existing designs keep resolving
             assertProblem(post("/api/designs", "{\"source\": \"shop\", \"catalog_item_slug\": \"jharokha-phone-stand\"}", guest(UUID.randomUUID())),
                     HttpStatus.UNPROCESSABLE_ENTITY, "template_not_available");
@@ -405,7 +408,7 @@ class AdminLoopIntegrationTest extends AbstractIntegrationTest {
             assertThat(body(get("/admin/api/templates", owner)).findParents("id").stream()
                     .filter(t -> t.get("id").asText().equals("jharokha_phone_stand")).findFirst().orElseThrow().get("live").asBoolean()).isFalse();
             assertThat(body(put("/admin/api/templates/jharokha_phone_stand", "{\"live\": true}", owner)).get("live").asBoolean()).isTrue();
-            assertThat(body(get("/api/templates"))).hasSize(12);
+            assertThat(body(get("/api/templates"))).hasSize(19);
             assertProblem(put("/admin/api/templates/nope_template", "{\"live\": false}", owner), HttpStatus.NOT_FOUND, "not_found");
             assertProblem(put("/admin/api/templates/jharokha_phone_stand", "{}", owner), HttpStatus.UNPROCESSABLE_ENTITY, "validation_failed");
 
@@ -453,7 +456,7 @@ class AdminLoopIntegrationTest extends AbstractIntegrationTest {
             assertProblem(put("/admin/api/catalog/items/elephant-bookends", elephant.toString(), karigar), HttpStatus.FORBIDDEN, "forbidden");
             assertProblem(post("/admin/api/catalog/items", body(createdItem).toString(), karigar), HttpStatus.FORBIDDEN, "forbidden");
             assertProblem(put("/admin/api/templates/jharokha_phone_stand", "{\"live\": false}", karigar), HttpStatus.FORBIDDEN, "forbidden");
-            assertThat(body(get("/api/templates"))).hasSize(12); // nothing changed
+            assertThat(body(get("/api/templates"))).hasSize(19); // nothing changed
             assertThat(body(post("/admin/api/pricing/preview",
                     "{\"policy\": " + policy + ", \"material\": \"terracotta_silk\", \"extruded_volume_cm3\": 51.6, \"print_seconds\": 13200}", karigar))
                     .get("total_paise").asLong()).isEqualTo(133_900); // a preview changes nothing, so the studio may run it
