@@ -226,6 +226,6 @@ Sessions hit limits, so every phase ends with a commit and push plus a `PROGRESS
 |---|---|---|
 | 0 Decide and record | Done (4 Oct 2026): this folder, ADR-0015, PROGRESS and CHANGELOG entries | Owner decisions 1–7 above |
 | 1 Proof of concept | Software done (4 Oct 2026): steps 1.1–1.3 on the branch (`connectors/`, `headphone_topper@1`, `connector_fit`, `aakar-geometry coupon`, `V15` with the `hybrid` kind and the family row off); bench steps 1.4–1.5 pending | Print `make coupons` in all six finishes, caliper and pull-off, write `fit-tests.md`, correct `connectors/compensation.py` from the measurements; go/no-go for Phase 2 |
-| 2 Core platform | Not started | PR 2.1 contracts first (`make contracts`) |
+| 2 Core platform | Data side in (31 Oct 2026, on `main`): contracts, tokens, generated types, `V16` with the hybrid families seeded `available = false`. Java not started | PR 2.2: `V17` base tables + catalog module (§3.1), then 2.3 design/pricing/order |
 | 3 UX rollout | Not started | PR 3.1 `HybridModel.tsx` |
 | 4 Scale | Not started | after launch |

@@ -28,6 +28,13 @@ Then open http://localhost:3000. Services: API :8080 (`/swagger-ui.html`), geome
 
 Either `make infra` (Docker Postgres on 5432 with `aakar` and `aakar_test` databases), or on a local Postgres:
 
+If 5432 is already taken by a Postgres of your own, publish the container on another host port and point the API at it:
+
+```sh
+AAKAR_PG_PORT=5440 make infra
+export AAKAR_JDBC_URL=jdbc:postgresql://127.0.0.1:5440/aakar AAKAR_TEST_JDBC_URL=jdbc:postgresql://127.0.0.1:5440/aakar_test
+```
+
 ```sql
 CREATE ROLE aakar LOGIN PASSWORD 'aakar';
 CREATE DATABASE aakar OWNER aakar;
@@ -49,7 +56,7 @@ Quick check: `curl -s localhost:8081/v1/templates | head -c 400`.
 
 ```sh
 cd services/api
-./gradlew test                         # uses jdbc:postgresql://127.0.0.1:5432/aakar_test
+./gradlew test                         # uses jdbc:postgresql://127.0.0.1:5432/aakar_test (AAKAR_TEST_JDBC_URL overrides)
 ./gradlew bootRun                      # direct profile: calls geometry over HTTP
 ```
 

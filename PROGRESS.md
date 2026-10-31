@@ -4,8 +4,8 @@ Living status of the plan in [PLAN.md](PLAN.md). Update this file with every mer
 
 | | |
 |---|---|
-| Last updated | 2026-10-04 (hybrid products (Jod): Phase 1 software done, the Kadi-S socket, `headphone_topper@1`, `connector_fit` and the fit coupons; the bench steps 1.4–1.5 wait for real prints) |
-| Current phase | **Phase 1** — the loop is complete locally (ADR-0013); outcome categories (Avatars) + Swaroop done; next **hybrid products (Jod)** per `docs/research/hybrid-products/implementation-plan.md` |
+| Last updated | 2026-10-31 (the Jod branch is on `main`; `V16` brings the seed level with the tokens with the hybrid families switched off; every suite green on Linux and Windows; CI pnpm pin fixed) |
+| Current phase | **Phase 1** — the loop is complete locally (ADR-0013); outcome categories (Avatars) + Swaroop done; **hybrid products (Jod)** in progress per `docs/research/hybrid-products/implementation-plan.md`: geometry through Phase 4, API Phase 2 not started |
 | Completed | Phase 0 — Foundations |
 | Roadmap position | ~2 of 28 scheduled weeks (5 phases; 1 done) |
 
@@ -130,19 +130,21 @@ Plan: [`docs/research/outcome-categories/implementation-plan.md`](docs/research/
 | 6 | PR 8 lithophane plate + night light, plinth, pet tag, photo frame, keycap | ✅ Done (geometry `9aa7ac8`; fixtures `907653e`; ranges `V12` `d3d6fc1`; anchor modes `cccb468`; opened in `V14` `c926b36`) | Roshni and Pratima orderable with placeholder minimums ₹599 / ₹699; photo_frame and keycap stay switched off until fit tests on real prints |
 | 7 | PRs 9–12 Duniya experiences + Katha | ✅ Done (PRs 9–11; 12a `869c9fd`, API 224; 12b `4d7317f`, geometry 665; Katha opened in `V14`) | `make smoke-katha` passed live; `/duniya/katha` and a comic studio render in Chromium without page errors |
 
-## Hybrid products (Jod) — Phase 0 done
+## Hybrid products (Jod) — Phase 1 software done, geometry ahead of the plan
 
-Plan: [`docs/research/hybrid-products/implementation-plan.md`](docs/research/hybrid-products/implementation-plan.md) (research in `report.md` beside it; decision ADR-0015). A hybrid pairs a bought-in base item (steel headphone stand, key-hook plate, LED lamp base, …) with a small printed Chhaap that plugs in through a standard Kadi connector. Every phase ends with a commit on `ccr-2ba8e715-ihp5b0` and a pointer here; a new session resumes from this table and the plan's "Resume state".
+Plan: [`docs/research/hybrid-products/implementation-plan.md`](docs/research/hybrid-products/implementation-plan.md) (research in `report.md` beside it; decision ADR-0015). A hybrid pairs a bought-in base item (steel headphone stand, key-hook plate, LED lamp base, …) with a small printed Chhaap that plugs in through a standard Kadi connector. The feature branch `ccr-2ba8e715-ihp5b0` was fast-forwarded into `main` on 2026-10-31; phases now land on `main` with a pointer here, and a new session resumes from this table and the plan's "Resume state".
+
+**Where the merge left things (31 Oct 2026):** the geometry service carries all five Kadi kinds (S/D/T/M/C), eight hybrid-side templates, `POST /v1/coupons` and `POST /v1/bases/preview`; the contracts, seeds and generated types describe bases, assembly and the new price lines; but the API has none of it beyond the `hybrid` kind — no `base_items` tables, no `/api/bases`, no base or assembly price line, no `assembling` transition, no portal Bases page — and both OpenAPI documents promise those endpoints ahead of the Java. So `V16` seeds the seven Jod families **switched off** (`available = false` in `families.json` too): nothing a customer can reach is half-priced. Turning one on is a portal flip once Phase 2 lands and its fit coupons pass.
 
 **Testing policy (owner, 4 Oct 2026):** no new unit or integration tests while Phases 1–3 are moving; each phase is verified by CLI builds, `make contracts`, `make descriptors`, typecheck · lint · build, the existing suites staying green, and live smoke walks. The feature's tests land in one hardening pass (Phase 3.5).
 
 | Phase | Scope | Status | Evidence / resume pointer |
 |---|---|---|---|
 | 0 | Research report, implementation plan, ADR-0015 | ✅ Done | `docs/research/hybrid-products/`, `docs/adr/0015-hybrid-products-kadi.md` |
-| 1 | Proof of concept: geometry `connectors/` (Kadi-S socket, compensation, fit coupon), `headphone_topper@1`, inspect `connector_fit`, bench fit tests on sourced stands | 🟨 Software done (steps 1.1–1.3); bench 1.4–1.5 pending | `services/geometry/aakar_geometry/connectors/`, `templates/headphone_topper.py`, `aakar-geometry coupon`, `aakar_inspect.checks.connector_fit`, `V15`; next: print the coupons (`make coupons`), measure, record in `docs/research/hybrid-products/fit-tests.md`, then Phase 2 |
-| 2 | Core platform: contracts, `V15` (`base_items`, `family_bases`, `fit_tests`, stock), catalog module, pricing (base + assembly lines, shipping tiers), order `assembling` stage, portal Bases page | ⬜ Not started | PR 2.1 contracts first |
+| 1 | Proof of concept: geometry `connectors/` (Kadi-S socket, compensation, fit coupon), `headphone_topper@1`, inspect `connector_fit`, bench fit tests on sourced stands | 🟨 Software done (steps 1.1–1.3); bench 1.4–1.5 pending | `services/geometry/aakar_geometry/connectors/`, `templates/headphone_topper.py`, `POST /v1/coupons` (the CLI command and `make coupons` are gone: coupons come from the portal once it has a Bases page), `aakar_inspect.checks.connector_fit`, `V15`; next: print the coupons, measure, record in `docs/research/hybrid-products/fit-tests.md`, then Phase 2 |
+| 2 | Core platform: contracts, `V15` (`base_items`, `family_bases`, `fit_tests`, stock), catalog module, pricing (base + assembly lines, shipping tiers), order `assembling` stage, portal Bases page | 🟨 Data side in: contracts (2.1), `families.json`/`materials.json`/`experiences.json`, generated types, `V16` (utility shelf, four Kadi hardware items, PETG Slate, six families off, Ghar and Safar, policy `2026-11-jod`). Java not started: no `base_items`/`family_bases`/`fit_tests`, no catalog, pricing or order changes | PR 2.2 `V17` base tables + catalog module (`docs/research/hybrid-products/implementation-plan.md` §3.1) |
 | 3 | UX rollout: `HybridModel` viewer, Jod picker and compare, base pages, Duniya promotion (Ghar, Safar), cart and share; 3.5 hardening tests; 3.6 launch | ⬜ Not started | PR 3.1 |
-| 4 | Scale: Kadi-D/T/C templates, PETG finish, more bases, stock ledger, kids compliance | ⬜ Not started | after launch |
+| 4 | Scale: Kadi-D/T/C templates, PETG finish, more bases, stock ledger, kids compliance | 🟨 Geometry done early (Kadi-D/T/M/C modules, seven templates, PETG Slate in the tokens and `V16`); the rest after launch | stock ledger, kids compliance |
 
 ## Decisions
 
@@ -168,15 +170,16 @@ Plan: [`docs/research/hybrid-products/implementation-plan.md`](docs/research/hyb
 
 | Suite | Count | Last run |
 |---|---|---|
-| `services/inspect` pytest | 21 passed | 2026-10-04 |
-| `services/geometry` pytest | 667 passed | 2026-10-04 |
-| `services/api` Gradle test | 224 passed | 2026-10-04 (local Postgres 16; `SessionServiceTest` now mints at the current second instead of a fixed past date) |
-| Avatar order smoke, live (`make smoke-avatars`: photo keychain + Swaroop raw print → cart → OTP → checkout → mock pay → print pack) | passed | 2026-10-03 |
-| Katha and keepsakes smoke, live (`make smoke-katha`: hero names refused, look-alikes allowed, hero-named upload held for review, comic Katha keychain, night light, plinth, photo frame still off) | passed | 2026-10-03 |
+| `services/inspect` pytest | 20 passed, 1 skipped (the PrusaSlicer fake binary is Unix-only; 21 on Linux) | 2026-10-31 (Windows 11) |
+| `services/geometry` pytest | 675 passed | 2026-10-31 (Windows 11, plain `pytest`: file URLs, paths and encodings are platform-neutral now) |
+| `services/api` Gradle build | 224 tests: 223 passed, 1 skipped (symbolic links need a privilege on Windows; 224 on Linux) | 2026-10-31 (Docker Postgres 16 on 5440) |
+| Avatar order smoke, live (`make smoke-avatars`: photo keychain + Swaroop raw print → cart → OTP → checkout → mock pay → print pack) | passed | 2026-10-31 |
+| Katha and keepsakes smoke, live (`make smoke-katha`: hero names refused, look-alikes allowed, hero-named upload held for review, comic Katha keychain, night light, plinth, photo frame still off) | passed | 2026-10-31 |
 | `/duniya/katha` and a comic design's studio in Chromium against the live API (rooftop backdrop, toon shading, ink outline) | passed, no page errors | 2026-10-03 |
-| `apps/web` typecheck · lint · build | clean | 2026-10-04 |
-| `apps/admin` typecheck · lint · build | clean | 2026-10-04 |
-| Jod Phase 1 smoke (CLI): `headphone-topper.spec.json` builds watertight with `connector_fit` warn "fit test pending"; a 60 mm `longest` form is refused with the saddle sentence; a contained form fuses; `make coupons` writes 18 coupons, wall 1.4 mm fails `connector_fit`; descriptors and the API fixture carry no drift | passed | 2026-10-04 |
+| `apps/web` typecheck · lint · build · `gen:api` drift | clean | 2026-10-31 |
+| `apps/admin` typecheck · lint · build · `gen:api` drift | clean | 2026-10-31 |
+| `/duniya/ghar`, `/duniya/safar` and the Shop against the live API after `V16` (Jod avatars hidden, Pillar stand orderable) | passed, no page errors | 2026-10-31 |
+| Jod Phase 1 smoke (CLI): `headphone-topper.spec.json` builds watertight with `connector_fit` warn "fit test pending"; a 60 mm `longest` form is refused with the saddle sentence; a contained form fuses; the coupon CLI wrote 18 coupons, wall 1.4 mm fails `connector_fit` (coupons come from `POST /v1/coupons` since the Kadi-D/T/M/C commit); descriptors and the API fixture carry no drift | passed | 2026-10-04 |
 | End-to-end slice (live services) | passed | 2026-09-26 |
 | Customer loop, live (guest design → cart → OTP → checkout → mock pay fail/retry/succeed → order queued → SSE) | passed, 1 finding (duplicate checkout) | 2026-09-27 |
 | Customer loop in the browser (sign-in → cart → checkout → mock pay → tracking) | passed, no page errors | 2026-09-27 |
@@ -190,3 +193,4 @@ Plan: [`docs/research/hybrid-products/implementation-plan.md`](docs/research/hyb
 - RabbitMQ path exercised only in unit tests and the Compose stack; the build container has no broker.
 - Docker images defined, not yet built in CI.
 - drei HDRI presets load from a CDN at runtime; the viewer falls back to plain lights when offline.
+- Jod: the OpenAPI documents describe `/api/bases`, admin bases, stock and fit tests, `POST /v1/coupons` and the base/assembly price lines ahead of the API; the seven hybrid families stay `available = false` until Phase 2 implements them (the geometry side is done).

@@ -4,6 +4,20 @@ All notable changes to Aakar. Format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed — the Jod branch lands on `main`; the seed catches up with the tokens
+- `ccr-2ba8e715-ihp5b0` fast-forwarded into `main` (four commits: the research and plan, Phase 1, the contracts and seeds, the Kadi-D/T/M/C modules and seven templates).
+- **`V16`**: the utility shelf, the four Kadi hardware items (dovetail rail, VHB pad, steel disc, brass insert), PETG Slate, the six remaining hybrid families, Ghar and Safar with every Duniya's avatar list, and the `2026-11-jod` pricing policy (base markup, labour rate, base packaging fee, weight tiers and the hybrid minimums, derived from the active policy as `V14` did). The seven Jod families are seeded **switched off** — `families.json` says so too — because the API does not yet resolve a base or price its base and assembly lines (Phase 2); the fully printed Pillar headphone stand is switched on now that `pillar_headphone_stand@1` builds.
+- `application.yml` pricing seed `2026-11-jod` with the hybrid minimums; the integration tests count the 32 families, 7 materials, 7 shelves, 7 Duniyas and 19 templates.
+- Compose publishes Postgres on `${AAKAR_PG_PORT:-5432}` so a machine with its own Postgres can run `AAKAR_PG_PORT=5440 make infra` (runbook).
+
+### Fixed
+- `SessionServiceTest` minted tokens at a fixed date in the past, so the suite (and CI on `main`) went red once that date passed; it now mints at the current second (from the Jod branch).
+- Print sheets used the JVM line separator, so a studio API on Windows wrote CRLF into the print pack; they are LF everywhere.
+- Windows portability: the geometry service turns `file://` URLs into paths with `url2pathname` (`/D:/…` was unreadable), reports the families source as a POSIX path, the CLI tests read JSON as UTF-8, a binary parametrize id no longer overflows `PYTEST_CURRENT_TEST`, and `MotifLibraryTest` skips its symlink case where links need a privilege and compares absolute paths.
+- CI: `pnpm/action-setup` no longer names a version beside `package.json`'s `packageManager` ("Multiple versions of pnpm specified" failed `contracts` and `web`); the `api` workflow also runs when any design token changes, since the seed drift tests exist for that.
+- A design created by `template_id` alone skipped the family's `available` flag, so the Create page's template list could start a design for a switched-off family (the photo frame, the keycap, every Jod); it answers 422 `family_not_available` now, as the family path does.
+- `.gitignore` covers the API's local media folder.
+
 ### Added — hybrid products (Jod): research and implementation plan
 - **Research and plan**: `docs/research/hybrid-products/` — why large everyday items should pair a bought-in base with a small printed Chhaap; four standard Kadi connectors (ribbed socket, dovetail slide, magnetic register, thread; PETG-only rim clip for variable bases) with the rule that the Chhaap is always the socket side and prints flat; per-material compensation, a `connector_fit` printability check and a fit-coupon calibration loop; viewer separation of the fixed base and the editable Chhaap, three discovery patterns, Duniya placement; the data model (`base_items`, `family_bases`, `fit_tests`, stock), the pricing flow (base and assembly lines, weight-tiered shipping) and a four-phase roadmap (proof of concept → core platform → UX rollout → scale), resumable from git.
 - **Testing policy for the feature**: no new tests while the phases are moving; CLI builds, contract validation, typecheck · lint · build, existing suites and live smoke walks verify each phase, with one hardening pass before launch.
