@@ -47,10 +47,28 @@ def test_3mf_in_millimetres_reloads():
 
 def test_export_all_skips_unknown_kinds():
     files = export_all(_cube(), ["glb", "usdz", "thumb", "stl", "3mf"])
-    assert sorted(files) == ["3mf", "glb", "stl"]
+    assert sorted(files) == ["3mf", "glb", "stl", "thumb"]
     assert files["glb"].content_type == "model/gltf-binary"
     assert files["3mf"].content_type == "model/3mf"
     assert files["stl"].content_type == "model/stl"
+    assert files["thumb"].content_type == "image/png"
+
+
+def test_thumbnail_is_a_4_by_3_png_in_the_finish():
+    from PIL import Image
+
+    white = export_all(_cube(), ["thumb"], material="basic_white")["thumb"].data
+    indigo = export_all(_cube(), ["thumb"], material="indigo_matte")["thumb"].data
+    img = Image.open(io.BytesIO(white))
+    assert img.format == "PNG" and img.size == (800, 600)
+    assert white != indigo  # the finish tints the piece
+    assert white == export_all(_cube(), ["thumb"], material="basic_white")["thumb"].data  # deterministic
+    centre = Image.open(io.BytesIO(indigo)).convert("RGB").getpixel((400, 270))
+    assert centre[2] > centre[0]  # the piece, not the sand backdrop, fills the middle
+
+
+def test_thumb_asset_key_is_a_png():
+    assert asset_key("0b8e7c6d-5a4b-4c3d-9e2f-1a0b9c8d7e6f", 2, "thumb").endswith("/v2/thumb.png")
 
 
 def test_local_storage_put_and_url(tmp_path):

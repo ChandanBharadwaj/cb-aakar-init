@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 COMPOSE := docker compose -f infra/docker-compose.yml
 
-.PHONY: help infra infra-down api geometry inspect web admin slice test test-api test-python test-web contracts descriptors smoke-avatars smoke-katha smoke-catalogue
+.PHONY: help infra infra-down api geometry inspect web admin slice test test-api test-python test-web contracts descriptors smoke-avatars smoke-katha smoke-catalogue shoot-catalogue
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -39,6 +39,9 @@ smoke-katha: ## Live Katha guardrail and keepsakes smoke (needs `make api` and `
 
 smoke-catalogue: ## Live walk of the second catalogue wave to G-code (needs `make api` and `make geometry`; set AAKAR_SLICER_BIN)
 	python3 scripts/smoke-catalogue.py
+
+shoot-catalogue: ## Build every Shop item and attach its rendered thumbnail and GLB as the item's media (needs `make api` and `make geometry`)
+	python3 scripts/shoot-catalogue.py
 
 descriptors: ## Export live template descriptors to packages/contracts/examples (mocks and API fixtures read them)
 	cd services/geometry && uv run aakar-geometry templates > ../../packages/contracts/examples/template-descriptors.json

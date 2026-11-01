@@ -30,8 +30,11 @@ class AssetRecord:
         return {"key": self.key, "url": self.url, "bytes": self.bytes, "content_type": self.content_type, "sha256": self.sha256}
 
 
+ASSET_FILENAMES = {"thumb": "thumb.png"}  # kinds whose file is not model.{kind}
+
+
 def asset_key(design_id: str, version_no: int, kind: str) -> str:
-    return f"designs/{design_id}/v{int(version_no)}/model.{kind}"
+    return f"designs/{design_id}/v{int(version_no)}/{ASSET_FILENAMES.get(kind, f'model.{kind}')}"
 
 
 class Storage(Protocol):

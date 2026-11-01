@@ -43,7 +43,7 @@ from .templates import Template, get_template
 log = logging.getLogger("aakar.geometry.pipeline")
 
 NIL_UUID = "00000000-0000-0000-0000-000000000000"
-DEFAULT_OUTPUTS = ["glb", "3mf", "stl"]
+DEFAULT_OUTPUTS = ["glb", "3mf", "stl", "thumb"]
 DEFAULT_BUILD_TIMEOUT_S = 120.0
 DEFAULT_SLICING = {"layer_height_mm": 0.2, "infill_pct": 15, "nozzle_mm": 0.4, "walls": 3}
 HTTP_STATUS_BY_CODE = {
@@ -265,7 +265,8 @@ def build_design(
                 {"template": template.ref(), "reason": "the build returned no geometry"},
             )
 
-        files = export_all(mesh, outputs, name=f"{template.id}_v{template.version}")
+        # the thumbnail wears the chosen finish, else the family's first
+        files = export_all(mesh, outputs, name=f"{template.id}_v{template.version}", material=material or (template.materials() or [None])[0])
         normalised_design_id = _uuid_or_nil(design_id)
         version_no = int(request["version_no"])
         assets: dict[str, AssetRecord] = {}

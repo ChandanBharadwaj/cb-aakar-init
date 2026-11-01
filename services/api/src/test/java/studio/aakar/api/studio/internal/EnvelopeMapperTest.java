@@ -60,7 +60,7 @@ class EnvelopeMapperTest {
         assertThat(body.get("version_no").asInt()).isEqualTo(1);
         assertThat(body.has("parent_version_id")).isFalse();
         assertThat(body.get("spec").get("template").asText()).isEqualTo("jharokha_phone_stand@1");
-        assertThat(body.get("outputs")).extracting(JsonNode::asText).containsExactly("glb", "3mf", "stl");
+        assertThat(body.get("outputs")).extracting(JsonNode::asText).containsExactly("glb", "3mf", "stl", "thumb");
         assertThat(body.get("callback_url").asText()).endsWith("/internal/jobs/" + jobId + "/callback");
     }
 

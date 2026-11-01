@@ -4,6 +4,10 @@ All notable changes to Aakar. Format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added — product thumbnails: the Shop shows the real pieces
+- Every build now renders a `thumb` (`thumb.png`, 800×600): the built model seen from the front-right and above, shaded in the chosen finish's colour on the storefront's sand backdrop. It is a software render (Pillow and numpy, no GL), so it runs anywhere the geometry service does and gives the same bytes for the same piece. The API asks for it by default, so cart rows, checkout and share pages, which already read `assets.thumb`, show the piece for new designs.
+- `make shoot-catalogue` (`scripts/shoot-catalogue.py`) builds each Shop item as a customer would start it and sets the item's media to that thumbnail and its GLB through the owner's catalogue endpoint, so the Shop cards and item pages stop showing the clay stand-in.
+
 ### Added — the second catalogue wave: fourteen new Avatars, real slicing, a live walk to G-code
 - Fourteen parametric templates, one for each family that had a seed row and no template: Jhumka pendant plate (`pendant_disc`), Mithai cake topper (`cake_topper_flat`), Saancha cookie cutter-stamp (`cookie_cutter`), Aasan coaster (`ajrakh_coaster_set`), Billa pin badge (`pin_badge`, packs the new `tie_tack_pin`), Nishaan bookmark (`bookmark_plate`), Gamla faceted planter with a catch reservoir (`fluted_planter`), Kitaab elephant bookend (`elephant_bookends`), Deepak lotus lamp over the USB LED puck (`lotus_lamp`), Diya holder (`diya_holder`), Aradhana pooja shelf (`pooja_shelf`), Khoonti paisley hook (`paisley_hook`), Tarteeb desk tray (`desk_tray`) and Safar vent mount (`vent_mount`). Each passes one shared acceptance run, `tests/test_catalogue_templates.py`, plus its own geometry tests.
 - `V17` opens the fourteen families, adds the tie-tack pin, puts the five curated Shop pieces on sale with parameters their templates have, adds the new Avatars to every Duniya and activates pricing policy `2026-11-catalogue` with a placeholder minimum per new family. The tokens, `application.yml`, the geometry built-in rows, the descriptor export and the API fixture match.

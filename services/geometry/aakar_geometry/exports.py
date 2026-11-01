@@ -1,4 +1,4 @@
-"""Mesh exports: GLB (metres, Y-up, neutral PBR), binary STL (mm), 3MF (mm).
+"""Mesh exports: GLB (metres, Y-up, neutral PBR), binary STL (mm), 3MF (mm) and the thumbnail PNG (``thumb``).
 
 The GLB is for three.js / <model-viewer>: glTF is Y-up and metres, so the mm Z-up mesh is scaled
 by 0.001 and rotated −90° about X (Z-up → Y-up; the stand's front, −Y, ends up facing +Z, i.e.
@@ -19,6 +19,8 @@ CONTENT_TYPES = {
     "glb": "model/gltf-binary",
     "stl": "model/stl",
     "3mf": "model/3mf",
+    "thumb": "image/png",
+    "png": "image/png",  # the thumb's file suffix, for the local /assets route
 }
 
 NEUTRAL_GREY = [180, 180, 180, 255]
@@ -119,16 +121,30 @@ def export_3mf(mesh: trimesh.Trimesh, name: str = "aakar_model") -> bytes:
     return _minimal_3mf(mesh, name)
 
 
-EXPORTERS = {"glb": export_glb, "stl": export_stl, "3mf": export_3mf}
+def export_thumb(mesh: trimesh.Trimesh, material: str | None = None) -> bytes:
+    from .thumbnail import render_thumbnail
+
+    return render_thumbnail(mesh, material)
+
+
+EXPORTERS = {"glb": export_glb, "stl": export_stl, "3mf": export_3mf, "thumb": export_thumb}
 SUPPORTED_OUTPUTS = tuple(EXPORTERS)
 
 
-def export_all(mesh: trimesh.Trimesh, kinds: list[str], name: str = "aakar_model") -> dict[str, ExportedFile]:
+def export_all(
+    mesh: trimesh.Trimesh, kinds: list[str], name: str = "aakar_model", material: str | None = None
+) -> dict[str, ExportedFile]:
+    """``material`` tints the thumbnail with the finish's colour; the model files stay neutral."""
     out: dict[str, ExportedFile] = {}
     for kind in kinds:
         if kind not in EXPORTERS:
             continue
         exporter: Any = EXPORTERS[kind]
-        data = exporter(mesh, name) if kind != "stl" else exporter(mesh)
+        if kind == "stl":
+            data = exporter(mesh)
+        elif kind == "thumb":
+            data = exporter(mesh, material)
+        else:
+            data = exporter(mesh, name)
         out[kind] = ExportedFile(kind=kind, data=data, content_type=CONTENT_TYPES[kind])
     return out

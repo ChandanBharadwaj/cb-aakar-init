@@ -77,6 +77,8 @@ pnpm --filter @aakar/admin dev    # staff; seeded account studio@aakar.local / a
 
 The customer loop runs entirely on mocks in the local profile (ADR-0013): the sign-in page shows the OTP dev code, the "Pay" step lands on a placeholder gateway page where you choose success or failure, shipping is a mock carrier, and messages are logged to the portal's Messages page instead of being sent.
 
+The Shop cards show a render of each piece once it has been photographed: with the API and geometry running, `make shoot-catalogue` builds every Shop item and attaches its thumbnail (and GLB) as the item's media. Re-run it after a fresh database, after clearing `.aakar-assets`, or after changing an item's template, parameters or finish; until then a card shows the clay stand-in.
+
 Open http://localhost:3000/shop, click **Modify with AI** on the Jharokha Phone Stand, watch the mandala run through *Understanding → Weaving → Checking → Pricing → Ready*, then swap finishes and drag the sliders.
 
 ### The slice from the command line

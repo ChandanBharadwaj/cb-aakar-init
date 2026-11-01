@@ -16,5 +16,5 @@ public record DesignGeneratePayload(
         List<String> outputs,
         String callbackUrl) {
 
-    public static final List<String> DEFAULT_OUTPUTS = List.of("glb", "3mf", "stl");
+    public static final List<String> DEFAULT_OUTPUTS = List.of("glb", "3mf", "stl", "thumb");
 }

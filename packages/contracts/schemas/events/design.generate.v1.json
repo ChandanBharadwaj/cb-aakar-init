@@ -15,7 +15,7 @@
     "outputs": {
       "type": "array",
       "items": { "type": "string", "enum": ["glb", "3mf", "stl", "usdz", "thumb"] },
-      "default": ["glb", "3mf", "stl"]
+      "default": ["glb", "3mf", "stl", "thumb"]
     },
     "callback_url": {
       "type": "string",

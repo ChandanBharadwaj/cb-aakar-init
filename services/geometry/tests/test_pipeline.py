@@ -23,9 +23,9 @@ def test_build_design_completed_payload(generate_request, local_storage, tmp_pat
     assert payload["spec"]["params"]["arch_cusps"] == 5
     assert payload["spec"]["constraints"] == {"min_wall_mm": 1.2, "max_overhang_deg": 55, "bed_mm": [250, 250, 250]}
     assert payload["spec"]["material"] == "terracotta_silk"
-    assert sorted(payload["assets"]) == ["3mf", "glb", "stl"]
+    assert sorted(payload["assets"]) == ["3mf", "glb", "stl", "thumb"]
     for kind, rec in payload["assets"].items():
-        assert rec["key"] == f"designs/{DESIGN_ID}/v1/model.{kind}"
+        assert rec["key"] == f"designs/{DESIGN_ID}/v1/" + ("thumb.png" if kind == "thumb" else f"model.{kind}")
         assert rec["url"] == f"http://localhost:8081/assets/{rec['key']}"
         file = local_storage.path_for(rec["key"])
         assert file.is_file() and file.stat().st_size == rec["bytes"] > 0
@@ -147,7 +147,7 @@ def test_not_printable_when_template_yields_open_mesh(generate_request, local_st
 def test_outputs_filter(generate_request, local_storage):
     generate_request["outputs"] = ["glb", "usdz", "thumb"]
     payload = build_design(generate_request, storage=local_storage)
-    assert sorted(payload["assets"]) == ["glb"]
+    assert sorted(payload["assets"]) == ["glb", "thumb"]
 
 
 def test_callback_sink_posts_progress_and_survives_failures(generate_request, local_storage):
