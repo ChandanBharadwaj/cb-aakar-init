@@ -26,6 +26,20 @@ from .pillar_headphone_stand import PillarHeadphoneStand
 from .planter_rim import PlanterRim
 from .plinth_round import PlinthRound
 from .raw_print import RawPrint
+from .ajrakh_coaster_set import AjrakhCoasterSet
+from .bookmark_plate import BookmarkPlate
+from .cake_topper_flat import CakeTopperFlat
+from .cookie_cutter import CookieCutter
+from .desk_tray import DeskTray
+from .diya_holder import DiyaHolder
+from .elephant_bookends import ElephantBookends
+from .fluted_planter import FlutedPlanter
+from .lotus_lamp import LotusLamp
+from .paisley_hook import PaisleyHook
+from .pendant_disc import PendantDisc
+from .pin_badge import PinBadge
+from .pooja_shelf import PoojaShelf
+from .vent_mount import VentMount
 
 _REF_RE = re.compile(r"^([a-z][a-z0-9_]*)@([0-9]+)$")
 
@@ -65,6 +79,21 @@ register(DashIdol)  # Kadi-M steel disc
 register(DrainLid)  # Kadi-C lid
 register(BottleCapCover)  # Kadi-C cap
 register(PlanterRim)  # Kadi-C rim
+# The second catalogue wave: fourteen families that had a seed row and no template (tests/test_catalogue_templates.py)
+register(AjrakhCoasterSet)
+register(BookmarkPlate)
+register(CakeTopperFlat)
+register(CookieCutter)
+register(DeskTray)
+register(DiyaHolder)
+register(ElephantBookends)
+register(FlutedPlanter)
+register(LotusLamp)
+register(PaisleyHook)
+register(PendantDisc)
+register(PinBadge)
+register(PoojaShelf)
+register(VentMount)
 
 
 def list_templates() -> list[type[Template]]:

@@ -3,6 +3,7 @@ package studio.aakar.api;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -54,10 +55,10 @@ class AdminFamiliesIntegrationTest extends AbstractIntegrationTest {
                  "available": false, "sort_order": 500}
                 """;
         try {
-            // hardware: the seven seeded SKUs, then create, duplicate, invalid, update, unknown, mismatch
+            // hardware: the seeded SKUs (the pin badge's tie-tack pin since V17), then create, duplicate, invalid, update, unknown, mismatch
             JsonNode hardware = body(get("/admin/api/hardware", owner));
             assertThat(hardware.findValuesAsText("sku")).contains("split_ring_25", "magnet_d10x3", "cord_200", "led_base_usb", "acrylic_4x6",
-                    "nameplate_screws", "adhesive_pads");
+                    "nameplate_screws", "adhesive_pads", "tie_tack_pin");
             JsonNode ring = find(hardware, "sku", "split_ring_25");
             assertThat(ring.get("name").asText()).isEqualTo("Steel split ring 25 mm");
             assertThat(ring.get("unit_cost_paise").asLong()).isEqualTo(300);
@@ -94,8 +95,8 @@ class AdminFamiliesIntegrationTest extends AbstractIntegrationTest {
             assertThat(keychain.get("template_ids")).extracting(JsonNode::asText).containsExactly("keychain_tag", "pet_tag");
             assertThat(keychain.get("templates")).as("the portal list names templates, it does not embed descriptors").isEmpty();
             assertThat(keychain.get("updated_at").asText()).endsWith("Z");
-            // a keepsake switched on in V14 with its live template (PR 8), a second-wave one still switched off, and a family with no
-            // template yet
+            // a keepsake switched on in V14 with its live template (PR 8), a second-wave one still switched off, and one switched on in
+            // the second catalogue wave (V17)
             JsonNode lithophane = find(all, "id", "lithophane");
             assertThat(lithophane.get("available").asBoolean()).isTrue();
             JsonNode frame = find(all, "id", "photo_frame");
@@ -104,9 +105,21 @@ class AdminFamiliesIntegrationTest extends AbstractIntegrationTest {
             assertThat(lithophane.get("ready").asBoolean()).isTrue();
             assertThat(lithophane.get("template_ids")).extracting(JsonNode::asText).containsExactly("lithophane_plate");
             JsonNode pendant = find(all, "id", "pendant");
-            assertThat(pendant.get("available").asBoolean()).isFalse();
-            assertThat(pendant.get("ready").asBoolean()).isFalse();
-            assertThat(pendant.get("template_ids")).isEmpty();
+            assertThat(pendant.get("available").asBoolean()).isTrue();
+            assertThat(pendant.get("ready").asBoolean()).isTrue();
+            assertThat(pendant.get("template_ids")).extracting(JsonNode::asText).containsExactly("pendant_disc");
+            // the keycap and the Jod hybrids have live templates too but stay switched off (the hybrids until Phase 2 prices their base)
+            JsonNode keycap = find(all, "id", "keycap");
+            assertThat(keycap.get("available").asBoolean()).isFalse();
+            assertThat(keycap.get("ready").asBoolean()).isTrue();
+            List<JsonNode> hybrids = new ArrayList<>();
+            all.forEach(f -> {
+                if (f.get("kind").asText().equals("hybrid")) {
+                    hybrids.add(f);
+                }
+            });
+            assertThat(hybrids).extracting(f -> f.get("id").asText()).contains("lamp_shade_e27", "headphone_topper", "bottle_cap_cover");
+            assertThat(hybrids).allSatisfy(f -> assertThat(f.get("available").asBoolean()).as("%s available", f.get("id")).isFalse());
             assertThat(find(all, "id", "raw_print").get("ready").asBoolean()).isTrue();
 
             // the viewer backdrop must be one the storefront can render
@@ -254,7 +267,7 @@ class AdminFamiliesIntegrationTest extends AbstractIntegrationTest {
     }
 
     private static List<String> topLevelIds(JsonNode array) {
-        List<String> ids = new java.util.ArrayList<>();
+        List<String> ids = new ArrayList<>();
         array.forEach(n -> ids.add(n.get("id").asText()));
         return ids;
     }

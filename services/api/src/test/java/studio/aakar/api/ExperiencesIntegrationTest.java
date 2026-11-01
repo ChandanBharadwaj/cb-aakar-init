@@ -78,15 +78,31 @@ class ExperiencesIntegrationTest extends AbstractIntegrationTest {
         assertThat(utsav.get("available").asBoolean()).isTrue();
         assertThat(utsav.get("sort_order").asInt()).isEqualTo(10);
 
-        // avatars: the orderable families in the experience's order (the second-wave photo frame and keycap stay switched off, and
-        // families without a live template are left out)
-        assertThat(ids(utsav.get("avatars"))).containsExactly("lithophane", "ornament", "nameplate", "keychain", "fridge_magnet");
-        assertThat(ids(experiences.get(1).get("avatars"))).containsExactly("keychain", "nameplate", "phone_stand", "headphone_stand");
-        assertThat(ids(experiences.get(2).get("avatars"))).containsExactly("lithophane", "figurine_base", "fridge_magnet");
-        assertThat(ids(experiences.get(3).get("avatars"))).containsExactly("keychain", "fridge_magnet", "ornament");
-        assertThat(ids(experiences.get(4).get("avatars"))).containsExactly("keychain", "figurine_base", "nameplate", "fridge_magnet", "lithophane");
+        // avatars: the orderable families in the experience's order, the second catalogue wave (V17) among them; the second-wave
+        // photo frame and keycap and the Jod hybrids (lamp shade, headphone topper, hook plaque, ...) stay switched off and are left out
+        assertThat(ids(utsav.get("avatars"))).containsExactly("lithophane", "diya_holder", "ornament", "nameplate", "pooja_accessory", "keychain",
+                "fridge_magnet", "pendant");
+        assertThat(ids(experiences.get(1).get("avatars"))).containsExactly("keychain", "nameplate", "phone_stand", "desk_organizer",
+                "headphone_stand", "pin");
+        assertThat(ids(experiences.get(2).get("avatars"))).containsExactly("lithophane", "figurine_base", "fridge_magnet", "bookmark", "pendant",
+                "pin");
+        assertThat(ids(experiences.get(3).get("avatars"))).containsExactly("keychain", "fridge_magnet", "ornament", "cake_topper", "cookie_cutter",
+                "pin", "bookmark");
+        assertThat(ids(experiences.get(4).get("avatars"))).containsExactly("keychain", "figurine_base", "nameplate", "fridge_magnet", "lithophane",
+                "pin", "bookmark");
+        assertThat(ids(experiences.get(5).get("avatars"))).containsExactly("fridge_magnet", "planter", "wall_hook", "bookend", "coaster",
+                "table_lamp");
+        assertThat(ids(experiences.get(6).get("avatars"))).containsExactly("keychain", "car_accessory", "pin");
+        experiences.forEach(x -> assertThat(ids(x.get("avatars"))).as("%s avatars", x.get("id")).doesNotContain("photo_frame", "keycap",
+                "lamp_shade_e27", "headphone_topper", "hook_plaque", "dash_idol", "drain_lid", "bottle_cap_cover", "planter_rim"));
         // in the shape of GET /api/families: copy, readiness, live templates and the family floor
-        JsonNode jhoomar = utsav.get("avatars").get(1);
+        JsonNode jhoomar = null;
+        for (JsonNode avatar : utsav.get("avatars")) {
+            if (avatar.get("id").asText().equals("ornament")) {
+                jhoomar = avatar;
+            }
+        }
+        assertThat(jhoomar).as("ornament among the Utsav avatars").isNotNull();
         JsonNode family = body(get("/api/families/ornament"));
         assertThat(jhoomar.get("codename").asText()).isEqualTo("Jhoomar");
         assertThat(jhoomar.get("name").asText()).isEqualTo(family.get("name").asText());
@@ -105,9 +121,10 @@ class ExperiencesIntegrationTest extends AbstractIntegrationTest {
             }
         });
 
-        // items: the curated Shop items in order, with their Coming soon state
+        // items: the curated Shop items in order, with their Coming soon state (both on sale since V17)
         assertThat(utsav.get("items").findValuesAsText("slug")).containsExactly("kantha-nameplate", "ajrakh-coasters");
-        assertThat(utsav.get("items").get(0).get("available").asBoolean()).isFalse();
+        assertThat(utsav.get("items").get(0).get("available").asBoolean()).isTrue();
+        assertThat(utsav.get("items").get(0).get("template_id").asText()).isEqualTo("desk_nameplate");
         JsonNode adda = experiences.get(1);
         assertThat(adda.get("codename").asText()).isEqualTo("Adda");
         assertThat(adda.get("items").findValuesAsText("slug")).containsExactly("jharokha-phone-stand", "pillar-headphone-stand");
@@ -127,7 +144,8 @@ class ExperiencesIntegrationTest extends AbstractIntegrationTest {
     void aSlugResolvesAnyExperience() {
         JsonNode utsav = body(get("/api/experiences/utsav"));
         assertThat(utsav.get("id").asText()).isEqualTo("festive");
-        assertThat(ids(utsav.get("avatars"))).containsExactly("lithophane", "ornament", "nameplate", "keychain", "fridge_magnet");
+        assertThat(ids(utsav.get("avatars"))).containsExactly("lithophane", "diya_holder", "ornament", "nameplate", "pooja_accessory", "keychain",
+                "fridge_magnet", "pendant");
 
         // Katha, open since V14: the comic backdrop, style and motif pack, and its orderable avatars (the keycap stays switched off)
         JsonNode katha = body(get("/api/experiences/katha"));
@@ -139,7 +157,8 @@ class ExperiencesIntegrationTest extends AbstractIntegrationTest {
         assertThat(katha.get("style").asText()).isEqualTo("comic_pop");
         assertThat(katha.get("motif_pack")).extracting(JsonNode::asText).containsExactly("comic_bursts");
         assertThat(katha.get("collections")).as("no licensed collections without a licence").isEmpty();
-        assertThat(ids(katha.get("avatars"))).containsExactly("keychain", "figurine_base", "nameplate", "fridge_magnet", "lithophane");
+        assertThat(ids(katha.get("avatars"))).containsExactly("keychain", "figurine_base", "nameplate", "fridge_magnet", "lithophane", "pin",
+                "bookmark");
 
         assertProblem(get("/api/experiences/nope"), HttpStatus.NOT_FOUND, "unknown_experience");
         assertProblem(get("/api/experiences/festive"), HttpStatus.NOT_FOUND, "unknown_experience"); // slugs, not ids
@@ -182,12 +201,14 @@ class ExperiencesIntegrationTest extends AbstractIntegrationTest {
             assertThat(ids(all)).containsExactly("festive", "desk_gaming", "memories", "kids_party", "comics", "home_utility", "on_the_road");
             JsonNode festive = all.get(0);
             assertThat(festive.get("avatars")).extracting(JsonNode::asText)
-                    .containsExactly("lithophane", "lamp_shade_e27", "ornament", "nameplate", "keychain", "fridge_magnet");
+                    .containsExactly("lithophane", "lamp_shade_e27", "diya_holder", "ornament", "nameplate", "pooja_accessory", "keychain",
+                            "fridge_magnet", "pendant");
             assertThat(festive.get("items")).extracting(JsonNode::asText).containsExactly("kantha-nameplate", "ajrakh-coasters");
             assertThat(festive.get("updated_at").asText()).endsWith("Z");
             JsonNode comics = all.get(4);
             assertThat(comics.get("avatars")).extracting(JsonNode::asText)
-                    .containsExactly("headphone_topper", "keychain", "keycap", "figurine_base", "nameplate", "fridge_magnet", "lithophane");
+                    .containsExactly("headphone_topper", "keychain", "keycap", "figurine_base", "nameplate", "fridge_magnet", "lithophane", "pin",
+                            "bookmark");
             assertThat(comics.get("available").asBoolean()).isTrue();
             ObjectNode document = json.createObjectNode();
             document.set("environments", body(get("/admin/api/environments", owner)));

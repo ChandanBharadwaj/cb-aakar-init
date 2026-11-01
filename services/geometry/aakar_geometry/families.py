@@ -133,6 +133,33 @@ BUILTIN_FAMILIES: list[dict[str, Any]] = [
     _row("planter_rim", "hybrid", "planter_rim", ["motif", "emboss_text"], ["band"], max_text_chars=16, allowed=["petg_slate"],
          shape_tolerance="strict", envelope=(80, 140), connector={"kind": "rim_clip", "nominal_mm": 8, "fit": "snap", "form": "rim"},
          bases=["planter_rim_class_8"], pair="planter"),
+    # the second catalogue wave: fourteen families that had a seed row and no template (tests/test_catalogue_templates.py)
+    _row("pendant", "carrier", "pendant_disc", ["relief_image", "emboss_text", "motif"], ["face"],
+         max_text_chars=8, shape_tolerance="constrained", envelope=(20, 40)),
+    _row("cake_topper", "carrier", "cake_topper_flat", ["emboss_text", "motif", "relief_image"], ["face"],
+         max_text_chars=24, envelope=(100, 150)),
+    _row("cookie_cutter", "carrier", "cookie_cutter", ["relief_image"], ["outline"], shape_tolerance="strict", envelope=(50, 100)),
+    _row("coaster", "carrier", "ajrakh_coaster_set", ["motif", "emboss_text"], ["face"],
+         max_text_chars=3, heat_safe_only=True, shape_tolerance="constrained", envelope=(90, 100)),
+    _row("pin", "carrier", "pin_badge", ["relief_image", "emboss_text", "motif"], ["face"],
+         max_text_chars=8, hardware=[{"sku": "tie_tack_pin", "qty": 1}], envelope=(20, 40)),
+    _row("bookmark", "carrier", "bookmark_plate", ["relief_image", "emboss_text", "motif"], ["face"],
+         max_text_chars=20, envelope=(120, 160)),
+    _row("planter", "object", "fluted_planter", ["emboss_text", "motif"], ["band", "rim"],
+         max_text_chars=16, shape_tolerance="constrained", envelope=(80, 160)),
+    _row("bookend", "object", "elephant_bookends", ["emboss_text", "motif"], ["face"],
+         max_text_chars=12, shape_tolerance="constrained", envelope=(120, 200)),
+    _row("table_lamp", "object", "lotus_lamp", ["emboss_text", "motif"], ["base_front", "shade_band"],
+         max_text_chars=16, hardware=[{"sku": "led_base_usb", "qty": 1}], heat_safe_only=True, shape_tolerance="constrained",
+         envelope=(150, 250)),
+    _row("diya_holder", "object", "diya_holder", ["motif"], ["rim"], heat_safe_only=True, shape_tolerance="strict", envelope=(60, 160)),
+    _row("pooja_accessory", "object", "pooja_shelf", ["motif", "emboss_text"], ["face"],
+         max_text_chars=16, shape_tolerance="strict", envelope=(80, 250)),
+    _row("wall_hook", "object", "paisley_hook", ["motif"], ["face"],
+         hardware=[{"sku": "nameplate_screws", "qty": 1}], shape_tolerance="strict", envelope=(60, 120)),
+    _row("desk_organizer", "object", "desk_tray", ["emboss_text", "motif"], ["front"],
+         max_text_chars=16, shape_tolerance="strict", envelope=(100, 250)),
+    _row("car_accessory", "object", "vent_mount", ["motif"], ["face"], heat_safe_only=True, shape_tolerance="strict", envelope=(60, 200)),
 ]
 
 BUILTIN_HARDWARE: list[dict[str, Any]] = [
@@ -148,6 +175,7 @@ BUILTIN_HARDWARE: list[dict[str, Any]] = [
     {"sku": "vhb_pad_25x40", "name": "VHB foam pad 25 × 40 mm", "unit_cost_paise": 400},
     {"sku": "steel_disc_40", "name": "Steel disc 40 × 1 mm", "unit_cost_paise": 900},
     {"sku": "insert_brass_1420", "name": "Brass heat-set insert 1/4-20", "unit_cost_paise": 1500},
+    {"sku": "tie_tack_pin", "name": "Tie-tack pin with butterfly clutch", "unit_cost_paise": 200},
 ]
 
 

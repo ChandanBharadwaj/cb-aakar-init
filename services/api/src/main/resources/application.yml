@@ -124,7 +124,7 @@ aakar:
   # the active policy lives in the pricing_policies table. Copied from packages/design-tokens/materials.json →
   # pricing_policy (MaterialsSeedTest fails on drift). Family keys are bracketed so Boot keeps the underscores.
   pricing:
-    version: 2026-11-jod
+    version: 2026-11-catalogue
     machine-rate-paise-per-hour: 20000
     finishing-fee-paise:
       matte: 8000
@@ -169,6 +169,35 @@ aakar:
         minimum-subtotal-paise: 19900
       "[planter_rim]":
         minimum-subtotal-paise: 24900
+      # The second catalogue wave (V17): placeholder minimums just above each piece's delivered floor; the owner sets real ones in the portal.
+      "[pendant]":
+        minimum-subtotal-paise: 19900
+      "[cake_topper]":
+        minimum-subtotal-paise: 29900
+      "[cookie_cutter]":
+        minimum-subtotal-paise: 24900
+      "[coaster]":
+        minimum-subtotal-paise: 29900
+      "[pin]":
+        minimum-subtotal-paise: 19900
+      "[bookmark]":
+        minimum-subtotal-paise: 19900
+      "[planter]":
+        minimum-subtotal-paise: 69900
+      "[bookend]":
+        minimum-subtotal-paise: 89900
+      "[table_lamp]":
+        minimum-subtotal-paise: 99900
+      "[diya_holder]":
+        minimum-subtotal-paise: 39900
+      "[pooja_accessory]":
+        minimum-subtotal-paise: 59900
+      "[wall_hook]":
+        minimum-subtotal-paise: 34900
+      "[desk_organizer]":
+        minimum-subtotal-paise: 59900
+      "[car_accessory]":
+        minimum-subtotal-paise: 39900
 
 logging:
   level:

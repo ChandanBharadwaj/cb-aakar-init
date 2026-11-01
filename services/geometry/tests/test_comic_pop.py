@@ -32,11 +32,12 @@ from aakar_geometry.templates import (
     list_templates,
 )
 from aakar_geometry.templates.base import Anchor, Template
+from aakar_geometry.templates.pin_badge import PinBadge
 
 from carrier_checks import relief
 from conftest import DESIGN_ID, JOB_ID, content_source
 
-COMIC = [KeychainTag, PetTag, FridgeMagnet, HangingOrnament, DeskNameplate, KeycapMx, PlinthRound, HeadphoneTopper, PillarHeadphoneStand, HookPlaque, DashIdol]
+COMIC = [KeychainTag, PetTag, FridgeMagnet, HangingOrnament, DeskNameplate, KeycapMx, PlinthRound, HeadphoneTopper, PillarHeadphoneStand, HookPlaque, DashIdol, PinBadge]
 # every spot of a comic carrier that takes a name or a motif
 MARKS = [
     (t, a, ftype)

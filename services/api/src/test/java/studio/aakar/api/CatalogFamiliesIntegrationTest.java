@@ -52,10 +52,14 @@ class CatalogFamiliesIntegrationTest extends AbstractIntegrationTest {
         JsonNode families = body(response);
         // the four planar carriers (keychain_tag + pet_tag, fridge_magnet, hanging_ornament, desk_nameplate), the keepsakes switched on
         // in V14 (lithophane_plate, plinth_round), phone_stand (jharokha_phone_stand@1) and raw_print (raw_print@1) have live templates in
-        // the stub; the second-wave keepsakes (photo_frame, keycap) have one too but stay switched off, so they may not appear, and so
-        // do the Jod families until Phase 2 prices their base (V16). headphone_stand (pillar_headphone_stand@1) is on since V16.
+        // the stub; headphone_stand (pillar_headphone_stand@1) is on since V16 and the fourteen families of the second catalogue wave
+        // since V17, in sort order. The second-wave keepsakes (photo_frame, keycap) have a template too but stay switched off, so they
+        // may not appear, and so do the Jod families until Phase 2 prices their base (V16).
         assertThat(ids(families)).containsExactly("keychain", "fridge_magnet", "ornament", "nameplate", "lithophane", "figurine_base",
-                "phone_stand", "headphone_stand", "raw_print");
+                "pendant", "cake_topper", "cookie_cutter", "coaster", "pin", "bookmark", "phone_stand", "headphone_stand", "planter", "bookend",
+                "table_lamp", "diya_holder", "pooja_accessory", "wall_hook", "desk_organizer", "car_accessory", "raw_print");
+        assertThat(ids(families)).doesNotContain("photo_frame", "keycap", "headphone_topper", "hook_plaque", "lamp_shade_e27", "dash_idol",
+                "drain_lid", "bottle_cap_cover", "planter_rim");
         assertThat(families).allSatisfy(f -> {
             assertThat(f.get("available").asBoolean()).as("%s available", f.get("id")).isTrue();
             assertThat(f.get("ready").asBoolean()).as("%s ready", f.get("id")).isTrue();
@@ -65,9 +69,11 @@ class CatalogFamiliesIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(ids(body(get("/api/families?kind=raw")))).containsExactly("raw_print");
         assertThat(ids(body(get("/api/families?kind=carrier")))).containsExactly("keychain", "fridge_magnet", "ornament", "nameplate", "lithophane",
-                "figurine_base");
-        assertThat(ids(body(get("/api/families?kind=object")))).containsExactly("phone_stand", "headphone_stand");
-        assertThat(ids(body(get("/api/families?kind=")))).hasSize(9);
+                "figurine_base", "pendant", "cake_topper", "cookie_cutter", "coaster", "pin", "bookmark");
+        assertThat(ids(body(get("/api/families?kind=object")))).containsExactly("phone_stand", "headphone_stand", "planter", "bookend", "table_lamp",
+                "diya_holder", "pooja_accessory", "wall_hook", "desk_organizer", "car_accessory");
+        assertThat(ids(body(get("/api/families?kind=hybrid")))).as("the Jod families stay switched off").isEmpty();
+        assertThat(ids(body(get("/api/families?kind=")))).containsExactlyElementsOf(ids(families));
         assertProblem(get("/api/families?kind=gadget"), HttpStatus.BAD_REQUEST, "validation_failed");
 
         // Every family row is a template-family.v1.json family once the read-only state is stripped, and every
@@ -170,12 +176,18 @@ class CatalogFamiliesIntegrationTest extends AbstractIntegrationTest {
         JsonNode frame = body(get("/api/families/photo_frame"));
         assertThat(frame.get("available").asBoolean()).isFalse();
         assertThat(frame.get("ready").asBoolean()).isTrue();
-        // and a family whose template the geometry service does not publish yet is neither
+        // and so does a Jod family, ready since its template is live but off until Phase 2
+        JsonNode shade = body(get("/api/families/lamp_shade_e27"));
+        assertThat(shade.get("available").asBoolean()).isFalse();
+        assertThat(shade.get("ready").asBoolean()).isTrue();
+        // a family of the second catalogue wave (V17): its template is live and it is orderable, at the placeholder minimum of
+        // 2026-11-catalogue
         JsonNode pendant = body(get("/api/families/pendant"));
-        assertThat(pendant.get("available").asBoolean()).isFalse();
-        assertThat(pendant.get("ready").asBoolean()).isFalse();
-        assertThat(pendant.get("templates")).isEmpty();
-        assertThat(pendant.get("template_ids")).isEmpty();
+        assertThat(pendant.get("available").asBoolean()).isTrue();
+        assertThat(pendant.get("ready").asBoolean()).isTrue();
+        assertThat(pendant.get("template_ids")).extracting(JsonNode::asText).containsExactly("pendant_disc");
+        assertThat(pendant.get("templates").get(0).get("id").asText()).isEqualTo("pendant_disc");
+        assertThat(pendant.get("price_from_paise").asLong()).isEqualTo(19_900);
         // the magnet is orderable now; its descriptor names one magnet, the geometry result names as many as the params ask for
         JsonNode magnet = body(get("/api/families/fridge_magnet"));
         assertThat(magnet.get("ready").asBoolean()).isTrue();
@@ -188,10 +200,13 @@ class CatalogFamiliesIntegrationTest extends AbstractIntegrationTest {
 
         // the fixture is the live export since the Jod branch (make descriptors), so every anchor carries the newer fields
         JsonNode templates = body(get("/api/templates"));
-        assertThat(ids(templates)).containsExactly("bottle_cap_cover", "dash_idol", "desk_nameplate", "drain_lid", "fridge_magnet",
-                "hanging_ornament", "headphone_topper", "hook_plaque", "jharokha_phone_stand", "keycap_mx", "keychain_tag", "lamp_shade_e27",
-                "lithophane_plate", "pet_tag", "photo_frame_std", "pillar_headphone_stand", "planter_rim", "plinth_round", "raw_print");
-        JsonNode jharokha = templates.get(8);
+        JsonNode jharokha = null;
+        for (JsonNode t : templates) {
+            if (t.get("id").asText().equals("jharokha_phone_stand")) {
+                jharokha = t;
+            }
+        }
+        assertThat(jharokha).as("jharokha_phone_stand in /api/templates").isNotNull();
         JsonNode jharokhaAnchor = jharokha.get("anchors").get(0);
         assertThat(jharokhaAnchor.get("id").asText()).isEqualTo("side_left");
         assertThat(jharokhaAnchor.get("kind").asText()).isEqualTo("surface");

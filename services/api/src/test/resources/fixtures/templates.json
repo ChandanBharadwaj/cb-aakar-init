@@ -1,5 +1,213 @@
 [
   {
+    "id": "ajrakh_coaster_set",
+    "version": 1,
+    "family": "coaster",
+    "name": "Aasan ajrakh coaster",
+    "description": "A heat-safe coaster with a raised ajrakh-style border and your motif or monogram in the field, printed in PETG so a hot cup does not mark it. The cup sits on the border, so a raised motif stays low (at most 0.8 mm, under the 1 mm border); a cut-in one is flush. This is one coaster; order four for a set.",
+    "environment": "kitchen_marble",
+    "params": {
+      "shape": {
+        "type": "enum",
+        "label": "Shape",
+        "default": "round",
+        "handle": false,
+        "options": [
+          "round",
+          "square",
+          "octagon"
+        ],
+        "group": "Shape"
+      },
+      "edge": {
+        "type": "enum",
+        "label": "Border edge",
+        "default": "notched",
+        "handle": false,
+        "description": "A scalloped ajrakh-style edge on the raised border, or a plain one.",
+        "options": [
+          "notched",
+          "plain"
+        ],
+        "group": "Shape"
+      },
+      "size_mm": {
+        "type": "number",
+        "label": "Size",
+        "default": 95.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "Across the coaster.",
+        "min": 90,
+        "max": 100,
+        "step": 1,
+        "group": "Size"
+      },
+      "thickness_mm": {
+        "type": "number",
+        "label": "Thickness",
+        "default": 5.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "The field; the border stands 1 mm higher.",
+        "min": 4.0,
+        "max": 6.0,
+        "step": 0.1,
+        "group": "Size"
+      },
+      "border_mm": {
+        "type": "number",
+        "label": "Border",
+        "default": 6.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "Width of the raised border.",
+        "min": 4,
+        "max": 8,
+        "step": 0.5,
+        "group": "Details"
+      }
+    },
+    "anchors": [
+      {
+        "id": "face",
+        "label": "Face",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          56.0,
+          57.1
+        ],
+        "bleed_mm": 1.0,
+        "accepts": [
+          "motif",
+          "emboss_text"
+        ],
+        "max_relief_mm": 0.8
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 1.2,
+      "max_overhang_deg": 45,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "petg_slate"
+    ],
+    "style_variants": [],
+    "features_supported": [
+      "motif",
+      "emboss_text"
+    ],
+    "hardware": [],
+    "min_feature_mm": 0.8
+  },
+  {
+    "id": "bookmark_plate",
+    "version": 1,
+    "family": "bookmark",
+    "name": "Nishaan bookmark",
+    "description": "A slim plate that marks your page, with a hole at the top for a tassel or a ribbon. Your photo, name or motif sits in relief along its face.",
+    "environment": "studio",
+    "params": {
+      "end": {
+        "type": "enum",
+        "label": "Top end",
+        "default": "rounded",
+        "handle": false,
+        "description": "The shape of the end with the tassel hole.",
+        "options": [
+          "square",
+          "rounded",
+          "pointed"
+        ],
+        "group": "Shape"
+      },
+      "length_mm": {
+        "type": "number",
+        "label": "Length",
+        "default": 140.0,
+        "handle": true,
+        "unit": "mm",
+        "min": 120,
+        "max": 160,
+        "step": 1,
+        "group": "Size"
+      },
+      "width_mm": {
+        "type": "number",
+        "label": "Width",
+        "default": 32.0,
+        "handle": false,
+        "unit": "mm",
+        "min": 28,
+        "max": 40,
+        "step": 1,
+        "group": "Size"
+      },
+      "thickness_mm": {
+        "type": "number",
+        "label": "Thickness",
+        "default": 2.4,
+        "handle": false,
+        "unit": "mm",
+        "min": 2.0,
+        "max": 3.0,
+        "step": 0.1,
+        "group": "Size"
+      }
+    },
+    "anchors": [
+      {
+        "id": "face",
+        "label": "Face",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          124.5,
+          28.7
+        ],
+        "bleed_mm": 1.0,
+        "accepts": [
+          "relief_image",
+          "emboss_text",
+          "motif"
+        ],
+        "max_relief_mm": 1.5
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 1.2,
+      "max_overhang_deg": 55,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "basic_white",
+      "terracotta_matte",
+      "terracotta_silk",
+      "polished_brass",
+      "sandalwood_silk",
+      "indigo_matte",
+      "petg_slate"
+    ],
+    "style_variants": [],
+    "features_supported": [
+      "relief_image",
+      "emboss_text",
+      "motif"
+    ],
+    "hardware": [],
+    "min_feature_mm": 0.8
+  },
+  {
     "id": "bottle_cap_cover",
     "version": 1,
     "family": "bottle_cap_cover",
@@ -94,6 +302,210 @@
       "clearance_mm": 0.6,
       "form": "cap"
     }
+  },
+  {
+    "id": "cake_topper_flat",
+    "version": 1,
+    "family": "cake_topper",
+    "name": "Mithai cake topper",
+    "description": "A flat banner, cloud, heart or circle on two tapered picks, printed lying flat. Your name, motif or picture sits in relief on the face; only the picks go into the cake.",
+    "environment": "kitchen_marble",
+    "params": {
+      "shape": {
+        "type": "enum",
+        "label": "Shape",
+        "default": "banner",
+        "handle": false,
+        "options": [
+          "banner",
+          "cloud",
+          "heart",
+          "circle"
+        ],
+        "group": "Shape"
+      },
+      "width_mm": {
+        "type": "number",
+        "label": "Width",
+        "default": 110.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "Across the plaque.",
+        "min": 90,
+        "max": 120,
+        "step": 1,
+        "group": "Size"
+      },
+      "pick_len_mm": {
+        "type": "number",
+        "label": "Pick length",
+        "default": 40.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "How far the picks reach below the plaque's lowest point; the plaque stays above the icing.",
+        "min": 30,
+        "max": 50,
+        "step": 1,
+        "group": "Size"
+      },
+      "thickness_mm": {
+        "type": "number",
+        "label": "Thickness",
+        "default": 2.8,
+        "handle": false,
+        "unit": "mm",
+        "min": 2.4,
+        "max": 3.2,
+        "step": 0.1,
+        "group": "Details"
+      }
+    },
+    "anchors": [
+      {
+        "id": "face",
+        "label": "Face",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          85.0,
+          73.9
+        ],
+        "bleed_mm": 1.0,
+        "accepts": [
+          "emboss_text",
+          "motif",
+          "relief_image"
+        ],
+        "max_relief_mm": 1.5
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 1.6,
+      "max_overhang_deg": 45,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "basic_white",
+      "terracotta_matte",
+      "terracotta_silk",
+      "polished_brass",
+      "sandalwood_silk",
+      "indigo_matte",
+      "petg_slate"
+    ],
+    "style_variants": [],
+    "features_supported": [
+      "emboss_text",
+      "motif",
+      "relief_image"
+    ],
+    "hardware": [],
+    "min_feature_mm": 0.8
+  },
+  {
+    "id": "cookie_cutter",
+    "version": 1,
+    "family": "cookie_cutter",
+    "name": "Saancha cookie cutter",
+    "description": "A cutter and stamp in one piece: a cutting wall round a solid plate that carries your picture. Press it face down into rolled dough and it cuts the outline and prints the picture in one push.",
+    "environment": "kitchen_marble",
+    "params": {
+      "outline": {
+        "type": "enum",
+        "label": "Outline",
+        "default": "round",
+        "handle": false,
+        "options": [
+          "round",
+          "scalloped",
+          "square",
+          "heart",
+          "star"
+        ],
+        "group": "Shape"
+      },
+      "size_mm": {
+        "type": "number",
+        "label": "Size",
+        "default": 70.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "Across the outline, its longest side.",
+        "min": 50,
+        "max": 100,
+        "step": 1,
+        "group": "Size"
+      },
+      "plate_mm": {
+        "type": "number",
+        "label": "Stamp plate",
+        "default": 3.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "The plate that carries the picture.",
+        "min": 3.0,
+        "max": 4.0,
+        "step": 0.1,
+        "group": "Size"
+      },
+      "blade_mm": {
+        "type": "number",
+        "label": "Cutting depth",
+        "default": 6.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "How far the cutting wall stands proud of the picture. Roll your dough to exactly this thickness: the wall cuts through it and the picture presses in, in one push.",
+        "min": 4,
+        "max": 8,
+        "step": 0.5,
+        "group": "Details"
+      }
+    },
+    "anchors": [
+      {
+        "id": "outline",
+        "label": "Stamp face",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          51.1,
+          38.1
+        ],
+        "bleed_mm": 1.0,
+        "accepts": [
+          "relief_image"
+        ],
+        "max_relief_mm": 1.5
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 1.5,
+      "max_overhang_deg": 45,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "basic_white",
+      "terracotta_matte",
+      "terracotta_silk",
+      "polished_brass",
+      "sandalwood_silk",
+      "indigo_matte",
+      "petg_slate"
+    ],
+    "style_variants": [],
+    "features_supported": [
+      "relief_image"
+    ],
+    "hardware": [],
+    "min_feature_mm": 0.8
   },
   {
     "id": "dash_idol",
@@ -345,6 +757,197 @@
     "min_feature_mm": 0.8
   },
   {
+    "id": "desk_tray",
+    "version": 1,
+    "family": "desk_organizer",
+    "name": "Tarteeb desk tray",
+    "description": "An open tray with rounded corners, up to three compartments and a slot along the back where your phone leans. Your name or a motif sits on the front wall.",
+    "environment": "desk_oak",
+    "params": {
+      "width_mm": {
+        "type": "number",
+        "label": "Width",
+        "default": 160.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "Across the front; the name goes on this side.",
+        "min": 100,
+        "max": 250,
+        "step": 5,
+        "group": "Size"
+      },
+      "depth_mm": {
+        "type": "number",
+        "label": "Depth",
+        "default": 100.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "Front to back; never more than the width, and at least 90 mm with the phone slot.",
+        "min": 70,
+        "max": 140,
+        "step": 5,
+        "group": "Size"
+      },
+      "height_mm": {
+        "type": "number",
+        "label": "Height",
+        "default": 30.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "At least 28 mm with the phone slot.",
+        "min": 22,
+        "max": 45.0,
+        "step": 1,
+        "group": "Size"
+      },
+      "compartments": {
+        "type": "integer",
+        "label": "Compartments",
+        "default": 2,
+        "handle": false,
+        "unit": "count",
+        "description": "Dividers split the tray evenly from left to right.",
+        "min": 1,
+        "max": 3,
+        "step": 1,
+        "group": "Shape"
+      },
+      "phone_slot": {
+        "type": "boolean",
+        "label": "Phone slot",
+        "default": true,
+        "handle": false,
+        "description": "A groove in a ledge along the back wall; a phone stands in it and leans back. Needs a tray at least 90 mm deep and 28 mm tall.",
+        "group": "Details"
+      }
+    },
+    "anchors": [
+      {
+        "id": "front",
+        "label": "Front wall",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          145.0,
+          27.0
+        ],
+        "bleed_mm": 1.0,
+        "accepts": [
+          "emboss_text",
+          "motif"
+        ],
+        "max_relief_mm": 1.5
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 1.6,
+      "max_overhang_deg": 45,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "basic_white",
+      "terracotta_matte",
+      "terracotta_silk",
+      "polished_brass",
+      "sandalwood_silk",
+      "indigo_matte",
+      "petg_slate"
+    ],
+    "style_variants": [],
+    "features_supported": [
+      "emboss_text",
+      "motif"
+    ],
+    "hardware": [],
+    "min_feature_mm": 0.8
+  },
+  {
+    "id": "diya_holder",
+    "version": 1,
+    "family": "diya_holder",
+    "name": "Diya holder",
+    "description": "A holder for standard clay diyas: one cup, five cups on a plate, or a wide bowl for a floating candle and petals, in a heat-safe finish. A motif sits on the centre cup's flat rim.",
+    "environment": "teak_table_candlelight",
+    "params": {
+      "style": {
+        "type": "enum",
+        "label": "Style",
+        "default": "single",
+        "handle": false,
+        "description": "One cup, five cups (one in the middle, four around it) or one wide bowl for a floating candle.",
+        "options": [
+          "single",
+          "panch",
+          "float"
+        ],
+        "group": "Shape"
+      },
+      "size_mm": {
+        "type": "number",
+        "label": "Size",
+        "default": 100.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "Across the whole holder: any size for one cup or the bowl; five cups need 150–160 mm.",
+        "min": 85.0,
+        "max": 160.0,
+        "step": 5,
+        "group": "Size"
+      },
+      "wall_mm": {
+        "type": "number",
+        "label": "Wall",
+        "default": 2.4,
+        "handle": false,
+        "unit": "mm",
+        "description": "The cup wall at the mouth; it thickens toward the floor as the cup tapers.",
+        "min": 2.0,
+        "max": 3.0,
+        "step": 0.1,
+        "group": "Details"
+      }
+    },
+    "anchors": [
+      {
+        "id": "rim",
+        "label": "Rim",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          17.0,
+          11.0
+        ],
+        "bleed_mm": 0.5,
+        "accepts": [
+          "motif"
+        ],
+        "max_relief_mm": 1.5
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 1.6,
+      "max_overhang_deg": 45,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "petg_slate"
+    ],
+    "style_variants": [],
+    "features_supported": [
+      "motif"
+    ],
+    "hardware": [],
+    "min_feature_mm": 0.8
+  },
+  {
     "id": "drain_lid",
     "version": 1,
     "family": "drain_lid",
@@ -448,6 +1051,224 @@
       "clearance_mm": 0.5,
       "form": "lid"
     }
+  },
+  {
+    "id": "elephant_bookends",
+    "version": 1,
+    "family": "bookend",
+    "name": "Elephant bookend",
+    "description": "One elephant bookend: an upright elephant in profile on a base plate with a sand cavity underneath. Print a left and a right for a pair. A name or a motif sits on the elephant's outer flank.",
+    "environment": "teak_table_candlelight",
+    "params": {
+      "side": {
+        "type": "enum",
+        "label": "Side",
+        "default": "left",
+        "handle": false,
+        "description": "Left or right end of the row: the two are mirror images, so a pair is one of each.",
+        "options": [
+          "left",
+          "right"
+        ],
+        "group": "Shape"
+      },
+      "height_mm": {
+        "type": "number",
+        "label": "Height",
+        "default": 160.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "To the top of the elephant's head.",
+        "min": 120,
+        "max": 200,
+        "step": 5,
+        "group": "Size"
+      },
+      "depth_mm": {
+        "type": "number",
+        "label": "Base depth",
+        "default": 110.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "Front to back of the base plate; the books stand on the part behind the elephant.",
+        "min": 90,
+        "max": 130,
+        "step": 5,
+        "group": "Size"
+      },
+      "thickness_mm": {
+        "type": "number",
+        "label": "Thickness",
+        "default": 24.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "Of the upright elephant.",
+        "min": 20,
+        "max": 30,
+        "step": 1,
+        "group": "Details"
+      }
+    },
+    "anchors": [
+      {
+        "id": "face",
+        "label": "Elephant's flank",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          92.3,
+          71.4
+        ],
+        "bleed_mm": 0.5,
+        "accepts": [
+          "emboss_text",
+          "motif"
+        ],
+        "max_relief_mm": 1.5
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 1.6,
+      "max_overhang_deg": 45,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "basic_white",
+      "terracotta_matte",
+      "terracotta_silk",
+      "polished_brass",
+      "sandalwood_silk",
+      "indigo_matte",
+      "petg_slate"
+    ],
+    "style_variants": [],
+    "features_supported": [
+      "emboss_text",
+      "motif"
+    ],
+    "hardware": [],
+    "min_feature_mm": 0.8
+  },
+  {
+    "id": "fluted_planter",
+    "version": 1,
+    "family": "planter",
+    "name": "Gamla faceted planter",
+    "description": "A faceted pot with a flat rim and a catch reservoir built into its base: water drains through the inner floor and spills from a small spout at the front. Your name or a motif sits on the front facet or on the rim.",
+    "environment": "balcony_daylight",
+    "params": {
+      "width_mm": {
+        "type": "number",
+        "label": "Width",
+        "default": 110.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "Across the rim at its widest; the pot's longest side.",
+        "min": 80,
+        "max": 160,
+        "step": 5,
+        "group": "Size"
+      },
+      "height_mm": {
+        "type": "number",
+        "label": "Height",
+        "default": 100.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "Base to rim, lip included.",
+        "min": 70,
+        "max": 150,
+        "step": 5,
+        "group": "Size"
+      },
+      "facets": {
+        "type": "integer",
+        "label": "Facets",
+        "default": 10,
+        "handle": false,
+        "unit": "count",
+        "description": "Flat sides, an even number so one faces the front and carries the name.",
+        "min": 8,
+        "max": 12,
+        "step": 2,
+        "group": "Shape"
+      },
+      "wall_mm": {
+        "type": "number",
+        "label": "Wall",
+        "default": 2.4,
+        "handle": false,
+        "unit": "mm",
+        "description": "The pot's wall; a cut-in name needs 1.2 mm of it left behind.",
+        "min": 2.0,
+        "max": 3.0,
+        "step": 0.1,
+        "group": "Details"
+      }
+    },
+    "anchors": [
+      {
+        "id": "band",
+        "label": "Front facet",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          22.3,
+          50.1
+        ],
+        "bleed_mm": 1.0,
+        "accepts": [
+          "emboss_text",
+          "motif"
+        ],
+        "max_relief_mm": 1.5
+      },
+      {
+        "id": "rim",
+        "label": "Rim",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          31.0,
+          9.0
+        ],
+        "bleed_mm": 1.0,
+        "accepts": [
+          "emboss_text",
+          "motif"
+        ],
+        "max_relief_mm": 1.5
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 1.6,
+      "max_overhang_deg": 45,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "basic_white",
+      "terracotta_matte",
+      "terracotta_silk",
+      "polished_brass",
+      "sandalwood_silk",
+      "indigo_matte",
+      "petg_slate"
+    ],
+    "style_variants": [],
+    "features_supported": [
+      "emboss_text",
+      "motif"
+    ],
+    "hardware": [],
+    "min_feature_mm": 0.8
   },
   {
     "id": "fridge_magnet",
@@ -1498,6 +2319,316 @@
     "min_feature_mm": 0.8
   },
   {
+    "id": "lotus_lamp",
+    "version": 1,
+    "family": "table_lamp",
+    "name": "Deepak lotus lamp",
+    "description": "An eight-sided shade tapering like a closed lotus bud on a matching foot, printed as one piece in a heat-safe finish; a USB LED puck slides into the foot from below and glows up through the shade. Your name sits on the foot, a motif on the shade.",
+    "environment": "teak_table_candlelight",
+    "params": {
+      "height_mm": {
+        "type": "number",
+        "label": "Height",
+        "default": 200.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "Foot and shade together; the bed is 250 mm.",
+        "min": 150,
+        "max": 250,
+        "step": 5,
+        "group": "Size"
+      },
+      "foot_w_mm": {
+        "type": "number",
+        "label": "Foot",
+        "default": 115.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "Across the flats of the eight-sided foot.",
+        "min": 100,
+        "max": 130,
+        "step": 5,
+        "group": "Size"
+      },
+      "top_w_mm": {
+        "type": "number",
+        "label": "Top",
+        "default": 65.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "Across the flats at the shade's open top; smaller tapers more.",
+        "min": 50,
+        "max": 80,
+        "step": 5,
+        "group": "Shape"
+      }
+    },
+    "anchors": [
+      {
+        "id": "base_front",
+        "label": "Front of the foot",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          44.6,
+          21.0
+        ],
+        "bleed_mm": 1.0,
+        "accepts": [
+          "emboss_text",
+          "motif"
+        ],
+        "max_relief_mm": 1.5
+      },
+      {
+        "id": "shade_band",
+        "label": "Front of the shade",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          27.1,
+          88.9
+        ],
+        "bleed_mm": 1.0,
+        "accepts": [
+          "emboss_text",
+          "motif"
+        ],
+        "max_relief_mm": 1.0
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 1.6,
+      "max_overhang_deg": 45,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "petg_slate"
+    ],
+    "style_variants": [],
+    "features_supported": [
+      "emboss_text",
+      "motif"
+    ],
+    "hardware": [
+      {
+        "sku": "led_base_usb",
+        "qty": 1
+      }
+    ],
+    "min_feature_mm": 0.8
+  },
+  {
+    "id": "paisley_hook",
+    "version": 1,
+    "family": "wall_hook",
+    "name": "Khoonti wall hook",
+    "description": "A paisley, lotus or arrow plate with a stout peg that leans up so a bag strap stays on; rated 2 kg on the two wall anchors in the pack. Your motif sits on the plate above the peg.",
+    "environment": "studio",
+    "params": {
+      "shape": {
+        "type": "enum",
+        "label": "Shape",
+        "default": "paisley",
+        "handle": false,
+        "options": [
+          "paisley",
+          "lotus",
+          "arrow"
+        ],
+        "group": "Shape"
+      },
+      "height_mm": {
+        "type": "number",
+        "label": "Height",
+        "default": 90.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "Top to bottom of the plate.",
+        "min": 60,
+        "max": 120,
+        "step": 1,
+        "group": "Size"
+      },
+      "plate_mm": {
+        "type": "number",
+        "label": "Plate",
+        "default": 5.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "Thickness of the plate against the wall.",
+        "min": 4,
+        "max": 6,
+        "step": 0.5,
+        "group": "Size"
+      },
+      "peg_len_mm": {
+        "type": "number",
+        "label": "Peg reach",
+        "default": 28.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "How far the peg stands out from the plate.",
+        "min": 20,
+        "max": 35,
+        "step": 1,
+        "group": "Details"
+      },
+      "peg_d_mm": {
+        "type": "number",
+        "label": "Peg",
+        "default": 12.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "Across the peg.",
+        "min": 10,
+        "max": 14,
+        "step": 0.5,
+        "group": "Details"
+      }
+    },
+    "anchors": [
+      {
+        "id": "face",
+        "label": "Face",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          26.2,
+          20.0
+        ],
+        "bleed_mm": 0.5,
+        "accepts": [
+          "motif"
+        ],
+        "max_relief_mm": 1.5
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 1.6,
+      "max_overhang_deg": 45,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "basic_white",
+      "terracotta_matte",
+      "terracotta_silk",
+      "polished_brass",
+      "sandalwood_silk",
+      "indigo_matte",
+      "petg_slate"
+    ],
+    "style_variants": [],
+    "features_supported": [
+      "motif"
+    ],
+    "hardware": [
+      {
+        "sku": "nameplate_screws",
+        "qty": 1
+      }
+    ],
+    "min_feature_mm": 0.8
+  },
+  {
+    "id": "pendant_disc",
+    "version": 1,
+    "family": "pendant",
+    "name": "Jhumka pendant plate",
+    "description": "A small disc, teardrop or heart pendant with a loop on top for a jump ring. Your name, motif or a small photo sits in relief on the face; thread it on your own chain.",
+    "environment": "studio",
+    "params": {
+      "shape": {
+        "type": "enum",
+        "label": "Shape",
+        "default": "disc",
+        "handle": false,
+        "options": [
+          "disc",
+          "teardrop",
+          "heart"
+        ],
+        "group": "Shape"
+      },
+      "size_mm": {
+        "type": "number",
+        "label": "Size",
+        "default": 30.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "Longest side, bail included.",
+        "min": 20,
+        "max": 40,
+        "step": 1,
+        "group": "Size"
+      },
+      "thickness_mm": {
+        "type": "number",
+        "label": "Thickness",
+        "default": 3.0,
+        "handle": false,
+        "unit": "mm",
+        "min": 2.5,
+        "max": 3.5,
+        "step": 0.1,
+        "group": "Size"
+      }
+    },
+    "anchors": [
+      {
+        "id": "face",
+        "label": "Face",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          20.1,
+          15.2
+        ],
+        "bleed_mm": 0.8,
+        "accepts": [
+          "relief_image",
+          "emboss_text",
+          "motif"
+        ],
+        "max_relief_mm": 1.2
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 0.8,
+      "max_overhang_deg": 45,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "basic_white",
+      "terracotta_matte",
+      "terracotta_silk",
+      "polished_brass",
+      "sandalwood_silk",
+      "indigo_matte",
+      "petg_slate"
+    ],
+    "style_variants": [],
+    "features_supported": [
+      "relief_image",
+      "emboss_text",
+      "motif"
+    ],
+    "hardware": [],
+    "min_feature_mm": 0.8
+  },
+  {
     "id": "pet_tag",
     "version": 1,
     "family": "keychain",
@@ -1846,6 +2977,104 @@
     "min_feature_mm": 0.8
   },
   {
+    "id": "pin_badge",
+    "version": 1,
+    "family": "pin",
+    "name": "Billa pin badge",
+    "description": "A small badge with a tie-tack pin set into a pocket on its back and a butterfly clutch to hold it on a shirt or a bag. Your name, motif or photo sits in relief on the face.",
+    "environment": "studio",
+    "params": {
+      "shape": {
+        "type": "enum",
+        "label": "Shape",
+        "default": "disc",
+        "handle": false,
+        "options": [
+          "disc",
+          "shield",
+          "star",
+          "heart"
+        ],
+        "group": "Shape"
+      },
+      "size_mm": {
+        "type": "number",
+        "label": "Size",
+        "default": 30.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "Longest side.",
+        "min": 20,
+        "max": 40,
+        "step": 1,
+        "group": "Size"
+      },
+      "thickness_mm": {
+        "type": "number",
+        "label": "Thickness",
+        "default": 3.0,
+        "handle": false,
+        "unit": "mm",
+        "min": 3.0,
+        "max": 4.0,
+        "step": 0.1,
+        "group": "Size"
+      }
+    },
+    "anchors": [
+      {
+        "id": "face",
+        "label": "Face",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          22.1,
+          16.5
+        ],
+        "bleed_mm": 1.0,
+        "accepts": [
+          "relief_image",
+          "emboss_text",
+          "motif"
+        ],
+        "max_relief_mm": 1.2
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 0.8,
+      "max_overhang_deg": 55,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "basic_white",
+      "terracotta_matte",
+      "terracotta_silk",
+      "polished_brass",
+      "sandalwood_silk",
+      "indigo_matte",
+      "petg_slate"
+    ],
+    "style_variants": [
+      "comic_pop"
+    ],
+    "features_supported": [
+      "relief_image",
+      "emboss_text",
+      "motif"
+    ],
+    "hardware": [
+      {
+        "sku": "tie_tack_pin",
+        "qty": 1
+      }
+    ],
+    "min_feature_mm": 0.8
+  },
+  {
     "id": "planter_rim",
     "version": 1,
     "family": "planter_rim",
@@ -2051,6 +3280,91 @@
     "min_feature_mm": 0.8
   },
   {
+    "id": "pooja_shelf",
+    "version": 1,
+    "family": "pooja_accessory",
+    "name": "Aradhana pooja shelf",
+    "description": "A small wall shelf for a diya, a bell or an agarbatti holder: a back plate with two keyhole slots for your own screws, a braced shelf and a low lip so nothing slides off. Your name or a motif sits on the back plate above the shelf.",
+    "environment": "teak_table_candlelight",
+    "params": {
+      "width_mm": {
+        "type": "number",
+        "label": "Width",
+        "default": 150.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "Across the shelf; the name goes on the back plate along this side.",
+        "min": 80,
+        "max": 250,
+        "step": 5,
+        "group": "Size"
+      },
+      "depth_mm": {
+        "type": "number",
+        "label": "Depth",
+        "default": 70.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "How far the shelf stands out from the wall.",
+        "min": 50,
+        "max": 100,
+        "step": 5,
+        "group": "Size"
+      },
+      "lip": {
+        "type": "boolean",
+        "label": "Front lip",
+        "default": true,
+        "handle": false,
+        "description": "A low rail along the shelf's front edge so a diya cannot slide off.",
+        "group": "Details"
+      }
+    },
+    "anchors": [
+      {
+        "id": "face",
+        "label": "Back plate",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          147.0,
+          32.9
+        ],
+        "bleed_mm": 1.0,
+        "accepts": [
+          "motif",
+          "emboss_text"
+        ],
+        "max_relief_mm": 1.5
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 1.6,
+      "max_overhang_deg": 45,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "basic_white",
+      "terracotta_matte",
+      "terracotta_silk",
+      "polished_brass",
+      "sandalwood_silk",
+      "indigo_matte",
+      "petg_slate"
+    ],
+    "style_variants": [],
+    "features_supported": [
+      "motif",
+      "emboss_text"
+    ],
+    "hardware": [],
+    "min_feature_mm": 0.8
+  },
+  {
     "id": "raw_print",
     "version": 1,
     "family": "raw_print",
@@ -2095,6 +3409,99 @@
     "style_variants": [],
     "features_supported": [
       "hero_mesh"
+    ],
+    "hardware": [],
+    "min_feature_mm": 0.8
+  },
+  {
+    "id": "vent_mount",
+    "version": 1,
+    "family": "car_accessory",
+    "name": "Safar vent mount",
+    "description": "A phone cradle that clips onto a horizontal car-vent louvre: two sprung tongues on its back pinch the louvre and a small barb holds it, a lip with a cable gap takes the phone's weight and two short wings keep it from sliding. Your motif sits on the cradle's face, in a heat-safe finish.",
+    "environment": "dashboard",
+    "params": {
+      "cradle_w_mm": {
+        "type": "number",
+        "label": "Width",
+        "default": 70.0,
+        "handle": true,
+        "unit": "mm",
+        "description": "Across the cradle; a phone in a case is 70-80 mm wide.",
+        "min": 60,
+        "max": 80,
+        "step": 1,
+        "group": "Size"
+      },
+      "cradle_h_mm": {
+        "type": "number",
+        "label": "Height",
+        "default": 110.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "From the lip to the cradle's top edge.",
+        "min": 90,
+        "max": 130,
+        "step": 1,
+        "group": "Size"
+      },
+      "lip_h_mm": {
+        "type": "number",
+        "label": "Lip",
+        "default": 12.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "How tall the lip the phone stands on is.",
+        "min": 10,
+        "max": 15,
+        "step": 0.5,
+        "group": "Details"
+      },
+      "cable_gap_mm": {
+        "type": "number",
+        "label": "Cable gap",
+        "default": 20.0,
+        "handle": false,
+        "unit": "mm",
+        "description": "The opening in the middle of the lip for a charging cable.",
+        "min": 16,
+        "max": 26,
+        "step": 1,
+        "group": "Details"
+      }
+    },
+    "anchors": [
+      {
+        "id": "face",
+        "label": "Face",
+        "kind": "surface",
+        "projection": "planar",
+        "size_mm": [
+          62.2,
+          104.6
+        ],
+        "bleed_mm": 1.0,
+        "accepts": [
+          "motif"
+        ],
+        "max_relief_mm": 1.5
+      }
+    ],
+    "constraints": {
+      "min_wall_mm": 2.0,
+      "max_overhang_deg": 45,
+      "bed_mm": [
+        250,
+        250,
+        250
+      ]
+    },
+    "materials": [
+      "petg_slate"
+    ],
+    "style_variants": [],
+    "features_supported": [
+      "motif"
     ],
     "hardware": [],
     "min_feature_mm": 0.8

@@ -30,16 +30,19 @@ def test_templates_endpoints(client):
     assert resp.status_code == 200
     descriptors = resp.json()
     assert [d["id"] for d in descriptors] == [
-        "bottle_cap_cover", "dash_idol", "desk_nameplate", "drain_lid", "fridge_magnet", "hanging_ornament", "headphone_topper",
-        "hook_plaque", "jharokha_phone_stand", "keycap_mx", "keychain_tag", "lamp_shade_e27", "lithophane_plate", "pet_tag",
-        "photo_frame_std", "pillar_headphone_stand", "planter_rim", "plinth_round", "raw_print",
+        "ajrakh_coaster_set", "bookmark_plate", "bottle_cap_cover", "cake_topper_flat", "cookie_cutter", "dash_idol",
+        "desk_nameplate", "desk_tray", "diya_holder", "drain_lid", "elephant_bookends", "fluted_planter",
+        "fridge_magnet", "hanging_ornament", "headphone_topper", "hook_plaque", "jharokha_phone_stand", "keycap_mx",
+        "keychain_tag", "lamp_shade_e27", "lithophane_plate", "lotus_lamp", "paisley_hook", "pendant_disc", "pet_tag",
+        "photo_frame_std", "pillar_headphone_stand", "pin_badge", "planter_rim", "plinth_round", "pooja_shelf",
+        "raw_print", "vent_mount",
     ]
     for d in descriptors:
         validate("template-descriptor", d)
     assert client.get("/v1/templates/jharokha_phone_stand").json()["version"] == 1
     assert client.get("/v1/templates/jharokha_phone_stand@1").json()["id"] == "jharokha_phone_stand"
     assert client.get("/v1/templates/jharokha_phone_stand@9").status_code == 404
-    assert client.get("/v1/templates/lotus_lamp").status_code == 404
+    assert client.get("/v1/templates/kantha_nameplate").status_code == 404
 
 
 def test_build_endpoint_and_assets(client, generate_request):

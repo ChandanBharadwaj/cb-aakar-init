@@ -24,8 +24,8 @@
       "compensation": { "process": "petg", "xy_hole_comp_mm": 0.25, "xy_outer_comp_mm": -0.15, "elephant_foot_mm": 0.35, "shrink_pct": 0.6, "max_strain_pct": 3.0, "creep_class": "medium", "connector_min_wall_mm": 1.6 } }
   ],
   "pricing_policy": {
-    "$comment": "PLAN §7.10. Placeholders reproducing the Checkout board: ₹389 material + ₹740 print time + ₹120 finishing = ₹1,249. Revisit monthly against measured costs. hardware_markup_pct (on bought-in parts) and the per-outcome family_rules (minimum subtotals, the raw-print setup fee) are placeholders too, to be replaced once real hardware quotes and studio labour times are measured; seeded by services/api Flyway V9 (2026-10-carriers), V14 (2026-10-keepsakes, the Roshni night light and Pratima plinth minimums) and V16 (2026-11-jod: the base markup, labour rate, base packaging fee, weight-tiered shipping and the hybrid families' assembly fees and minimums; docs/research/hybrid-products §3.3) as the active policy version.",
-    "version": "2026-11-jod",
+    "$comment": "PLAN §7.10. Placeholders reproducing the Checkout board: ₹389 material + ₹740 print time + ₹120 finishing = ₹1,249. Revisit monthly against measured costs. hardware_markup_pct (on bought-in parts) and the per-outcome family_rules (minimum subtotals, the raw-print setup fee) are placeholders too, to be replaced once real hardware quotes and studio labour times are measured; seeded by services/api Flyway V9 (2026-10-carriers), V14 (2026-10-keepsakes, the Roshni night light and Pratima plinth minimums) and V16 (2026-11-jod: the base markup, labour rate, base packaging fee, weight-tiered shipping and the hybrid families' assembly fees and minimums; docs/research/hybrid-products §3.3) and V17 (2026-11-catalogue: a minimum per family of the second catalogue wave) as the active policy version.",
+    "version": "2026-11-catalogue",
     "machine_rate_paise_per_hour": 20000,
     "finishing_fee_paise": { "matte": 8000, "silk": 12000 },
     "packaging_fee_paise": 0,
@@ -58,7 +58,21 @@
       "dash_idol": { "minimum_subtotal_paise": 29900, "assembly_fee_paise": 2900 },
       "drain_lid": { "minimum_subtotal_paise": 19900, "assembly_fee_paise": 1900 },
       "bottle_cap_cover": { "minimum_subtotal_paise": 19900 },
-      "planter_rim": { "minimum_subtotal_paise": 24900 }
+      "planter_rim": { "minimum_subtotal_paise": 24900 },
+      "pendant": { "minimum_subtotal_paise": 19900 },
+      "cake_topper": { "minimum_subtotal_paise": 29900 },
+      "cookie_cutter": { "minimum_subtotal_paise": 24900 },
+      "coaster": { "minimum_subtotal_paise": 29900 },
+      "pin": { "minimum_subtotal_paise": 19900 },
+      "bookmark": { "minimum_subtotal_paise": 19900 },
+      "planter": { "minimum_subtotal_paise": 69900 },
+      "bookend": { "minimum_subtotal_paise": 89900 },
+      "table_lamp": { "minimum_subtotal_paise": 99900 },
+      "diya_holder": { "minimum_subtotal_paise": 39900 },
+      "pooja_accessory": { "minimum_subtotal_paise": 59900 },
+      "wall_hook": { "minimum_subtotal_paise": 34900 },
+      "desk_organizer": { "minimum_subtotal_paise": 59900 },
+      "car_accessory": { "minimum_subtotal_paise": 39900 }
     }
   }
 }

@@ -32,6 +32,7 @@ def name(anchor: str, text: str = "Asha", **extra) -> dict:
 
 
 def buti(anchor: str, motif_id: str = "lotus", **extra) -> dict:
+    """A motif; without ``mode`` the contract default applies, which is deboss (cut in), so a raised one says ``mode="emboss"``."""
     return {"type": "motif", "motif_id": motif_id, "anchor": anchor, **extra}
 
 
@@ -44,7 +45,7 @@ SPEC: dict[str, dict] = {
         features=["relief_image", "emboss_text", "motif"], accepts={"face": ["relief_image", "emboss_text", "motif"]},
         hardware=[], material="basic_white",
         primary=[name("face", "Asha", depth_mm=0.8)],
-        content=[(name("face", "Asha", depth_mm=0.8), +1), (relief("face", "deboss", 0.5), -1), (buti("face", "paisley", depth_mm=0.6), +1)],
+        content=[(name("face", "Asha", depth_mm=0.8), +1), (relief("face", "deboss", 0.5), -1), (buti("face", "paisley", mode="emboss", depth_mm=0.6), +1)],
     ),
     "cake_topper_flat": dict(
         module="cake_topper_flat", cls="CakeTopperFlat", family="cake_topper",
@@ -64,30 +65,30 @@ SPEC: dict[str, dict] = {
         module="ajrakh_coaster_set", cls="AjrakhCoasterSet", family="coaster",
         features=["motif", "emboss_text"], accepts={"face": ["motif", "emboss_text"]},
         hardware=[], material="petg_slate",
-        primary=[buti("face", "paisley", depth_mm=0.8)],
-        content=[(buti("face", "paisley", depth_mm=0.8), +1), (name("face", "AR", mode="deboss", depth_mm=0.8), -1)],
+        primary=[buti("face", "paisley", mode="emboss", depth_mm=0.8)],
+        content=[(buti("face", "paisley", mode="emboss", depth_mm=0.8), +1), (name("face", "AR", mode="deboss", depth_mm=0.8), -1)],
     ),
     "pin_badge": dict(
         module="pin_badge", cls="PinBadge", family="pin",
         features=["relief_image", "emboss_text", "motif"], accepts={"face": ["relief_image", "emboss_text", "motif"]},
         hardware=[{"sku": "tie_tack_pin", "qty": 1}], material="basic_white",
         primary=[name("face", "Ravi", depth_mm=0.8)],
-        content=[(name("face", "Ravi", depth_mm=0.8), +1), (relief("face", "deboss", 0.5), -1), (buti("face", "lotus", depth_mm=0.6), +1)],
+        content=[(name("face", "Ravi", depth_mm=0.8), +1), (relief("face", "deboss", 0.5), -1), (buti("face", "lotus", mode="emboss", depth_mm=0.6), +1)],
     ),
     "bookmark_plate": dict(
         module="bookmark_plate", cls="BookmarkPlate", family="bookmark",
         features=["relief_image", "emboss_text", "motif"], accepts={"face": ["relief_image", "emboss_text", "motif"]},
         hardware=[], material="basic_white",
         primary=[name("face", "Asha reads", depth_mm=0.8)],
-        content=[(relief("face"), +1), (name("face", "Asha reads", mode="deboss", depth_mm=0.6), -1), (buti("face", "jaali_lattice", depth_mm=0.6), +1)],
+        content=[(relief("face"), +1), (name("face", "Asha reads", mode="deboss", depth_mm=0.6), -1), (buti("face", "jaali_lattice", mode="emboss", depth_mm=0.6), +1)],
     ),
     # ---- objects (kind object): a useful thing whose surfaces take a name or a motif
     "fluted_planter": dict(
         module="fluted_planter", cls="FlutedPlanter", family="planter",
         features=["emboss_text", "motif"], accepts={"band": ["emboss_text", "motif"], "rim": ["emboss_text", "motif"]},
         hardware=[], material="basic_white",
-        primary=[name("band", "Tulsi", depth_mm=1.0), buti("rim", "lotus", depth_mm=0.6)],
-        content=[(name("band", "Tulsi", depth_mm=1.0), +1), (buti("band", "lotus", mode="deboss", depth_mm=0.6), -1), (buti("rim", "lotus", depth_mm=0.6), +1)],
+        primary=[name("band", "Tulsi", depth_mm=1.0), buti("rim", "lotus", mode="emboss", depth_mm=0.6)],
+        content=[(name("band", "Tulsi", depth_mm=1.0), +1), (buti("band", "lotus", mode="deboss", depth_mm=0.6), -1), (buti("rim", "lotus", mode="emboss", depth_mm=0.6), +1)],
     ),
     "elephant_bookends": dict(
         module="elephant_bookends", cls="ElephantBookends", family="bookend",
@@ -100,15 +101,15 @@ SPEC: dict[str, dict] = {
         module="lotus_lamp", cls="LotusLamp", family="table_lamp",
         features=["emboss_text", "motif"], accepts={"base_front": ["emboss_text", "motif"], "shade_band": ["emboss_text", "motif"]},
         hardware=[{"sku": "led_base_usb", "qty": 1}], material="petg_slate",
-        primary=[buti("shade_band", "lotus", depth_mm=0.8), name("base_front", "Deepak", depth_mm=0.8)],
-        content=[(buti("shade_band", "lotus", depth_mm=0.8), +1), (name("shade_band", "Deepak", mode="deboss", depth_mm=0.6), -1), (name("base_front", "Deepak", depth_mm=0.8), +1)],
+        primary=[buti("shade_band", "lotus", mode="emboss", depth_mm=0.8), name("base_front", "Deepak", depth_mm=0.8)],
+        content=[(buti("shade_band", "lotus", mode="emboss", depth_mm=0.8), +1), (name("shade_band", "Deepak", mode="deboss", depth_mm=0.6), -1), (name("base_front", "Deepak", depth_mm=0.8), +1)],
     ),
     "diya_holder": dict(
         module="diya_holder", cls="DiyaHolder", family="diya_holder",
         features=["motif"], accepts={"rim": ["motif"]},
         hardware=[], material="petg_slate",
-        primary=[buti("rim", "star_rangoli", depth_mm=0.8)],
-        content=[(buti("rim", "star_rangoli", depth_mm=0.8), +1), (buti("rim", "lotus", mode="deboss", depth_mm=0.6), -1)],
+        primary=[buti("rim", "star_rangoli", mode="emboss", depth_mm=0.8)],
+        content=[(buti("rim", "star_rangoli", mode="emboss", depth_mm=0.8), +1), (buti("rim", "lotus", mode="deboss", depth_mm=0.6), -1)],
     ),
     "pooja_shelf": dict(
         module="pooja_shelf", cls="PoojaShelf", family="pooja_accessory",
@@ -121,8 +122,8 @@ SPEC: dict[str, dict] = {
         module="paisley_hook", cls="PaisleyHook", family="wall_hook",
         features=["motif"], accepts={"face": ["motif"]},
         hardware=[{"sku": "nameplate_screws", "qty": 1}], material="basic_white",
-        primary=[buti("face", "paisley", depth_mm=0.8)],
-        content=[(buti("face", "paisley", depth_mm=0.8), +1), (buti("face", "lotus", mode="deboss", depth_mm=0.6), -1)],
+        primary=[buti("face", "paisley", mode="emboss", depth_mm=0.8)],
+        content=[(buti("face", "paisley", mode="emboss", depth_mm=0.8), +1), (buti("face", "lotus", mode="deboss", depth_mm=0.6), -1)],
     ),
     "desk_tray": dict(
         module="desk_tray", cls="DeskTray", family="desk_organizer",
@@ -135,8 +136,8 @@ SPEC: dict[str, dict] = {
         module="vent_mount", cls="VentMount", family="car_accessory",
         features=["motif"], accepts={"face": ["motif"]},
         hardware=[], material="petg_slate",
-        primary=[buti("face", "lotus", depth_mm=0.8)],
-        content=[(buti("face", "lotus", depth_mm=0.8), +1), (buti("face", "paisley", mode="deboss", depth_mm=0.6), -1)],
+        primary=[buti("face", "lotus", mode="emboss", depth_mm=0.8)],
+        content=[(buti("face", "lotus", mode="emboss", depth_mm=0.8), +1), (buti("face", "paisley", mode="deboss", depth_mm=0.6), -1)],
     ),
 }
 

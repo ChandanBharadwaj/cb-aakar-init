@@ -17,15 +17,22 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 import studio.aakar.api.support.AbstractIntegrationTest;
 import studio.aakar.api.support.Contracts;
 import studio.aakar.api.support.GeometryStub;
 
 /** The Phase 0 vertical slice against Postgres with the geometry service stubbed by WireMock. */
 class DesignFlowIntegrationTest extends AbstractIntegrationTest {
+
+    static final String OWNER_LOGIN = "{\"email\": \"studio@aakar.local\", \"password\": \"aakar-studio\"}";
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     private static final Pattern SSE_ID = Pattern.compile("^id:\\s*(\\d+)$", Pattern.MULTILINE);
     private static final Pattern SSE_DATA = Pattern.compile("^data:\\s*(\\{.*})$", Pattern.MULTILINE);
@@ -67,12 +74,19 @@ class DesignFlowIntegrationTest extends AbstractIntegrationTest {
     void templatesComeFromTheGeometryService() {
         JsonNode all = body(get("/api/templates"));
         // the stub publishes the Jharokha stand, the four planar carriers, the raw-print template, the five PR 8 keepsakes, the pillar
-        // headphone stand and the seven Jod templates (fixtures/templates.json order)
-        assertThat(all).extracting(d -> d.get("id").asText()).containsExactly("bottle_cap_cover", "dash_idol", "desk_nameplate", "drain_lid",
-                "fridge_magnet", "hanging_ornament", "headphone_topper", "hook_plaque", "jharokha_phone_stand", "keycap_mx", "keychain_tag",
-                "lamp_shade_e27", "lithophane_plate", "pet_tag", "photo_frame_std", "pillar_headphone_stand", "planter_rim", "plinth_round",
-                "raw_print");
-        JsonNode d = all.get(8); // jharokha_phone_stand
+        // headphone stand, the seven Jod templates and the fourteen of the second catalogue wave (fixtures/templates.json order)
+        assertThat(all).extracting(d -> d.get("id").asText()).containsExactly("ajrakh_coaster_set", "bookmark_plate", "bottle_cap_cover",
+                "cake_topper_flat", "cookie_cutter", "dash_idol", "desk_nameplate", "desk_tray", "diya_holder", "drain_lid", "elephant_bookends",
+                "fluted_planter", "fridge_magnet", "hanging_ornament", "headphone_topper", "hook_plaque", "jharokha_phone_stand", "keycap_mx",
+                "keychain_tag", "lamp_shade_e27", "lithophane_plate", "lotus_lamp", "paisley_hook", "pendant_disc", "pet_tag", "photo_frame_std",
+                "pillar_headphone_stand", "pin_badge", "planter_rim", "plinth_round", "pooja_shelf", "raw_print", "vent_mount");
+        JsonNode d = null;
+        for (JsonNode t : all) {
+            if (t.get("id").asText().equals("jharokha_phone_stand")) {
+                d = t;
+            }
+        }
+        assertThat(d).as("jharokha_phone_stand in /api/templates").isNotNull();
         assertThat(d.get("params").get("width_mm").get("default").asInt()).isEqualTo(92);
         assertThat(d.get("anchors")).hasSize(3);
         assertThat(d.get("constraints").get("bed_mm")).hasSize(3);
@@ -232,9 +246,21 @@ class DesignFlowIntegrationTest extends AbstractIntegrationTest {
         assertProblem(post("/api/designs", "{\"source\": \"shop\"}"), HttpStatus.BAD_REQUEST, "validation_failed");
         assertProblem(post("/api/designs", "{\"source\": \"remix\"}"), HttpStatus.BAD_REQUEST, "validation_failed");
         assertProblem(post("/api/designs", "{\"source\": \"shop\", \"catalog_item_slug\": \"nope\"}"), HttpStatus.NOT_FOUND, "not_found");
-        assertProblem(post("/api/designs", "{\"source\": \"shop\", \"catalog_item_slug\": \"ajrakh-coasters\"}"),
-                HttpStatus.UNPROCESSABLE_ENTITY, "template_not_available");
-        assertProblem(post("/api/designs", "{\"source\": \"remix\", \"template_id\": \"lotus_lamp\"}"), HttpStatus.NOT_FOUND, "not_found");
+        // every seeded Shop piece is on sale since V17, so a Coming soon piece is made for the check
+        String comingSoon = "test-coming-soon-" + UUID.randomUUID().toString().substring(0, 8);
+        try {
+            ResponseEntity<String> created = post("/admin/api/catalog/items", """
+                    {"slug": "%s", "name": "Test coming soon", "category": "desk_tech", "description": "A test item.",
+                     "template_id": "jharokha_phone_stand", "default_params": {}, "default_material": "basic_white", "base_price_paise": 9900,
+                     "specs_line": "test", "environment": "studio", "available": false, "media": []}
+                    """.formatted(comingSoon), bearer(body(post("/admin/api/auth/login", OWNER_LOGIN)).get("access_token").asText()));
+            assertThat(created.getStatusCode()).as(created.getBody()).isEqualTo(HttpStatus.CREATED);
+            assertProblem(post("/api/designs", "{\"source\": \"shop\", \"catalog_item_slug\": \"" + comingSoon + "\"}"),
+                    HttpStatus.UNPROCESSABLE_ENTITY, "template_not_available");
+        } finally {
+            jdbc.update("delete from catalog_items where slug = ?", comingSoon);
+        }
+        assertProblem(post("/api/designs", "{\"source\": \"remix\", \"template_id\": \"kantha_nameplate\"}"), HttpStatus.NOT_FOUND, "not_found");
         assertProblem(post("/api/designs", "{\"source\": \"remix\", \"template_id\": \"jharokha_phone_stand\", \"material\": \"gold_leaf\"}"),
                 HttpStatus.UNPROCESSABLE_ENTITY, "unknown_material");
         assertProblem(post("/api/designs", "{\"source\": \"remix\", \"template_id\": \"jharokha_phone_stand\", \"params\": {\"tilt_deg\": 90}}"),

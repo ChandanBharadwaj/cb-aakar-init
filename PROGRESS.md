@@ -4,7 +4,7 @@ Living status of the plan in [PLAN.md](PLAN.md). Update this file with every mer
 
 | | |
 |---|---|
-| Last updated | 2026-10-31 (the Jod branch is on `main`; `V16` brings the seed level with the tokens with the hybrid families switched off; every suite green on Linux and Windows; CI pnpm pin fixed) |
+| Last updated | 2026-11-01 (the second catalogue wave: fourteen new templates, `V17` opens them; real slicing with PrusaSlicer; `make smoke-catalogue` walks a design to G-code; the hybrid families stay off) |
 | Current phase | **Phase 1** — the loop is complete locally (ADR-0013); outcome categories (Avatars) + Swaroop done; **hybrid products (Jod)** in progress per `docs/research/hybrid-products/implementation-plan.md`: geometry through Phase 4, API Phase 2 not started |
 | Completed | Phase 0 — Foundations |
 | Roadmap position | ~2 of 28 scheduled weeks (5 phases; 1 done) |
@@ -81,10 +81,10 @@ Order of work agreed on 27 Sep 2026: finish the customer loop with mocks, featur
 Grouped by workstream (PLAN §15). Tick items as they merge.
 
 **Geometry and inspect**
-- [ ] Eleven remaining templates: headphone stand, planter, coaster set, nameplate, bookend, table lamp, diya holder, pooja accessory, wall hook, desk organizer, car accessory
+- [x] Remaining templates: headphone stand, planter, coaster, nameplate, bookend, table lamp, diya holder, pooja shelf, wall hook, desk tray, vent mount, plus pendant, cake topper, cookie cutter, pin badge and bookmark (2026-11-01, `V17`)
 - [ ] Text embossing: HarfBuzz shaping, Noto fonts for all seven scripts (ADR-0003), planar + cylindrical projection, minimum stroke rule
 - [ ] Golden-image tests per script; native-speaker review sign-off
-- [ ] PrusaSlicer installed on dev and CI; `AAKAR_SLICER_BIN` replaces the heuristic
+- [ ] PrusaSlicer on CI; `AAKAR_SLICER_BIN` replaces the heuristic (installed and verified on dev, 2026-11-01; CI still estimates heuristically)
 - [ ] Material calibration photos for the six finishes
 
 **API**
@@ -171,13 +171,14 @@ Plan: [`docs/research/hybrid-products/implementation-plan.md`](docs/research/hyb
 | Suite | Count | Last run |
 |---|---|---|
 | `services/inspect` pytest | 20 passed, 1 skipped (the PrusaSlicer fake binary is Unix-only; 21 on Linux) | 2026-10-31 (Windows 11) |
-| `services/geometry` pytest | 675 passed | 2026-10-31 (Windows 11, plain `pytest`: file URLs, paths and encodings are platform-neutral now) |
-| `services/api` Gradle build | 224 tests: 223 passed, 1 skipped (symbolic links need a privilege on Windows; 224 on Linux) | 2026-10-31 (Docker Postgres 16 on 5440) |
-| Avatar order smoke, live (`make smoke-avatars`: photo keychain + Swaroop raw print → cart → OTP → checkout → mock pay → print pack) | passed | 2026-10-31 |
-| Katha and keepsakes smoke, live (`make smoke-katha`: hero names refused, look-alikes allowed, hero-named upload held for review, comic Katha keychain, night light, plinth, photo frame still off) | passed | 2026-10-31 |
+| `services/geometry` pytest | 1,363 passed (the shared catalogue acceptance run builds every parameter corner of the fourteen new templates) | 2026-11-01 (Windows 11) |
+| `services/api` Gradle build | 224 tests: 223 passed, 1 skipped (symbolic links need a privilege on Windows; 224 on Linux) | 2026-11-01 (Docker Postgres 16 on 5440, `V17`) |
+| Catalogue smoke, live (`make smoke-catalogue` with `AAKAR_SLICER_BIN`: fourteen new Avatars designed, printable, sliced by PrusaSlicer and priced at or above their minimums → Shop coasters → cart → OTP → checkout → mock pay → print pack → each packed model sliced to G-code) | passed | 2026-11-01 |
+| Avatar order smoke, live (`make smoke-avatars`: photo keychain + Swaroop raw print → cart → OTP → checkout → mock pay → print pack) | passed | 2026-11-01 |
+| Katha and keepsakes smoke, live (`make smoke-katha`: hero names refused, look-alikes allowed, hero-named upload held for review, comic Katha keychain, night light, plinth, photo frame still off) | passed | 2026-11-01 |
 | `/duniya/katha` and a comic design's studio in Chromium against the live API (rooftop backdrop, toon shading, ink outline) | passed, no page errors | 2026-10-03 |
-| `apps/web` typecheck · lint · build · `gen:api` drift | clean | 2026-10-31 |
-| `apps/admin` typecheck · lint · build · `gen:api` drift | clean | 2026-10-31 |
+| `apps/web` typecheck · lint · build · `gen:api` drift | clean | 2026-11-01 |
+| `apps/admin` typecheck · lint · build · `gen:api` drift | clean | 2026-11-01 |
 | `/duniya/ghar`, `/duniya/safar` and the Shop against the live API after `V16` (Jod avatars hidden, Pillar stand orderable) | passed, no page errors | 2026-10-31 |
 | Jod Phase 1 smoke (CLI): `headphone-topper.spec.json` builds watertight with `connector_fit` warn "fit test pending"; a 60 mm `longest` form is refused with the saddle sentence; a contained form fuses; the coupon CLI wrote 18 coupons, wall 1.4 mm fails `connector_fit` (coupons come from `POST /v1/coupons` since the Kadi-D/T/M/C commit); descriptors and the API fixture carry no drift | passed | 2026-10-04 |
 | End-to-end slice (live services) | passed | 2026-09-26 |

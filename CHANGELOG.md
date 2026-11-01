@@ -4,6 +4,15 @@ All notable changes to Aakar. Format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added — the second catalogue wave: fourteen new Avatars, real slicing, a live walk to G-code
+- Fourteen parametric templates, one for each family that had a seed row and no template: Jhumka pendant plate (`pendant_disc`), Mithai cake topper (`cake_topper_flat`), Saancha cookie cutter-stamp (`cookie_cutter`), Aasan coaster (`ajrakh_coaster_set`), Billa pin badge (`pin_badge`, packs the new `tie_tack_pin`), Nishaan bookmark (`bookmark_plate`), Gamla faceted planter with a catch reservoir (`fluted_planter`), Kitaab elephant bookend (`elephant_bookends`), Deepak lotus lamp over the USB LED puck (`lotus_lamp`), Diya holder (`diya_holder`), Aradhana pooja shelf (`pooja_shelf`), Khoonti paisley hook (`paisley_hook`), Tarteeb desk tray (`desk_tray`) and Safar vent mount (`vent_mount`). Each passes one shared acceptance run, `tests/test_catalogue_templates.py`, plus its own geometry tests.
+- `V17` opens the fourteen families, adds the tie-tack pin, puts the five curated Shop pieces on sale with parameters their templates have, adds the new Avatars to every Duniya and activates pricing policy `2026-11-catalogue` with a placeholder minimum per new family. The tokens, `application.yml`, the geometry built-in rows, the descriptor export and the API fixture match.
+- Real print estimates: with `AAKAR_SLICER_BIN` pointing at PrusaSlicer (2.9.6 tested; `winget install Prusa3D.PrusaSlicer` on Windows) the geometry process slices every design, and `print_estimate.method` reads `prusaslicer_cli`.
+- `make smoke-catalogue`: designs all fourteen live, checks printability, the slicer estimate and the minimum price, orders a planter, a pin and four Shop coasters through the mock OTP and payment, downloads the print pack and slices each packed model to G-code.
+
+### Fixed
+- `/create` no longer lists templates of switched-off families under "start from a template"; the API refuses them anyway (422 `family_not_available`).
+
 ### Changed — the Jod branch lands on `main`; the seed catches up with the tokens
 - `ccr-2ba8e715-ihp5b0` fast-forwarded into `main` (four commits: the research and plan, Phase 1, the contracts and seeds, the Kadi-D/T/M/C modules and seven templates).
 - **`V16`**: the utility shelf, the four Kadi hardware items (dovetail rail, VHB pad, steel disc, brass insert), PETG Slate, the six remaining hybrid families, Ghar and Safar with every Duniya's avatar list, and the `2026-11-jod` pricing policy (base markup, labour rate, base packaging fee, weight tiers and the hybrid minimums, derived from the active policy as `V14` did). The seven Jod families are seeded **switched off** — `families.json` says so too — because the API does not yet resolve a base or price its base and assembly lines (Phase 2); the fully printed Pillar headphone stand is switched on now that `pillar_headphone_stand@1` builds.
